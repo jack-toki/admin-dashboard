@@ -11,8 +11,7 @@ function windowFor(period) {
     return { from: new Date(Date.UTC(y, m, d)), to: now };
   }
   if (period === 'this-week') {
-    // Monday 00:00 UTC to now
-    const day = now.getUTCDay(); // 0=Sun,1=Mon...
+    const day = now.getUTCDay();
     const daysToMon = (day === 0) ? 6 : day - 1;
     const mon = new Date(Date.UTC(y, m, d - daysToMon));
     return { from: mon, to: now };
@@ -26,10 +25,9 @@ function windowFor(period) {
   if (period === 'all-time') {
     return { from: new Date(Date.UTC(2000, 0, 1)), to: now };
   }
-  return { from: new Date(Date.UTC(y, m, 1)), to: now }; // this-month (default)
+  return { from: new Date(Date.UTC(y, m, 1)), to: now };
 }
 
-// naive 60s cache of the profiles sheet so we don't refetch on every load
 let sheetCache = { text: '', at: 0 };
 async function getSheet() {
   const url = process.env.SHEET_CSV_URL;
@@ -46,8 +44,6 @@ async function getSheet() {
 export async function GET(req) {
   const period = new URL(req.url).searchParams.get('period') || 'this-month';
   const { from, to } = windowFor(period);
-
-  // page through Supabase in case there are many rows
   const rows = [];
   const pageSize = 1000;
   for (let offset = 0; ; offset += pageSize) {
@@ -62,7 +58,6 @@ export async function GET(req) {
     rows.push(...data);
     if (data.length < pageSize) break;
   }
-
   const sheet = await getSheet();
   const dashboard = buildDashboard(rows, sheet, { period, from: from.toISOString(), to: to.toISOString() });
   return Response.json(dashboard);
