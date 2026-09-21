@@ -6,7 +6,10 @@ export const dynamic = 'force-dynamic';
 
 function windowFor(period) {
   const now = new Date();
-  const y = now.getUTCFullYear(), m = now.getUTCMonth();
+  const y = now.getUTCFullYear(), m = now.getUTCMonth(), d = now.getUTCDate();
+  if (period === 'today') {
+    return { from: new Date(Date.UTC(y, m, d)), to: now };
+  }
   if (period === 'last-month') {
     return { from: new Date(Date.UTC(y, m - 1, 1)), to: new Date(Date.UTC(y, m, 1)) };
   }

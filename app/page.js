@@ -31,7 +31,7 @@ const COLS = [
   { key: 'leads', label: 'Leads', kind: 'num' },
   { key: 'adminTasks', label: 'Auto-Admin', kind: 'num' },
 ];
-const PERIODS = [['This month', 'this-month'], ['Last month', 'last-month'], ['90 days', '90-days'], ['All time', 'all-time']];
+const PERIODS = [['Today', 'today'], ['This month', 'this-month'], ['Last month', 'last-month'], ['90 days', '90-days'], ['All time', 'all-time']];
 
 function Spark({ data, color }) {
   if (!data || data.length < 2) return <span style={{ color }}>—</span>;
