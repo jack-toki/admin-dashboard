@@ -10,6 +10,13 @@ function windowFor(period) {
   if (period === 'today') {
     return { from: new Date(Date.UTC(y, m, d)), to: now };
   }
+  if (period === 'this-week') {
+    // Monday 00:00 UTC to now
+    const day = now.getUTCDay(); // 0=Sun,1=Mon...
+    const daysToMon = (day === 0) ? 6 : day - 1;
+    const mon = new Date(Date.UTC(y, m, d - daysToMon));
+    return { from: mon, to: now };
+  }
   if (period === 'last-month') {
     return { from: new Date(Date.UTC(y, m - 1, 1)), to: new Date(Date.UTC(y, m, 1)) };
   }
