@@ -109,7 +109,7 @@ export default function Page() {
   const tiles = T ? [
     { label: 'Client accounts', value: T.clientAccounts, accent: true },
     { label: 'Automations live', value: T.automationsLive },
-    { label: 'Runs this month', value: fmt(T.runs) },
+    { label: period === 'today' ? 'Runs today' : period === 'this-week' ? 'Runs this week' : period === 'last-month' ? 'Runs last month' : period === '90-days' ? 'Runs (90 days)' : period === 'all-time' ? 'Runs all time' : 'Runs this month', value: fmt(T.runs) },
     { label: 'Est. time saved', value: T.estHoursSaved, suffix: 'hrs' },
     { label: 'Est. value saved', value: `£${fmt(T.estValueSaved)}` },
     { label: 'Auto-Admin tasks', value: fmt(T.adminTasks) },
