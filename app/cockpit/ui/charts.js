@@ -291,6 +291,7 @@ export function YearColumns({ name, months, selectedId, onOpen, format }) {
   const shownLines = (active?.lines || []).filter((line) => visible.has(line.type) || (line.type === 'unallocated' && visible.has('unallocated')));
 
   return (
+    <div className="chart-block">
     <figure className="finance-plot" data-chart={name}>
       <figcaption>
         <strong>{name}</strong>
@@ -340,17 +341,18 @@ export function YearColumns({ name, months, selectedId, onOpen, format }) {
           ))}
         </div>
       </div>
-      <div className="chart-readout" role="status">
-        <p>{active ? `${active.label} · Income ${moneyText(active.total, format)} · Actual ${moneyText(active.actual, format)}` : 'Select a month'}</p>
-        {shownLines.length > 0 && (
-          <ul>
-            {shownLines.map((line) => (
-              <li key={`${line.type}-${line.name}`} data-income-line={line.name}>{linePhrase(line, format)}</li>
-            ))}
-          </ul>
-        )}
-      </div>
     </figure>
+    <div className="chart-breakdown" role="status" aria-live="polite">
+      <p>{active ? `${active.label} · Income ${moneyText(active.total, format)} · Actual ${moneyText(active.actual, format)}` : 'Select a month'}</p>
+      {shownLines.length > 0 && (
+        <ul>
+          {shownLines.map((line) => (
+            <li key={`${line.type}-${line.name}`} data-income-line={line.name}>{linePhrase(line, format)}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+    </div>
   );
 }
 
@@ -365,6 +367,7 @@ export function HorizontalBars({ name, points, series, format }) {
   const max = Math.max(1, ...nums.map((value) => Math.abs(value)), ...segmentNums.filter((value) => value != null && Number.isFinite(value)).map((value) => Math.abs(value)));
 
   return (
+    <div className="chart-block">
     <figure className="finance-plot" data-chart={name}>
       <figcaption>
         <strong>{name}</strong>
@@ -409,17 +412,18 @@ export function HorizontalBars({ name, points, series, format }) {
           </div>
         ))}
       </div>
-      <div className="chart-readout" role="status">
-        <p>{active ? `${active.label} · ${visible.map((item) => `${item.label} ${moneyText(item.values.find((entry) => entry.id === active.id)?.value, format)}`).join(' · ')}` : name}</p>
-        {active?.lines?.length > 0 && (
-          <ul>
-            {active.lines.map((line) => (
-              <li key={`${line.type}-${line.name}`} data-income-line={line.name}>{linePhrase(line, format)}</li>
-            ))}
-          </ul>
-        )}
-      </div>
     </figure>
+    <div className="chart-breakdown" role="status" aria-live="polite">
+      <p>{active ? `${active.label} · ${visible.map((item) => `${item.label} ${moneyText(item.values.find((entry) => entry.id === active.id)?.value, format)}`).join(' · ')}` : name}</p>
+      {active?.lines?.length > 0 && (
+        <ul>
+          {active.lines.map((line) => (
+            <li key={`${line.type}-${line.name}`} data-income-line={line.name}>{linePhrase(line, format)}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+    </div>
   );
 }
 
