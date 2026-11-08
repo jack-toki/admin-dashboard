@@ -1,6 +1,7 @@
 import { canAccess, readSession } from '../../../../../lib/auth.js';
 import { loginGate, noteLoginFailure } from '../../../../../lib/auth/throttle.js';
 import { clearJrlSessionCookie, jrlSessionCookie, sealJrlSession, signInJrlPassword } from '../../../../../lib/jrl/session.js';
+import { establishOwnerLink, ownerLinkEnabled, ownerLinkStore, revokeOwnerLink } from '../../../../../lib/jrl/ownerLink.js';
 import { openAppStore, supabaseGuard } from '../../../../../lib/store/index.js';
 
 export const runtime = 'nodejs';
@@ -33,8 +34,15 @@ export async function POST(req) {
     if (signed.error === 'invalid') await noteLoginFailure({ subject, store, now: Date.now() });
     return Response.json({ ok: false, error: signed.error, missing: signed.missing || [] }, { status: signed.status, headers: { 'cache-control': 'private, no-store' } });
   }
+  let linked = { ok: false, skipped: true };
+  if (ownerLinkEnabled()) {
+    linked = await establishOwnerLink({ store: ownerLinkStore(store), session: signed.session });
+    if (!linked.ok && linked.error === 'cross_owner') {
+      return Response.json({ ok: false, error: 'cross_owner', linked: false }, { status: 403, headers: { 'cache-control': 'private, no-store' } });
+    }
+  }
   const sealed = sealJrlSession(signed.session);
-  return new Response(JSON.stringify({ ok: true, signedIn: true, expiresAt: signed.session.expiresAt }), {
+  return new Response(JSON.stringify({ ok: true, signedIn: true, expiresAt: signed.session.expiresAt, linked: Boolean(linked.ok) }), {
     status: 200,
     headers: {
       'content-type': 'application/json',
@@ -44,7 +52,12 @@ export async function POST(req) {
   });
 }
 
-export function DELETE() {
+export async function DELETE(req) {
+  if (ownerLinkEnabled() && readSession(req)) {
+    const opened = openAppStore();
+    const linkStore = ownerLinkStore(opened.ok ? opened.store : null);
+    if (linkStore.ready) await revokeOwnerLink(linkStore);
+  }
   return new Response(JSON.stringify({ ok: true, signedIn: false }), {
     status: 200,
     headers: {

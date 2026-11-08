@@ -219,13 +219,14 @@
 
     .jrl-root nav{flex-direction:row; width:100%; gap:0}
     .jrl-root nav a{
-      flex:1 1 0; min-width:0; flex-direction:column; align-items:center; justify-content:center;
-      gap:4px; padding:7px 2px 4px; border-radius:22px; font-size:.66rem; font-weight:500;
+      flex:1 1 0; min-width:44px; min-height:44px; flex-direction:column; align-items:center; justify-content:center;
+      gap:0; padding:10px 4px; border-radius:22px; font-size:.66rem; font-weight:500;
       line-height:1.15; text-align:center; letter-spacing:-.01em; border:none; background:none;
     }
-    .jrl-root nav a .ic{display:block; width:22px; height:22px; opacity:.72}
-    .jrl-root nav a .lbl{display:none}
-    .jrl-root nav a .lbl-short{display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%}
+    .jrl-root nav a:focus-visible{outline:2px solid var(--ink); outline-offset:2px}
+    .jrl-root nav a .ic{display:flex; align-items:center; justify-content:center; width:24px; height:24px; opacity:.72}
+    .jrl-root nav a .lbl,
+    .jrl-root nav a .lbl-short{position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0}
     .jrl-root nav a.on{background:none; color:var(--ink)}
     .jrl-root nav a.on .ic{color:var(--orange); opacity:1}
 

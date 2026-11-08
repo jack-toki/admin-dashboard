@@ -1,6 +1,5 @@
 'use client';
 import { Fragment, useEffect, useState } from 'react';
-import { syntheticDashboard, syntheticDashboardActuals } from '../../../lib/fixtures/synthetic';
 import { validateEntry } from '../../../lib/planning/entries';
 import { TokiScreen, AutomationsScreen } from './TokiScreen';
 import JrlScreen from './JrlScreen';
@@ -16,7 +15,6 @@ export default function App({ role, areas, client }) {
   const [collapsed, setCollapsed] = useState(false);
   const [status, setStatus] = useState(null);
   const [jrl, setJrl] = useState(null);
-  const [example, setExample] = useState(false);
   const [theme, setTheme] = useState('light');
   const [plan, setPlan] = useState([]);
   const [planNote, setPlanNote] = useState('');
@@ -109,8 +107,8 @@ export default function App({ role, areas, client }) {
     setCollapsed(toggleCollapsed(window.localStorage));
   }
 
-  const baseline = example ? syntheticDashboard() : storedForecast;
-  const actuals = example ? syntheticDashboardActuals() : evidence?.actuals || null;
+  const baseline = storedForecast;
+  const actuals = evidence?.actuals || null;
 
   async function onSave(form) {
     const result = validateEntry({
@@ -190,6 +188,7 @@ export default function App({ role, areas, client }) {
                 <a
                   href={`#${item.id}`}
                   className={area === item.id ? 'on' : undefined}
+                  aria-label={item.label}
                   aria-current={item.id === 'toki' ? (area === 'toki' && tokiView === 'toki' ? 'page' : undefined) : (area === item.id ? 'page' : undefined)}
                   aria-expanded={item.id === 'toki' ? area === 'toki' : undefined}
                   onClick={(event) => { event.preventDefault(); setArea(item.id); if (item.id === 'toki') setTokiView('toki'); }}
@@ -219,7 +218,7 @@ export default function App({ role, areas, client }) {
           </nav>
           <div className="spacer" />
           <button type="button" className="toggle glass" aria-label={collapsed ? 'Expand menu' : 'Collapse menu'} onClick={onToggleNav}>{collapsed ? '»' : '«'}</button>
-          <div className="help"><b>Example data stays off</b><span>Turn it on only to preview the layout. Press [ to collapse the menu ({NAV_STORAGE_KEY}).</span></div>
+          <div className="help"><b>Menu</b><span>Press [ to collapse the menu ({NAV_STORAGE_KEY}).</span></div>
         </aside>
         <main className="main">
           <div className="head">
@@ -228,7 +227,6 @@ export default function App({ role, areas, client }) {
               <div className="period">{role}{client ? ` · ${client}` : ''}</div>
             </div>
             <div className="head-actions">
-              {area !== 'jrl' && <button type="button" className="toggle glass" onClick={() => setExample((value) => !value)}>{example ? 'Hide example data' : 'Show example data'}</button>}
               <label className="theme-switch">
                 <span>Dark</span>
                 <input type="checkbox" role="switch" aria-checked={theme === 'dark'} checked={theme === 'dark'} onChange={onTheme} />
@@ -236,10 +234,10 @@ export default function App({ role, areas, client }) {
               <button type="button" className="toggle glass signout" onClick={onSignOut}>Sign out</button>
             </div>
           </div>
-          {area === 'toki' && <TokiScreen example={example} baseline={baseline} actuals={actuals} evidence={example ? null : evidence} plan={plan} planNote={planNote} onSave={onSave} onRemove={onRemove} formError={formError} forecastError={forecastError} section={tokiView} onSection={setTokiView} />}
+          {area === 'toki' && <TokiScreen baseline={baseline} actuals={actuals} evidence={evidence} plan={plan} planNote={planNote} onSave={onSave} onRemove={onRemove} formError={formError} forecastError={forecastError} section={tokiView} onSection={setTokiView} />}
           {area === 'automations' && (
             <>
-              <AutomationsScreen example={example} board={example ? null : runBoard} error={runError} />
+              <AutomationsScreen board={runBoard} error={runError} />
               {status && <p className="caveat">The ingest alias was not called. The last export snapshot recorded {status.coverage.clientOnWithIngest} of {status.coverage.clientOn} client workflows on, and {status.coverage.jackOwnOnWithIngest} of {status.coverage.jackOwnOn} on Jack’s own account. Louise was {status.coverage.louise}.</p>}
             </>
           )}

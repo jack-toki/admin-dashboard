@@ -1,6 +1,5 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { exampleConversations, exampleEntries, examplePurchases, exampleTargets, JRL_EXAMPLE_BANNER } from '../../../lib/jrl/example';
 import { deriveLedger, ENTRY_FIELDS } from '../../../lib/jrl/finance';
 import { monthWindow } from '../../../lib/jrl/months';
 import { personalMonthlyPlan } from '../../../lib/jrl/targets';
@@ -29,7 +28,6 @@ const EMPTY = {
 export default function JrlScreen({ gate }) {
   const [section, setSection] = useState('overview');
   const [theme, setTheme] = useState('');
-  const [example, setExample] = useState(false);
   const [entries, setEntries] = useState([]);
   const [targets, setTargets] = useState([]);
   const [purchases, setPurchases] = useState([]);
@@ -67,18 +65,11 @@ export default function JrlScreen({ gate }) {
   }, [period, entries]);
 
   useEffect(() => {
-    if (example) {
-      setEntries(exampleEntries());
-      setTargets(exampleTargets());
-      setPurchases(examplePurchases());
-      setConversations(exampleConversations());
-      return;
-    }
     setEntries(Array.isArray(gate?.body?.entries) ? gate.body.entries : []);
     setTargets([]);
     setPurchases([]);
     setConversations([]);
-  }, [example, gate]);
+  }, [gate]);
 
   function onTheme() {
     const next = theme === 'dark' ? 'light' : 'dark';
@@ -115,30 +106,25 @@ export default function JrlScreen({ gate }) {
 
   return (
     <>
-          <div className="head-actions">
-            <button type="button" className="toggle glass" onClick={() => setExample((value) => !value)}>{example ? 'Hide example data' : 'Show example data'}</button>
-          </div>
           <div className="tgt-modes" role="tablist" aria-label="JRL pages">
             {LINKS.map(([id, label]) => (
               <button key={id} type="button" className={section === id ? 'tgt-mode on' : 'tgt-mode'} onClick={() => setSection(id)}>{label}</button>
             ))}
           </div>
-          {example ? <p className="caveat">{JRL_EXAMPLE_BANNER}</p> : (
-            <div className="nudge glass">
+          <div className="nudge glass">
               <span className="nudge-dot" />
               <span>{auth?.expired ? 'The JRL session expired. Sign in again. The ledger was not filled in.' : auth?.supabaseUser ? `Signed in to JRL. The session expires ${auth.expiresAt ? new Date(auth.expiresAt).toLocaleString('en-GB') : 'on its own'}.` : (!auth?.configured ? `JRL sign-in needs ${(auth?.missing || ['JRL_SUPABASE_URL', 'JRL_SUPABASE_ANON_KEY']).join(' and ')} on this server. The legacy anon key is accepted. No service role is used.` : 'Sign in with the JRL account. The cockpit password does not open the ledger.')}</span>
               {auth?.supabaseUser ? <button type="button" className="nudge-btn" onClick={async () => { await fetch('/api/cockpit/jrl/session', { method: 'DELETE' }); window.location.assign('/cockpit#jrl'); }}>Sign out of JRL</button> : auth?.configured ? <a className="nudge-btn" href={auth?.handoff || '/cockpit/jrl/login?return=/cockpit%23jrl'}>JRL sign-in</a> : null}
-            </div>
-          )}
-          {(example || auth?.supabaseUser) && section === 'overview' && <Overview ledger={ledger} targets={targets} />}
-          {(example || auth?.supabaseUser) && section === 'month' && (
+          </div>
+          {auth?.supabaseUser && section === 'overview' && <Overview ledger={ledger} targets={targets} />}
+          {auth?.supabaseUser && section === 'month' && (
             <MonthForm form={form} setForm={setForm} period={period} setPeriod={setPeriod} options={window.options} ledger={ledger} onSave={onSave} note={saveNote} />
           )}
-          {(example || auth?.supabaseUser) && section === 'targets' && <Targets ledger={ledger} targets={targets} />}
-          {(example || auth?.supabaseUser) && section === 'spending' && (
+          {auth?.supabaseUser && section === 'targets' && <Targets ledger={ledger} targets={targets} />}
+          {auth?.supabaseUser && section === 'spending' && (
             <Spending purchases={purchases} targets={targets} savings={latest?.savings_total || 0} price={price} setPrice={setPrice} budget={budget} setBudget={setBudget} floor={floor} setFloor={setFloor} savingsFirst={savingsFirst} setSavingsFirst={setSavingsFirst} />
           )}
-          {(example || auth?.supabaseUser) && section === 'sora' && (
+          {auth?.supabaseUser && section === 'sora' && (
             <Sora rows={paged.page} filter={filter} setFilter={(value) => { setFilter(value); setCursor(null); }} next={paged.next} onMore={() => setCursor(paged.next)} openId={openId} setOpenId={setOpenId} confirmId={confirmId} setConfirmId={setConfirmId} onDelete={(id) => { if (confirmDelete(true).ok) setConversations((rows) => rows.filter((row) => row.id !== id)); }} />
           )}
     </>
