@@ -4,11 +4,19 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { importBaseline, upsertBaseline, summarizeSnapshot, snapshotMatchesExpected, EXPECTED_SNAPSHOT_SHAPE } = require('../lib/forecast/import');
+const { importBaseline, importNormalized, upsertBaseline, summarizeSnapshot, snapshotMatchesExpected, EXPECTED_SNAPSHOT_SHAPE } = require('../lib/forecast/import');
 const { readTheme, writeTheme } = require('../lib/theme');
 const { openAppStore } = require('../lib/store/index');
+const { targetCheck, EXPECTED_PROJECT_REF, EXPECTED_SNAPSHOT_HASH, COCKPIT_ACCESS } = require('../lib/store/target');
 const { POST, GET } = require('../app/api/cockpit/forecast/route');
+const { GET: targetGET } = require('../app/api/cockpit/target/route');
 const { signSession, cookieName } = require('../lib/auth');
+
+function serviceJwt(ref, role = 'service_role') {
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+  const body = Buffer.from(JSON.stringify({ role, ref })).toString('base64url');
+  return `${header}.${body}.not-a-signature`;
+}
 
 const grid = [
   ['', 'January', 'February'],
@@ -22,15 +30,49 @@ const grid = [
   ['Monthly Cost', '1', '1'],
 ];
 
-test('supabase forecast reads stay closed until the cockpit schema is confirmed', async () => {
+test('supabase forecast reads stay closed until the project ref and schema flag match', async () => {
+  const other = 'aaaaaaaaaaaaaaaaaaaa';
+  const key = serviceJwt(other);
   const opened = openAppStore({
     APP_STORE: 'supabase',
-    SUPABASE_URL: 'https://example.supabase.co',
-    SUPABASE_SERVICE_KEY: 'not-a-live-key',
+    SUPABASE_URL: `https://${other}.supabase.co`,
+    SUPABASE_SERVICE_KEY: key,
     APP_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString('base64'),
+    COCKPIT_DB_SCHEMA: 'cockpit',
   });
   assert.equal(opened.ok, true);
-  await assert.rejects(() => opened.store.listBaseline(), /schema_unconfirmed/);
+  await assert.rejects(() => opened.store.listBaseline(), /target_mismatch/);
+  const readyHost = openAppStore({
+    APP_STORE: 'supabase',
+    SUPABASE_URL: `https://${EXPECTED_PROJECT_REF}.supabase.co`,
+    SUPABASE_SERVICE_KEY: serviceJwt(EXPECTED_PROJECT_REF),
+    APP_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString('base64'),
+  });
+  await assert.rejects(() => readyHost.store.listBaseline(), /schema_unconfirmed/);
+  const report = targetCheck({
+    SUPABASE_URL: `https://${EXPECTED_PROJECT_REF}.supabase.co`,
+    SUPABASE_SERVICE_KEY: serviceJwt(EXPECTED_PROJECT_REF),
+  });
+  assert.equal(report.match, true);
+  assert.equal(report.reason, 'match');
+  assert.equal(report.connected, false);
+  assert.equal(report.writesAllowed, false);
+  assert.equal(report.importGateOpen, false);
+  assert.equal(JSON.stringify(report).includes(serviceJwt(EXPECTED_PROJECT_REF)), false);
+  const publishable = targetCheck({
+    SUPABASE_URL: `https://${EXPECTED_PROJECT_REF}.supabase.co`,
+    SUPABASE_SERVICE_KEY: serviceJwt(EXPECTED_PROJECT_REF, 'anon'),
+  });
+  assert.equal(publishable.match, false);
+  assert.equal(publishable.reason, 'unreadable');
+  const flagged = targetCheck({
+    SUPABASE_URL: `https://${EXPECTED_PROJECT_REF}.supabase.co/rest/v1`,
+    SUPABASE_SERVICE_KEY: serviceJwt(EXPECTED_PROJECT_REF),
+    COCKPIT_DB_SCHEMA: 'cockpit',
+  });
+  assert.equal(flagged.match, false);
+  assert.equal(COCKPIT_ACCESS.reachable, false);
+  assert.equal(COCKPIT_ACCESS.doNot.includes('ALTER ROLE'), true);
 });
 
 test('light is the default until an explicit dark choice is saved', () => {
@@ -120,7 +162,18 @@ test('the private snapshot shape is 29 rows by 13 periods and the sql default-de
   assert.match(sql, /grant select, insert, update on all tables in schema cockpit to service_role/);
   assert.equal(/grant .+ to anon/i.test(sql), false);
   assert.equal(/alter table public\.runs/i.test(sql), false);
+  assert.equal(/^\s*alter\s+role\b/im.test(sql), false);
   assert.match(sql, /TRUNCATE/);
+  const packet = records.map((record) => ({
+    ...record,
+    label: 'example',
+    value: record.cell_state === 'value' ? '1.00' : record.value,
+  }));
+  const normalized = importNormalized(packet, { spreadsheetId: 'example-sheet', sheetId: 1455407915, fullSnapshot: true });
+  assert.equal(normalized.ok, false);
+  assert.equal(normalized.error, 'hash_mismatch');
+  assert.equal(normalized.cells, undefined);
+  assert.equal(EXPECTED_SNAPSHOT_HASH, 'd6ef94188f453fab499cf4740885d2f7086fd6a74b2b3e8021cc8359c70f01a7');
 });
 
 test('forecast import requires a signed-in Toki session and does not read a sheet', async () => {
@@ -149,6 +202,49 @@ test('forecast import requires a signed-in Toki session and does not read a shee
       }),
     }), { env: undefined });
     assert.equal(saved.status, 503);
+    const previousStore = {
+      APP_STORE: process.env.APP_STORE,
+      SUPABASE_URL: process.env.SUPABASE_URL,
+      SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY,
+      APP_TOKEN_ENCRYPTION_KEY: process.env.APP_TOKEN_ENCRYPTION_KEY,
+      COCKPIT_DB_SCHEMA: process.env.COCKPIT_DB_SCHEMA,
+    };
+    const other = 'bbbbbbbbbbbbbbbbbbbb';
+    const otherKey = serviceJwt(other);
+    process.env.APP_STORE = 'supabase';
+    process.env.SUPABASE_URL = `https://${other}.supabase.co`;
+    process.env.SUPABASE_SERVICE_KEY = otherKey;
+    process.env.APP_TOKEN_ENCRYPTION_KEY = Buffer.alloc(32, 3).toString('base64');
+    process.env.COCKPIT_DB_SCHEMA = 'cockpit';
+    const blocked = await POST(new Request('http://localhost/api/cockpit/forecast', {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        confirm: 'import-forecast-baseline',
+        spreadsheetId: 'example-sheet',
+        sheets: [{ title: 'Forecast Profit & Loss', sheetId: 1455407915, grid }],
+      }),
+    }));
+    const blockedBody = await blocked.json();
+    assert.equal(blocked.status, 503);
+    assert.equal(blockedBody.error, 'target_mismatch');
+    assert.equal(blockedBody.connected, false);
+    assert.equal(blockedBody.target.match, false);
+    assert.equal(JSON.stringify(blockedBody).includes(other), false);
+    assert.equal(JSON.stringify(blockedBody).includes(otherKey), false);
+    const status = await targetGET(new Request('http://localhost/api/cockpit/target', { headers: { cookie } }));
+    const statusBody = await status.json();
+    assert.equal(status.status, 200);
+    assert.equal(statusBody.connected, false);
+    assert.equal(statusBody.target.expectedRef, EXPECTED_PROJECT_REF);
+    assert.equal(statusBody.access.reachable, false);
+    assert.equal(JSON.stringify(statusBody).includes(otherKey), false);
+    const anonymous = await targetGET(new Request('http://localhost/api/cockpit/target'));
+    assert.equal(anonymous.status, 401);
+    for (const [name, value] of Object.entries(previousStore)) {
+      if (value == null) delete process.env[name];
+      else process.env[name] = value;
+    }
     const opened = openAppStore(env);
     const direct = importBaseline([{ title: 'Forecast Profit & Loss', sheetId: 1455407915, grid }], { spreadsheetId: 'example-sheet' });
     const first = await opened.store.saveBaseline(direct.cells);

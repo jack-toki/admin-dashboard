@@ -1,6 +1,6 @@
 import { authConfigStatus, authenticatePassword, clearCookie, readSession, sessionCookie, signSession } from '../../../../lib/auth.js';
 import { loginGate, noteLoginFailure, resetProcessThrottle } from '../../../../lib/auth/throttle.js';
-import { openAppStore } from '../../../../lib/store/index.js';
+import { openAppStore, supabaseGuard } from '../../../../lib/store/index.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -16,7 +16,7 @@ export async function POST(req) {
     return Response.json({ ok: false, error: status.error || 'auth_not_configured', missing: status.missing }, { status: 503 });
   }
   const opened = openAppStore();
-  const store = opened.ok ? opened.store : null;
+  const store = opened.ok && (opened.status.backend === 'file' || supabaseGuard().ok) ? opened.store : null;
   const subject = subjectFor(req);
   const gate = await loginGate({ subject, store, now: Date.now() });
   if (gate.locked) {

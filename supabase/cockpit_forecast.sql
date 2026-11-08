@@ -14,8 +14,14 @@
 -- not an exposed Data API schema until that setting is confirmed.
 -- anon and authenticated receive no usage and no table rights.
 -- service_role can select, insert, and update. It cannot delete or truncate.
--- The app refuses the Supabase store until COCKPIT_DB_SCHEMA=cockpit, and
--- that variable stays unset until the host and exposed-schema setting are confirmed.
+-- The API host from get_project_url is https://hcjybjpimqzsueyslxvl.supabase.co.
+-- The inherited Vercel host is not verified by that lookup. GET /api/cockpit/target
+-- compares the runtime URL and service-role key claim with this ref and returns
+-- only match or mismatch. It does not return the URL or the key.
+-- .schema('cockpit') is not a working route until cockpit is added to Data API
+-- Exposed schemas, keeping every schema already listed. Do not run ALTER ROLE.
+-- Do not grant anon or authenticated. A publishable key is not the server key.
+-- Leave COCKPIT_DB_SCHEMA unset until that setting is done. This file is not applied.
 
 begin;
 
