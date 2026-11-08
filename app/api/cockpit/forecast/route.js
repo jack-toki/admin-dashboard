@@ -1,5 +1,6 @@
 import { canAccess, readSession } from '../../../../lib/auth.js';
 import { importBaseline, importNormalized } from '../../../../lib/forecast/import.js';
+import { modelFromStoredCells, DELETION_AUDIT } from '../../../../lib/forecast/model.js';
 import { openAppStore, supabaseGuard } from '../../../../lib/store/index.js';
 
 export const runtime = 'nodejs';
@@ -52,8 +53,12 @@ export async function GET(req) {
     storedCount: cells.length,
     testedAgainstPreview: false,
     cells,
+    model: modelFromStoredCells(cells),
     actuals: null,
     sheetRuntime: false,
+    sheetFallback: false,
+    workbookRequiredAtRuntime: false,
+    allSheetsSafeToDelete: DELETION_AUDIT.allGoogleSheetsSafeToDelete,
     provenance: 'forecast_baseline',
   }, { headers: { 'cache-control': 'private, no-store' } });
 }

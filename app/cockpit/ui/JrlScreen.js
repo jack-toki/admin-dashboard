@@ -319,7 +319,7 @@ function MonthForm({ form, setForm, period, setPeriod, options, ledger, onSave, 
         <button className="btn" type="submit">Save month</button>
         {note ? <span className="entry-err">{note}</span> : null}
       </div>
-      <p className="foot-note">Fields stay in this order: {ENTRY_FIELDS.join(', ')}. Saving overwrites the same month. The sheet and Xero are not written.</p>
+      <p className="foot-note">Fields stay in this order: {ENTRY_FIELDS.join(', ')}. Saving overwrites the same month. This form does not write the forecast workbook or Xero.</p>
     </form>
   );
 }

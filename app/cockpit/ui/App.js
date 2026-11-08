@@ -20,6 +20,8 @@ export default function App({ role, areas, client }) {
   const [plan, setPlan] = useState([]);
   const [planNote, setPlanNote] = useState('');
   const [formError, setFormError] = useState('');
+  const [storedForecast, setStoredForecast] = useState(null);
+  const [forecastError, setForecastError] = useState('');
 
   useEffect(() => {
     fetch('/api/cockpit/workspace').then(async (res) => {
@@ -32,6 +34,23 @@ export default function App({ role, areas, client }) {
     if (area !== 'jrl') return;
     fetch('/api/cockpit/jrl').then(async (res) => setJrl({ status: res.status, body: await res.json() }));
   }, [area]);
+
+  useEffect(() => {
+    if (!areas.includes('toki')) return;
+    fetch('/api/cockpit/forecast').then(async (res) => {
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setStoredForecast(null);
+        setForecastError(body.error || 'store_unavailable');
+        return;
+      }
+      setForecastError('');
+      setStoredForecast(body.model?.rows?.length ? body.model : null);
+    }).catch(() => {
+      setStoredForecast(null);
+      setForecastError('store_unavailable');
+    });
+  }, [areas]);
 
   useEffect(() => {
     if (!areas.includes('toki')) return;
@@ -62,7 +81,7 @@ export default function App({ role, areas, client }) {
     setCollapsed(toggleCollapsed(window.localStorage));
   }
 
-  const baseline = example ? syntheticBaseline() : null;
+  const baseline = example ? syntheticBaseline() : storedForecast;
   const actuals = example ? syntheticActuals() : null;
 
   async function onSave(form) {
@@ -155,7 +174,7 @@ export default function App({ role, areas, client }) {
               <button type="button" className="toggle glass signout" onClick={onSignOut}>Sign out</button>
             </div>
           </div>
-          {area === 'toki' && <TokiScreen example={example} baseline={baseline} actuals={actuals} plan={plan} planNote={planNote} onSave={onSave} formError={formError} />}
+          {area === 'toki' && <TokiScreen example={example} baseline={baseline} actuals={actuals} plan={plan} planNote={planNote} onSave={onSave} formError={formError} forecastError={forecastError} />}
           {area === 'automations' && (
             <>
               <AutomationsScreen example={example} />

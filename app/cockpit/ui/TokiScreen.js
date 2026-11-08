@@ -15,7 +15,7 @@ const SECTIONS = [
   ['commentary', 'This week'],
 ];
 
-export function TokiScreen({ example, baseline, actuals, plan, planNote, onSave, formError }) {
+export function TokiScreen({ example, baseline, actuals, plan, planNote, onSave, formError, forecastError }) {
   const [section, setSection] = useState('overview');
   const [month, setMonth] = useState('2026-01');
   const [mode, setMode] = useState('base');
@@ -34,7 +34,7 @@ export function TokiScreen({ example, baseline, actuals, plan, planNote, onSave,
     return {
       points,
       series: [
-        { id: 'plan', label: 'Plan', color: 'var(--ink)', values: points.map((point) => ({ id: point.id, value: billingAt(point.id)?.forecast.minor ?? null, status: 'Example forecast. The sheet is not connected.' })) },
+        { id: 'plan', label: 'Plan', color: 'var(--ink)', values: points.map((point) => ({ id: point.id, value: billingAt(point.id)?.forecast.minor ?? null, status: baseline.synthetic ? 'Example forecast. The workbook is not read.' : 'Stored forecast. The workbook is not read.' })) },
         { id: 'actual', label: 'Accounting actual', color: 'var(--c1)', values: points.map((point) => {
           const group = billingAt(point.id);
           return { id: point.id, value: group?.actual.known ? group.actual.minor : null, status: group?.actual.known ? 'Example actual. Not from Xero.' : 'Not on record' };
@@ -47,12 +47,12 @@ export function TokiScreen({ example, baseline, actuals, plan, planNote, onSave,
   const activity = example ? reviewActivity(syntheticContacts()) : [];
   const notes = example ? weeklyCommentary(syntheticFacts()) : [];
 
-  if (!example || !view) {
+  if (!view) {
     return (
       <section>
         <div className="panel glass">
-          <h2>No forecast is stored yet</h2>
-          <p style={muted}>The Google Sheet is not read while the app is running. A one-time import can store the first Forecast Profit &amp; Loss tab. Those figures are forecasts, not actuals. Example data stays off until you ask for it.</p>
+          <h2>{forecastError ? 'The stored forecast could not be read' : 'No forecast is stored yet'}</h2>
+          <p style={muted}>{forecastError ? 'The workbook is not used as a fallback.' : 'The workbook is not read while the app is running. Stored cells are the forecast. Example data stays off until you ask for it.'}</p>
         </div>
       </section>
     );
@@ -60,7 +60,8 @@ export function TokiScreen({ example, baseline, actuals, plan, planNote, onSave,
 
   return (
     <section>
-      <p className="caveat">{SYNTHETIC_BANNER} Example data.</p>
+      {baseline.synthetic && <p className="caveat">{SYNTHETIC_BANNER} Example data. This is not the stored forecast.</p>}
+      {!baseline.synthetic && <p className="caveat">Stored forecast. The workbook is not read at runtime.</p>}
       <div style={pills}>
         {SECTIONS.map(([id, label]) => (
           <button key={id} type="button" onClick={() => setSection(id)} style={pill(section === id)}>{label}</button>
@@ -79,7 +80,7 @@ export function TokiScreen({ example, baseline, actuals, plan, planNote, onSave,
       {chartSeries && (
         <>
           <InteractiveSeriesChart name="billing" points={chartSeries.points} series={chartSeries.series} selectedId={month} onSelect={setMonth} format={formatPounds} caption="Example data. A missing actual stays unknown. Higher and lower recompute the plan line only." />
-          <p id="toki-month-detail" aria-live="polite">{baseline.months.find((item) => item.key === month)?.header} selected. Sheet and Xero are not connected.</p>
+          <p id="toki-month-detail" aria-live="polite">{baseline.months.find((item) => item.key === month)?.header} selected. Xero is not connected.</p>
         </>
       )}
 
@@ -113,7 +114,7 @@ export function TokiScreen({ example, baseline, actuals, plan, planNote, onSave,
               </tbody>
             </table>
           </div>
-          <p style={muted}>Gross profit on the sheet is the billing total, not profit after costs. People actuals are missing, not zero. A partial month is not a finished result.</p>
+          <p style={muted}>Gross profit in the stored forecast is the billing total, not profit after costs. People actuals are missing, not zero. A partial month is not a finished result.</p>
         </>
       )}
 
@@ -143,7 +144,7 @@ export function TokiScreen({ example, baseline, actuals, plan, planNote, onSave,
           <button style={button} type="submit">Save to the plan</button>
           </div>
           {formError && <p role="alert">{formError}</p>}
-          {planNote && <p style={muted}>{planNote} The sheet and Xero are not written.</p>}
+          {planNote && <p style={muted}>{planNote} The workbook and Xero are not written.</p>}
           <ul>
             {plan.map((entry) => <li key={entry.id}>{entry.kind} {formatPounds(entry.amountMinor)} · {entry.party} · {entry.month} · {entry.timing}</li>)}
           </ul>
@@ -160,7 +161,7 @@ export function TokiScreen({ example, baseline, actuals, plan, planNote, onSave,
           <div style={tiles}>
             <Tile label="Result in this what-if" value={formatPounds(overview({ rows: mode === 'base' ? baseline.rows : withScenario(baseline.rows, mode) }, actuals, month).resultMinor)} accent />
           </div>
-          <p style={muted}>This recalculates on screen only. The saved plan and the sheet are not changed.</p>
+          <p style={muted}>This recalculates from the cells on screen. The saved plan is not changed, and the workbook is not read.</p>
         </>
       )}
 
