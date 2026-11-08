@@ -2,7 +2,7 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { formatPounds } from '../../../lib/money';
 import { automationBoard } from '../../../lib/finance/screen';
-import { workingMonthLines, sumLines } from '../../../lib/planning/entries';
+import { workingMonthLines, sumLines, incomeBreakdown } from '../../../lib/planning/entries';
 import { syntheticWorkflows, syntheticEvents, SYNTHETIC_BANNER } from '../../../lib/fixtures/synthetic';
 import { TOKI_VIEWS } from '../../../lib/nav/sidebar';
 import { HorizontalBars, YearColumns } from './charts';
@@ -11,6 +11,11 @@ const MONTHS = [
   ['01', 'Jan', 'January'], ['02', 'Feb', 'February'], ['03', 'Mar', 'March'], ['04', 'Apr', 'April'],
   ['05', 'May', 'May'], ['06', 'Jun', 'June'], ['07', 'Jul', 'July'], ['08', 'Aug', 'August'],
   ['09', 'Sep', 'September'], ['10', 'Oct', 'October'], ['11', 'Nov', 'November'], ['12', 'Dec', 'December'],
+];
+const INCOME_SPLIT = [
+  ['retainer', 'Retainer', 'var(--series-retainer)'],
+  ['project', 'Project', 'var(--series-project)'],
+  ['unallocated', 'Not set', 'var(--series-open)'],
 ];
 const COST_GROUPS = [
   ['administration', 'Administration and software'],
@@ -64,26 +69,33 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
   const monthLines = (key) => workingMonthLines(baseline?.rows || [], plan, key);
   const chartSeries = useMemo(() => {
     if (!baseline) return null;
-    const billingOf = (key) => sumLines(monthLines(key), 'sale');
-    const costOf = (key) => sumLines(monthLines(key), 'cost');
     const actualOf = (key) => {
       const coverage = actuals?.months?.[key]?.coverage;
       const known = actuals?.months?.[key]?.billing != null;
-      return { value: known ? actuals.months[key].billing : null, status: coverage === 'partial' ? 'Partial accounting export. Not a complete profit and loss.' : known ? 'Historical accounting export. Not live Xero.' : 'Missing information' };
+      return { value: known ? actuals.months[key].billing : null, status: coverage === 'partial' ? 'Partial accounting export. Not a complete profit and loss.' : known ? 'Historical accounting export.' : 'Missing information' };
     };
+    const monthView = incomeBreakdown(lines);
     return {
-      year: {
-        points: yearPoints,
-        series: [
-          { id: 'plan', label: 'Plan', color: 'var(--ink)', values: yearPoints.map((point) => ({ id: point.id, value: billingOf(point.id), status: 'Working forecast. Accounting actuals are not changed.' })) },
-          { id: 'actual', label: 'Actual', color: 'var(--c1)', values: yearPoints.map((point) => ({ id: point.id, ...actualOf(point.id) })) },
-        ],
-      },
+      year: yearPoints.map((point) => {
+        const split = incomeBreakdown(monthLines(point.id));
+        return {
+          ...point,
+          total: split.total,
+          actual: actualOf(point.id).value,
+          lines: split.lines,
+          segments: INCOME_SPLIT.map(([id, label, color]) => ({ id, label, color, value: split[id] })),
+        };
+      }),
       compare: {
-        points: [{ id: 'sale', label: 'Income' }, { id: 'cost', label: 'Costs' }],
+        points: [{
+          id: 'sale',
+          label: 'Income',
+          lines: monthView.lines,
+          segments: INCOME_SPLIT.map(([id, label, color]) => ({ id, label, color, value: monthView[id] })),
+        }, { id: 'cost', label: 'Costs' }],
         series: [
-          { id: 'plan', label: 'Plan', color: 'var(--ink)', values: [{ id: 'sale', value: billingShown, status: 'Working forecast' }, { id: 'cost', value: costShown, status: 'Working forecast' }] },
-          { id: 'actual', label: 'Actual', color: 'var(--c1)', values: [
+          { id: 'plan', label: 'Plan', color: 'var(--series-cost)', values: [{ id: 'sale', value: billingShown, status: 'Working forecast' }, { id: 'cost', value: costShown, status: 'Working forecast' }] },
+          { id: 'actual', label: 'Actual', color: 'var(--series-actual)', values: [
             { id: 'sale', value: actualOf(month).value, status: actualOf(month).status },
             { id: 'cost', value: null, status: 'Missing information unless every cost actual is on record' },
           ] },
@@ -94,7 +106,7 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
         series: [{
           id: 'plan',
           label: 'Plan',
-          color: 'var(--orange)',
+          color: 'var(--series-cost)',
           values: COST_GROUPS.map(([id]) => {
             const groupLines = lines.filter((line) => line.kind === 'cost' && line.groupId === id);
             const seen = groupLines.some((line) => line.minor != null);
@@ -225,7 +237,6 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
         </div>
         <p id="toki-month-detail" className="toki-month-title" aria-live="polite">{monthName} {year}</p>
         <div className="toki-alerts">
-          <p className="alert-pill">Xero is not connected.</p>
           {coverage === 'partial' && <p className="alert-pill" role="status">Partial accounting export. Not a complete profit and loss.</p>}
           {coverage === 'missing' && <p className="alert-pill" role="status">Accounting actuals are missing information, not zero.</p>}
           {(baseline.formulaFlags || []).map((flag) => (
@@ -252,7 +263,7 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
             <HorizontalBars name="Income and costs" points={chartSeries.compare.points} series={chartSeries.compare.series} format={formatPounds} />
           </div>
           <div className="chart-panel" data-panel="year" data-on={board === 'year' ? 'true' : 'false'}>
-            <YearColumns name="Income through the year" points={chartSeries.year.points} series={chartSeries.year.series} selectedId={month} onSelect={setMonth} format={formatPounds} />
+            <YearColumns name="Income through the year" months={chartSeries.year} selectedId={month} onOpen={(key) => { setMonth(key); onSection?.('sources'); }} format={formatPounds} />
           </div>
           <div className="chart-panel" data-panel="groups" data-on={board === 'groups' ? 'true' : 'false'}>
             <HorizontalBars name="Cost groups" points={chartSeries.groups.points} series={chartSeries.groups.series} format={formatPounds} />
@@ -269,7 +280,7 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
             {editAll && <button type="button" onClick={saveAll}>Save all</button>}
           </div>
           {(sheetError || formError) && <p role="alert">{sheetError || formError}</p>}
-          {planNote && <p className="quiet">{planNote} These edits are a working forecast. Xero is not written.</p>}
+          {planNote && <p className="quiet">{planNote} These edits are a working forecast.</p>}
           <SheetBlock title="Income" lines={income} bulk={editAll} rowOpen={rowOpen} draftFor={draftFor} setDrafts={setDrafts} openEdit={openEdit} saveLine={saveLine} onRemove={onRemove} setEditingKey={setEditingKey} />
           <div className="sheet-add">
             <button type="button" onClick={() => setAdding({ kind: 'sale', workType: 'retainer', party: '', amount: '', groupId: 'billing' })}>Add a retainer</button>

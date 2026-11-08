@@ -263,22 +263,38 @@ function ChartLegend({ name, series, hidden, setHidden }) {
   );
 }
 
-export function YearColumns({ name, points, series, selectedId, onSelect, format }) {
+function typeLabel(type) {
+  if (type === 'retainer') return 'Retainer';
+  if (type === 'project') return 'Project';
+  return 'Not set';
+}
+
+function linePhrase(line, format) {
+  const kind = line.aggregate ? `${typeLabel(line.type)} aggregate` : typeLabel(line.type);
+  return `${kind} · ${line.name} · ${moneyText(line.minor, format)}`;
+}
+
+export function YearColumns({ name, months, selectedId, onOpen, format }) {
   const [hidden, setHidden] = useState({});
   const [focusId, setFocusId] = useState('');
-  const visible = series.filter((item) => !hidden[item.id]);
-  const nums = visible.flatMap((item) => item.values.map((value) => value.value)).filter((value) => value != null && Number.isFinite(value));
+  const legend = [
+    ...(months[0]?.segments || []).map((item) => ({ id: item.id, label: item.label, color: item.color })),
+    { id: 'actual', label: 'Actual', color: 'var(--series-actual)' },
+  ];
+  const visible = new Set(legend.map((item) => item.id).filter((id) => !hidden[id]));
+  const nums = months.flatMap((month) => [
+    ...month.segments.filter((item) => visible.has(item.id)).map((item) => item.value),
+    visible.has('actual') ? month.actual : null,
+  ]).filter((value) => value != null && Number.isFinite(value));
   const max = niceMax(Math.max(1, ...nums.map((value) => Math.abs(value))));
-  const active = points.find((point) => point.id === (focusId || selectedId)) || points[0];
-  const readout = active
-    ? `${active.label} · ${visible.map((item) => `${item.label} ${moneyText(item.values.find((entry) => entry.id === active.id)?.value, format)}`).join(' · ')}`
-    : 'Select a month';
+  const active = months.find((month) => month.id === (focusId || selectedId)) || months[0];
+  const shownLines = (active?.lines || []).filter((line) => visible.has(line.type) || (line.type === 'unallocated' && visible.has('unallocated')));
 
   return (
     <figure className="finance-plot" data-chart={name}>
       <figcaption>
         <strong>{name}</strong>
-        <ChartLegend name={name} series={series} hidden={hidden} setHidden={setHidden} />
+        <ChartLegend name={name} series={legend} hidden={hidden} setHidden={setHidden} />
       </figcaption>
       <div className="col-chart">
         <div className="col-axis" aria-hidden="true">
@@ -288,40 +304,52 @@ export function YearColumns({ name, points, series, selectedId, onSelect, format
         </div>
         <div className="col-plot" role="group" aria-label={name}>
           <div className="col-grid" aria-hidden="true" />
-          {points.map((point) => (
+          {months.map((month) => (
             <button
-              key={point.id}
+              key={month.id}
               type="button"
               className="col-slot"
-              data-chart-point={point.id}
-              aria-pressed={point.id === selectedId}
-              aria-label={`${point.label}. ${visible.map((item) => `${item.label} ${moneyText(item.values.find((entry) => entry.id === point.id)?.value, format)}`).join('. ')}.`}
-              onClick={() => onSelect?.(point.id)}
-              onFocus={() => setFocusId(point.id)}
+              data-chart-point={month.id}
+              aria-pressed={month.id === selectedId}
+              aria-label={`${month.label}. Income ${moneyText(month.total, format)}. ${month.lines.map((line) => linePhrase(line, format)).join('. ')}. Opens income and costs.`}
+              onClick={() => onOpen?.(month.id)}
+              onFocus={() => setFocusId(month.id)}
               onBlur={() => setFocusId('')}
-              onMouseEnter={() => setFocusId(point.id)}
+              onMouseEnter={() => setFocusId(month.id)}
               onMouseLeave={(event) => { if (event.currentTarget !== document.activeElement) setFocusId(''); }}
+              onPointerDown={() => setFocusId(month.id)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
-                  onSelect?.(point.id);
+                  onOpen?.(month.id);
                 }
               }}
             >
               <span className="col-bars">
-                {visible.map((item) => {
-                  const value = item.values.find((entry) => entry.id === point.id)?.value;
-                  if (value == null || !Number.isFinite(value)) return null;
-                  const height = value === 0 ? undefined : `${Math.max(2, (Math.abs(value) / max) * 100)}%`;
-                  return <i key={item.id} data-bar={item.id} data-state={value === 0 ? 'zero' : 'value'} style={{ height, background: point.id === selectedId && item.id === 'plan' ? 'var(--orange)' : item.color }} />;
-                })}
+                <span className="col-stack">
+                  {month.segments.filter((item) => visible.has(item.id) && item.value != null && Number.isFinite(item.value)).map((item) => (
+                    <i key={item.id} data-bar={item.id} data-state={item.value === 0 ? 'zero' : 'value'} style={{ height: item.value === 0 ? undefined : `${(Math.abs(item.value) / max) * 100}%`, background: item.color }} />
+                  ))}
+                </span>
+                {visible.has('actual') && month.actual != null && Number.isFinite(month.actual) ? (
+                  <i data-bar="actual" data-state={month.actual === 0 ? 'zero' : 'value'} style={{ height: month.actual === 0 ? undefined : `${(Math.abs(month.actual) / max) * 100}%`, background: 'var(--series-actual)' }} />
+                ) : null}
               </span>
-              <span className="col-label">{point.label}</span>
+              <span className="col-label">{month.label}</span>
             </button>
           ))}
         </div>
       </div>
-      <p className="chart-readout" role="status">{readout}</p>
+      <div className="chart-readout" role="status">
+        <p>{active ? `${active.label} · Income ${moneyText(active.total, format)} · Actual ${moneyText(active.actual, format)}` : 'Select a month'}</p>
+        {shownLines.length > 0 && (
+          <ul>
+            {shownLines.map((line) => (
+              <li key={`${line.type}-${line.name}`} data-income-line={line.name}>{linePhrase(line, format)}</li>
+            ))}
+          </ul>
+        )}
+      </div>
     </figure>
   );
 }
@@ -331,12 +359,10 @@ export function HorizontalBars({ name, points, series, format }) {
   const [focusId, setFocusId] = useState('');
   const visible = series.filter((item) => !hidden[item.id]);
   const nums = visible.flatMap((item) => item.values.map((value) => value.value)).filter((value) => value != null && Number.isFinite(value));
-  const max = Math.max(1, ...nums.map((value) => Math.abs(value)));
   const single = visible.length <= 1;
-  const active = points.find((point) => point.id === focusId);
-  const readout = active
-    ? `${active.label} · ${visible.map((item) => `${item.label} ${moneyText(item.values.find((entry) => entry.id === active.id)?.value, format)}`).join(' · ')}`
-    : `${points[0]?.label || name} · ${visible.map((item) => `${item.label} ${moneyText(item.values.find((entry) => entry.id === points[0]?.id)?.value, format)}`).join(' · ')}`;
+  const active = points.find((point) => point.id === focusId) || points[0];
+  const segmentNums = points.flatMap((point) => (point.segments || []).map((item) => item.value));
+  const max = Math.max(1, ...nums.map((value) => Math.abs(value)), ...segmentNums.filter((value) => value != null && Number.isFinite(value)).map((value) => Math.abs(value)));
 
   return (
     <figure className="finance-plot" data-chart={name}>
@@ -353,6 +379,8 @@ export function HorizontalBars({ name, points, series, format }) {
                 const value = item.values.find((entry) => entry.id === point.id)?.value;
                 const known = value != null && Number.isFinite(value);
                 const width = !known || value === 0 ? undefined : `${Math.max(2, (Math.abs(value) / max) * 100)}%`;
+                const stacked = item.id === 'plan' && point.segments;
+                const lineText = point.lines ? point.lines.map((line) => linePhrase(line, format)).join('. ') : '';
                 return (
                   <button
                     key={item.id}
@@ -360,14 +388,19 @@ export function HorizontalBars({ name, points, series, format }) {
                     className={single ? 'hbar single' : 'hbar'}
                     data-chart-point={point.id}
                     data-series={item.id}
-                    aria-label={`${point.label}. ${item.label} ${moneyText(value, format)}.`}
+                    aria-label={`${point.label}. ${item.label} ${moneyText(value, format)}. ${lineText}`}
                     onFocus={() => setFocusId(point.id)}
                     onBlur={() => setFocusId('')}
                     onMouseEnter={() => setFocusId(point.id)}
+                    onPointerDown={() => setFocusId(point.id)}
                     onMouseLeave={(event) => { if (event.currentTarget !== document.activeElement) setFocusId(''); }}
                   >
                     {!single && <span className="hbar-key">{item.label}</span>}
-                    <span className="hbar-track">{known ? <i data-bar={item.id} data-state={value === 0 ? 'zero' : 'value'} style={{ width, background: item.color }} /> : null}</span>
+                    <span className={stacked ? 'hbar-track hbar-stack' : 'hbar-track'}>
+                      {stacked ? point.segments.filter((segment) => segment.value != null && Number.isFinite(segment.value)).map((segment) => (
+                        <i key={segment.id} data-bar={segment.id} data-state={segment.value === 0 ? 'zero' : 'value'} style={{ width: segment.value === 0 ? undefined : `${(Math.abs(segment.value) / max) * 100}%`, background: segment.color }} />
+                      )) : (known ? <i data-bar={item.id} data-state={value === 0 ? 'zero' : 'value'} style={{ width, background: item.color }} /> : null)}
+                    </span>
                     <span className="hbar-value">{moneyText(value, format)}</span>
                   </button>
                 );
@@ -376,7 +409,16 @@ export function HorizontalBars({ name, points, series, format }) {
           </div>
         ))}
       </div>
-      <p className="chart-readout" role="status">{readout}</p>
+      <div className="chart-readout" role="status">
+        <p>{active ? `${active.label} · ${visible.map((item) => `${item.label} ${moneyText(item.values.find((entry) => entry.id === active.id)?.value, format)}`).join(' · ')}` : name}</p>
+        {active?.lines?.length > 0 && (
+          <ul>
+            {active.lines.map((line) => (
+              <li key={`${line.type}-${line.name}`} data-income-line={line.name}>{linePhrase(line, format)}</li>
+            ))}
+          </ul>
+        )}
+      </div>
     </figure>
   );
 }

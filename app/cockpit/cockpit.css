@@ -208,18 +208,32 @@
 .toki-month-title { margin: 0; font-size: 1.2rem; font-weight: 600; letter-spacing: -.03em; }
 .toki-alerts { display: flex; flex-wrap: wrap; gap: 6px; }
 .alert-pill { margin: 0; width: fit-content; max-width: 100%; border: 1px solid var(--orange); border-radius: 999px; padding: 4px 10px; font-size: .78rem; }
-.jrl-root { --chart-surface: rgba(250,249,247,.94); }
-.jrl-root[data-theme="dark"] { --chart-surface: rgba(8,16,30,.92); }
+.jrl-root {
+  --chart-surface: rgba(255,252,248,.36);
+  --series-retainer: rgba(47,107,214,.78);
+  --series-project: rgba(214,92,58,.74);
+  --series-open: rgba(78,88,104,.58);
+  --series-actual: rgba(32,128,112,.66);
+  --series-cost: rgba(62,78,112,.62);
+}
+.jrl-root[data-theme="dark"] {
+  --chart-surface: rgba(10,18,34,.42);
+  --series-retainer: rgba(142,190,255,.8);
+  --series-project: rgba(255,164,132,.78);
+  --series-open: rgba(226,232,242,.5);
+  --series-actual: rgba(140,214,188,.72);
+  --series-cost: rgba(186,204,232,.62);
+}
 .toki-panel-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
 .toki-panel-tabs button, .sheet-tools button, .sheet-add button, .sheet-new button, .sheet-rows button { font: inherit; min-height: 36px; border-radius: 10px; border: .5px solid var(--hair); background: var(--glass-strong); color: var(--ink); padding: 6px 12px; cursor: pointer; }
 .toki-panel-tabs button[aria-selected="true"] { background: var(--chart-surface); font-weight: 600; }
 .chart-panel { min-width: 0; }
-.finance-plot { margin: 0; padding: 12px 14px 10px; border-radius: 16px; background: var(--chart-surface); border: .5px solid var(--hair); min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.finance-plot { margin: 0; padding: 12px 14px 10px; border-radius: 16px; background: var(--chart-surface); border: 1px solid rgba(255,255,255,.42); box-shadow: inset 0 1px 0 rgba(255,255,255,.28); backdrop-filter: blur(18px) saturate(1.3); -webkit-backdrop-filter: blur(18px) saturate(1.3); min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .finance-plot figcaption { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 28px; }
 .finance-plot strong { font-size: .95rem; font-weight: 600; color: var(--ink); }
 .finance-plot .chart-key { color: var(--ink); font-size: .88rem; min-height: 32px; }
 .finance-plot .chart-key[aria-pressed="false"] { opacity: .45; text-decoration: none; }
-.col-chart { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 8px; height: 188px; min-width: 0; }
+.col-chart { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 8px; height: 156px; min-width: 0; }
 .col-axis { display: flex; flex-direction: column; justify-content: space-between; height: calc(100% - 22px); color: var(--ink); font-size: 12px; line-height: 1; font-variant-numeric: tabular-nums; text-align: right; }
 .col-plot { position: relative; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); min-width: 0; height: 100%; }
 .col-grid { position: absolute; inset: 0 0 22px 0; pointer-events: none; border-top: 1px solid var(--line-strong); border-bottom: 1px solid var(--line-strong); background-image: linear-gradient(var(--line-strong), var(--line-strong)); background-size: 100% 1px; background-repeat: no-repeat; background-position: center; }
@@ -227,10 +241,16 @@
 .col-slot[aria-pressed="true"] { background: var(--c1-fill); }
 .col-slot:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
 .col-bars { flex: 1; min-height: 0; display: flex; align-items: flex-end; justify-content: center; gap: 3px; padding: 0 1px 0; }
-.col-bars i { display: block; width: 10px; max-width: 42%; border-radius: 3px 3px 0 0; }
-.col-bars i[data-state="zero"] { height: 3px; }
+.col-stack { width: 14px; max-width: 46%; height: 100%; display: flex; flex-direction: column-reverse; justify-content: flex-start; }
+.col-stack i, .col-bars > i { display: block; flex: none; }
+.col-stack i { width: 100%; max-width: none; border-radius: 0; }
+.col-stack i:last-child, .col-bars > i { border-radius: 3px 3px 0 0; }
+.col-bars > i { width: 8px; max-width: 28%; }
+.col-stack i[data-state="zero"], .col-bars > i[data-state="zero"] { height: 3px; }
 .col-label { height: 22px; font-size: 12px; line-height: 22px; text-align: center; color: var(--ink); }
-.chart-readout { margin: 0; min-height: 2.5em; font-size: .9rem; line-height: 1.25; color: var(--ink); }
+.chart-readout { margin: 0; min-height: 4.6em; font-size: .86rem; line-height: 1.3; color: var(--ink); }
+.chart-readout p, .chart-readout ul, .chart-readout li { margin: 0; padding: 0; }
+.chart-readout ul { list-style: none; }
 .phone-result { display: none; margin: 0; color: var(--ink); font-weight: 600; }
 .hbar-list { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .hbar-group { display: grid; grid-template-columns: minmax(0, 240px) minmax(0, 1fr); gap: 6px 14px; align-items: center; min-width: 0; }
@@ -243,6 +263,11 @@
 .hbar-track { height: 12px; border-radius: 6px; background: var(--track); min-width: 0; overflow: hidden; }
 .hbar-track i { display: block; height: 100%; border-radius: 6px; }
 .hbar-track i[data-state="zero"] { width: 3px; }
+.hbar-stack { display: flex; align-items: stretch; }
+.hbar-stack i { border-radius: 0; flex: none; }
+.hbar-stack i:first-child { border-radius: 6px 0 0 6px; }
+.hbar-stack i:last-child { border-radius: 0 6px 6px 0; }
+.hbar-stack i:only-child { border-radius: 6px; }
 .hbar-value { font-size: .9rem; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; color: var(--ink); }
 .jrl-root .main:has(.toki-dash) { padding-top: 10px; padding-bottom: 12px; }
 .jrl-root .main:has(.toki-dash) .head { margin-bottom: 4px; }
@@ -275,7 +300,7 @@
   .hbar-name { font-size: .84rem; line-height: 1.1; }
   .hbar-track { height: 8px; }
   .finance-plot figcaption { min-height: 22px; }
-  .chart-readout { min-height: 1.25em; }
+  .chart-readout { min-height: 0; max-height: none; overflow: visible; }
   .hbar-group { grid-template-columns: minmax(0, 1fr); gap: 1px; }
   .hbar:not(.single) { grid-template-columns: auto minmax(48px, 1fr) auto; padding: 0; }
   .hbar.single { grid-template-columns: minmax(0, 1fr) auto; padding: 0; }
@@ -283,8 +308,7 @@
   .hbar-value { text-align: right; }
   .jrl-root .toki-view.toki-dash { gap: 4px; }
   .finance-plot { padding: 8px 10px 4px; gap: 4px; }
-  .chart-readout { min-height: 1.45em; }
-  .col-chart { height: 160px; }
+  .col-chart { height: 112px; }
   .sheet-rows li { grid-template-columns: 1fr auto; }
 }
 @media (max-width: 820px) {
