@@ -7,6 +7,7 @@ const { signSession, cookieName } = require('../lib/auth');
 const { incomeDetailGet, incomeDetailPost, incomeDetailDelete } = require('../lib/cockpit/http');
 const { workingMonthLines, incomeBreakdown, sumLines } = require('../lib/planning/entries');
 const { scheduleFor, detailSum, reconcileKind, validateIncomeDetail, presentDetails } = require('../lib/planning/incomeDetail');
+const { adaptSnapshot, loadIncomeSource } = require('../lib/planning/incomeSource');
 const { syntheticBaseline } = require('../lib/fixtures/synthetic');
 
 const acme = {
@@ -40,6 +41,27 @@ test('a known retainer needs an end date and an unknown import must not invent o
   assert.equal(validateIncomeDetail({ ...acme, firstPaymentMonth: '2026-13' }).ok, false);
   assert.equal(validateIncomeDetail({ ...acme, observedMonth: '2026-00' }).ok, false);
   assert.equal(validateIncomeDetail({ ...acme, sourceRowId: 'sheet:3:retainer' }).record.sourceRowId, 'sheet:3:retainer');
+});
+
+test('a private snapshot file is adapted without inventing a contract end', () => {
+  const records = adaptSnapshot({
+    amountUnit: 'pounds',
+    retainers: [{ sheet: 'retainer', row: 4, client: 'Example Retainer', amount: 15 }],
+    projects: [{ sourceRowId: 'project:2', client: 'Example Project', amountMinor: 4000, month: '2026-11' }],
+    costs: [{ sheet: 'cost', row: 8, name: 'Example Cost', amountPence: 250 }],
+  });
+  assert.equal(records.length, 3);
+  const retainer = records.find((row) => row.kind === 'retainer');
+  assert.equal(retainer.sourceRowId, 'retainer:4');
+  assert.equal(retainer.amountMinor, 1500);
+  assert.equal(retainer.contractEndDate, null);
+  assert.equal(retainer.contractEndUnknown, true);
+  assert.equal(retainer.source, 'snapshot');
+  assert.equal(records.find((row) => row.kind === 'project').amountMinor, 4000);
+  assert.equal(records.find((row) => row.kind === 'additional_cost').party, 'Example Cost');
+  const missing = loadIncomeSource({ INCOME_SOURCE_SNAPSHOT: '' });
+  assert.equal(missing.error, 'income_source_not_configured');
+  assert.deepEqual(missing.records, []);
 });
 
 test('a missing amount stays missing and an explicit zero is summed', () => {

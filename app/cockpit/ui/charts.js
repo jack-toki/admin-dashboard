@@ -246,7 +246,7 @@ function axisText(minor) {
 
 function niceMax(minor) {
   const pounds = Math.max(minor / 100, 1);
-  const step = pounds >= 100000 ? 20000 : pounds >= 20000 ? 10000 : pounds >= 5000 ? 1000 : 500;
+  const step = pounds >= 100000 ? 20000 : pounds >= 20000 ? 10000 : pounds >= 5000 ? 1000 : pounds >= 1000 ? 200 : pounds >= 200 ? 50 : pounds >= 50 ? 10 : 5;
   return Math.ceil(pounds / step) * step * 100;
 }
 
@@ -294,11 +294,13 @@ export function YearColumns({ name, months, selectedId, onOpen, format }) {
   const knownTotals = months.map((month) => month.total).filter((value) => value != null && Number.isFinite(value));
   const average = knownTotals.length ? Math.round(knownTotals.reduce((sum, value) => sum + value, 0) / knownTotals.length) : null;
   const visible = new Set(legend.map((item) => item.id).filter((id) => ready[id] !== false && !hidden[id]));
-  const nums = months.flatMap((month) => [
-    ...month.segments.filter((item) => visible.has(item.id)).map((item) => item.value),
-    visible.has('actual') ? month.actual : null,
-  ]).filter((value) => value != null && Number.isFinite(value));
-  const max = niceMax(Math.max(1, ...nums.map((value) => Math.abs(value))));
+  const stacked = months.map((month) => month.segments
+    .filter((item) => visible.has(item.id) && item.value != null && Number.isFinite(item.value))
+    .reduce((sum, item) => sum + Math.abs(item.value), 0));
+  const actuals = visible.has('actual')
+    ? months.map((month) => month.actual).filter((value) => value != null && Number.isFinite(value)).map((value) => Math.abs(value))
+    : [];
+  const max = niceMax(Math.max(1, ...stacked, ...actuals));
   const active = months.find((month) => month.id === (focusId || selectedId)) || months[0];
   const shownLines = (active?.lines || []).filter((line) => visible.has(line.type) || (line.type === 'unallocated' && visible.has('unallocated')));
 
