@@ -1,0 +1,4 @@
+-- This file is not run by the app, by tests, or by deployment.
+-- Do not apply it. It creates nothing.
+-- The operator schema is supabase/cockpit_forecast.sql.
+-- The existing runs table is not modified here. Its TRUNCATE privilege is a separate fix.
