@@ -5,27 +5,40 @@ import '../jrl.css';
 export default function LoginForm() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [pending, setPending] = useState(false);
 
   async function onSubmit(event) {
     event.preventDefault();
+    const entered = event.currentTarget.elements.password?.value ?? password;
     setError('');
-    const res = await fetch('/api/cockpit/login', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ password }),
-    });
-    if (res.status === 503) {
-      const body = await res.json().catch(() => ({}));
-      setError(body.error === 'password_verifier_malformed'
-        ? 'The password verifier is set but unreadable. The plaintext password was not used.'
-        : 'Sign-in is not configured. The server needs DASHBOARD_SESSION_SECRET and either DASHBOARD_PASSWORD_HASH or DASHBOARD_PASSWORD.');
-      return;
+    setPending(true);
+    try {
+      const res = await fetch('/api/cockpit/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ password: entered }),
+      });
+      if (res.status === 503) {
+        const body = await res.json().catch(() => ({}));
+        setError(body.error === 'password_verifier_malformed'
+          ? 'The password verifier is set but unreadable. The plaintext password was not used.'
+          : 'Sign-in is not configured. The server needs DASHBOARD_SESSION_SECRET and either DASHBOARD_PASSWORD_HASH or DASHBOARD_PASSWORD.');
+        return;
+      }
+      if (res.status === 429) {
+        setError('Too many attempts. Wait a few minutes and try again.');
+        return;
+      }
+      if (!res.ok) {
+        setError('That password was not accepted.');
+        return;
+      }
+      window.location.assign('/cockpit');
+    } catch {
+      setError('Sign-in could not reach the server.');
+    } finally {
+      setPending(false);
     }
-    if (!res.ok) {
-      setError('That password was not accepted.');
-      return;
-    }
-    window.location.href = '/cockpit';
   }
 
   return (
@@ -36,9 +49,9 @@ export default function LoginForm() {
           <h1>Cockpit sign-in</h1>
           <p className="sub">This password is not the personal Supabase sign-in. The public site is unchanged.</p>
           <label className="entry-row" htmlFor="password"><span>Password</span></label>
-          <span className="entry-input login-input"><input id="password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" /></span>
-          {error && <p role="alert" className="entry-err">{error}</p>}
-          <button className="btn" type="submit">Continue</button>
+          <span className="entry-input login-input"><input id="password" name="password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" aria-invalid={error ? 'true' : 'false'} aria-describedby="login-error" /></span>
+          <p id="login-error" role="alert" className="entry-err">{error}</p>
+          <button className="btn" type="submit" disabled={pending} aria-busy={pending}>{pending ? 'Signing in…' : 'Continue'}</button>
         </form>
       </main>
     </div>

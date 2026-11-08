@@ -293,7 +293,7 @@
 .jrl-root .entry-err{font-size:.86rem; color:var(--orange)}
 
 .jrl-root /* ── login ──────────────────────────────────────────────────────────────── */
-.login-wrap{min-height:100vh; min-height:100dvh; display:flex; align-items:center; justify-content:center; padding:24px}
+.login-wrap{position:relative; z-index:2; min-height:100vh; min-height:100dvh; display:flex; align-items:center; justify-content:center; padding:24px}
 .jrl-root .login-card{width:100%; max-width:380px; text-align:left}
 .jrl-root .login-card .logo{margin-bottom:20px}
 .jrl-root .login-card .btn{width:100%}
