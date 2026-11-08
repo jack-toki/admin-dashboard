@@ -22,6 +22,7 @@ test('ledger keeps contributions out of gain and does not invent a missing value
   assert.equal(august.chase_total, august.savings_total + august.tax_total);
   assert.equal(august.net_total, august.chase_total + august.hl_contributed);
   assert.notEqual(august.net_total, august.hl_value);
+  assert.equal(august.earned, null);
   assert.equal(august.gain, 1000 - 150);
   assert.equal(september.hl_value, null);
   assert.equal(september.gain, null);
@@ -46,9 +47,9 @@ test('a month overwrite replaces that period and blank flows are zero', () => {
 
 test('the month window keeps the current off-by-one options', () => {
   const window = monthWindow(new Date('2026-11-08T00:00:00Z'));
-  assert.equal(window.defaultPeriod, '2026-10');
-  assert.equal(window.options[0], '2026-11');
-  assert.equal(window.options[1], '2026-10');
+  assert.equal(window.defaultPeriod, '2026-10-01');
+  assert.equal(window.options[0], '2026-11-01');
+  assert.equal(window.options[1], '2026-10-01');
   assert.equal(window.options.length, 24);
 });
 

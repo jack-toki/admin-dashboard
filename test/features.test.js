@@ -137,17 +137,26 @@ test('manual plan reload, registry upsert, event retry, and token encryption use
       status: 'success',
       attempt: 1,
     };
+    const mismatched = await eventsPost(new Request('http://localhost/api/automations/events', {
+      method: 'POST',
+      headers: { 'x-toki-secret': env.INGEST_SECRET, 'content-type': 'application/json' },
+      body: JSON.stringify({ ...event, accountSlug: 'other-client', payload: { secret: 'do-not-store' } }),
+    }), { env });
+    assert.equal(mismatched.status, 409);
     const posted = await eventsPost(new Request('http://localhost/api/automations/events', {
       method: 'POST',
       headers: { 'x-toki-secret': env.INGEST_SECRET, 'content-type': 'application/json' },
       body: JSON.stringify(event),
     }), { env });
+    const postedBody = await posted.json();
+    assert.equal(postedBody.deduped, false);
+    assert.equal(postedBody.accountSlug, 'example-client');
+    assert.equal(JSON.stringify(postedBody).includes('do-not-store'), false);
     const retried = await eventsPost(new Request('http://localhost/api/automations/events', {
       method: 'POST',
       headers: { 'x-toki-secret': env.INGEST_SECRET, 'content-type': 'application/json' },
       body: JSON.stringify(event),
     }), { env });
-    assert.equal((await posted.json()).deduped, false);
     assert.equal((await retried.json()).deduped, true);
 
     const token = { refresh_token: 'refresh-secret', access_token: 'access-secret' };

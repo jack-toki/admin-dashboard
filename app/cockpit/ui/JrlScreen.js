@@ -1,10 +1,12 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { advise } from '../../../lib/jrl/afford';
 import { exampleConversations, exampleEntries, examplePurchases, exampleTargets, JRL_EXAMPLE_BANNER } from '../../../lib/jrl/example';
-import { annualised, deriveLedger, ENTRY_FIELDS, projectionRows, verdict } from '../../../lib/jrl/finance';
+import { deriveLedger, ENTRY_FIELDS } from '../../../lib/jrl/finance';
 import { monthWindow } from '../../../lib/jrl/months';
-import { monthsToTarget, personalMonthlyPlan, projectPath } from '../../../lib/jrl/targets';
+import { personalMonthlyPlan } from '../../../lib/jrl/targets';
+import { performance, projection, BENCHMARK_RATE } from '../../../vendor/jrl-finance/code/lib/finance.ts';
+import { afford } from '../../../vendor/jrl-finance/code/lib/afford.ts';
+import { monthsToTarget, projectPath } from '../../../vendor/jrl-finance/code/lib/targets.ts';
 import { confirmDelete, dayGroup, filterConversations, pageConversations } from '../../../lib/jrl/sora';
 import '../jrl.css';
 
@@ -41,7 +43,7 @@ export default function JrlScreen({ gate }) {
   const [price, setPrice] = useState('');
   const [budget, setBudget] = useState('');
   const [floor, setFloor] = useState('500');
-  const [savingsFirst, setSavingsFirst] = useState(true);
+  const [savingsFirst, setSavingsFirst] = useState('0');
   const window = useMemo(() => monthWindow(new Date('2026-11-08T12:00:00Z')), []);
 
   useEffect(() => {
@@ -187,8 +189,13 @@ function Overview({ ledger, targets }) {
     ['Tax pot', latest.tax_total, false],
     ['HargLans ISA', latest.hl_contributed, false],
   ];
-  const rate = annualised(latest.gain, latest.hl_contributed, ledger.filter((row) => row.hl_value != null).length);
-  const call = verdict(rate, ledger.length);
+  const perf = performance(ledger.map((row) => ({
+    period: row.period,
+    hl_in: row.hl_in,
+    hl_contributed: row.hl_contributed,
+    hl_value: row.hl_chart_value ?? 0,
+  })), BENCHMARK_RATE);
+  perf.earningsThisMonth = latest.hl_value == null ? null : latest.earned;
   const chartValue = latest.hl_chart_value;
   return (
     <>
@@ -231,11 +238,11 @@ function Overview({ ledger, targets }) {
         <h2>HargLans ISA</h2>
         <div className="perf">
           <div className="mini"><div className="k">{latest.hl_carried ? 'Value carried forward' : 'Portfolio value'}</div><div className="v">{money(chartValue)}</div></div>
-          <div className="mini"><div className="k">Earned this month</div><div className="v">{money(latest.earned)}</div></div>
+          <div className="mini"><div className="k">Earned this month</div><div className="v">{money(perf.earningsThisMonth)}</div></div>
           <div className="mini"><div className="k">Gain so far</div><div className="v">{money(latest.gain)}</div></div>
         </div>
-        {call ? <div className="verdict-row"><span className={call.label === 'Lagging' ? 'badge bad' : 'badge'}>{call.label}</span><span>{call.caveat ? 'Under 12 months, the annualised figure swings.' : `${call.gapPoints.toFixed(1)} points versus 7%.`} No new money in the projection.</span></div> : <p className="caveat">No gain is shown for a month without a fresh HargLans reading.</p>}
-        {projectionRows(chartValue).slice(0, 4).map((row) => (
+        {perf.verdict ? <div className="verdict-row"><span className={perf.verdict === 'lagging' ? 'badge bad' : 'badge'}>{perf.verdict}</span><span>{ledger.length < 12 ? 'Under 12 months, the money-weighted figure swings.' : `${perf.gapPP?.toFixed(1)} points versus 7%.`} No new money in the projection.</span></div> : <p className="caveat">No money-weighted return until there is a real reading. A missing value is not zero.</p>}
+        {(chartValue == null ? [] : projection(chartValue)).slice(0, 4).map((row) => (
           <div key={row.years} className="prow"><span className="yr">{row.years}y</span><span className="bar"><i style={{ width: '100%' }} /></span><span className="amt">{money(row.value)}</span></div>
         ))}
       </section>
@@ -344,8 +351,8 @@ function Targets({ ledger, targets }) {
   const [goal, setGoal] = useState(2000);
   if (!targets.length && !latest) return <div className="panel glass"><h2>{EMPTY.targets}</h2></div>;
   const current = latest?.savings_total || 0;
-  const months = monthsToTarget({ current, target: Number(goal), monthly: Number(monthly), rate: 0.045 });
-  const path = projectPath({ current, monthly: Number(monthly), rate: 0.045, months: months || 1 });
+  const months = monthsToTarget({ current, target: Number(goal), monthly: Number(monthly), annualRate: 0.045 });
+  const path = projectPath({ current, target: Number(goal), monthly: Number(monthly), annualRate: 0.045, months: months || 1 });
   const end = path.at(-1);
   return (
     <section className="panel glass">
@@ -361,8 +368,8 @@ function Targets({ ledger, targets }) {
         </div>
         <div className="tgt-answer">
           <div className="k">{months == null ? 'No end date at this rate' : `${months} months`}</div>
-          <div className="tgt-big">{money(end?.balance)}</div>
-          <div className="tgt-split"><span>Contributions <b>{money(end?.contributed)}</b></span><span>Growth <b>{money(end?.growth)}</b></span></div>
+          <div className="tgt-big">{money(end?.value)}</div>
+          <p className="caveat">The path uses the original monthly rate, (1 + annual) to the power of 1/12, minus 1.</p>
         </div>
       </div>
       <ul>
@@ -374,14 +381,16 @@ function Targets({ ledger, targets }) {
 }
 
 function Spending({ purchases, targets, savings, price, setPrice, budget, setBudget, floor, setFloor, savingsFirst, setSavingsFirst }) {
-  const advice = advise({
-    amount: price === '' ? null : Number(price),
-    budget: budget === '' ? null : Number(budget),
+  const advice = price === '' || budget === '' ? null : afford({
+    price: Number(price),
+    kind: 'want',
+    monthlyBudget: Number(budget),
+    spentThisMonth: purchases.reduce((sum, row) => sum + row.amount, 0),
+    savingsPot: savings,
     emergencyFloor: Number(floor),
-    savingsFirst,
-    savingsBalance: savings,
-    targets,
-    spent: purchases.reduce((sum, row) => sum + row.amount, 0),
+    targetCommitments: personalMonthlyPlan(targets),
+    savingsFirst: Number(savingsFirst) || 0,
+    savedThisMonth: 0,
   });
   return (
     <section className="panel glass">
@@ -390,12 +399,12 @@ function Spending({ purchases, targets, savings, price, setPrice, budget, setBud
         <label className="entry-row"><span>Price</span><span className="entry-input"><input aria-label="Price" value={price} onChange={(event) => setPrice(event.target.value)} /></span></label>
         <label className="entry-row"><span>Monthly budget</span><span className="entry-input"><input aria-label="Monthly budget" value={budget} onChange={(event) => setBudget(event.target.value)} /></span></label>
         <label className="entry-row"><span>Emergency floor</span><span className="entry-input"><input aria-label="Emergency floor" value={floor} onChange={(event) => setFloor(event.target.value)} /></span></label>
-        <label className="entry-row"><input type="checkbox" checked={savingsFirst} onChange={(event) => setSavingsFirst(event.target.checked)} /> Saving comes first</label>
+        <label className="entry-row"><span>Saving comes first</span><span className="entry-input"><input aria-label="Saving comes first" value={savingsFirst} onChange={(event) => setSavingsFirst(event.target.value)} /></span></label>
       </div>
-      {advice.reason === 'needs_budget_and_price' ? <p className="sub">Add a monthly budget and a price before this will advise.</p> : (
+      {!advice ? <p className="sub">Add a monthly budget and a price before this will advise.</p> : (
         <div className="afford-verdict">
-          <div className={advice.verdict === 'no' || advice.verdict === 'wait' ? 'afford-head warn' : 'afford-head ok'}>{advice.verdict}</div>
-          <p className="afford-body">Advice stored as {advice.advice}. Personal monthly plan {money(advice.personalMonthlyPlan)}. Left alone for 10 years at 7%: {money(advice.opportunity)}.</p>
+          <div className={advice.verdict === 'no' || advice.verdict === 'wait' ? 'afford-head warn' : 'afford-head ok'}>{advice.headline}</div>
+          <p className="afford-body">{advice.reasoning} Left alone for 10 years at 7%: {money(advice.opportunityCost)}.</p>
         </div>
       )}
       <div className="ledger-scroll">

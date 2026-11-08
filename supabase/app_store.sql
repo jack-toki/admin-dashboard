@@ -71,8 +71,24 @@ create table if not exists login_attempts (
 
 create index if not exists login_attempts_subject_idx on login_attempts (subject, failed_at);
 
+-- Zapier account visibility. A row means the account id was selectable, not that it is a client.
+-- Removal sets missing_at. Rows are not deleted.
+create table if not exists zapier_account_access (
+  zapier_account_id text primary key,
+  access_state text not null,
+  role_state text not null,
+  identity_state text not null,
+  client_slug text,
+  label_snapshot text,
+  reporting text not null default 'unmonitored',
+  first_seen_at timestamptz,
+  last_seen_at timestamptz,
+  missing_at timestamptz
+);
+
 alter table app_oauth_tokens enable row level security;
 alter table automation_registry enable row level security;
 alter table automation_events enable row level security;
 alter table plan_entries enable row level security;
 alter table login_attempts enable row level security;
+alter table zapier_account_access enable row level security;
