@@ -227,6 +227,160 @@ export function CompactColumns({ name, points, series, selectedId, onSelect, for
   );
 }
 
+function moneyText(value, format) {
+  if (value == null || !Number.isFinite(value)) return 'Missing information';
+  return format(value);
+}
+
+function axisText(minor) {
+  const pounds = minor / 100;
+  const abs = Math.abs(pounds);
+  const sign = pounds < 0 ? '−' : '';
+  if (abs >= 1000) {
+    const thousands = abs / 1000;
+    const text = Number.isInteger(thousands) ? String(thousands) : String(Math.round(thousands * 10) / 10);
+    return `${sign}£${text}k`;
+  }
+  return `${sign}£${Math.round(abs)}`;
+}
+
+function niceMax(minor) {
+  const pounds = Math.max(minor / 100, 1);
+  const step = pounds >= 100000 ? 20000 : pounds >= 20000 ? 10000 : pounds >= 5000 ? 1000 : 500;
+  return Math.ceil(pounds / step) * step * 100;
+}
+
+function ChartLegend({ name, series, hidden, setHidden }) {
+  return (
+    <span className="year-legend" role="group" aria-label={`${name} series`}>
+      {series.map((item) => (
+        <button key={item.id} type="button" className="chart-key" aria-pressed={!hidden[item.id]} onClick={() => setHidden((current) => ({ ...current, [item.id]: !current[item.id] }))}>
+          <i style={{ background: item.color }} />
+          {item.label}
+        </button>
+      ))}
+    </span>
+  );
+}
+
+export function YearColumns({ name, points, series, selectedId, onSelect, format }) {
+  const [hidden, setHidden] = useState({});
+  const [focusId, setFocusId] = useState('');
+  const visible = series.filter((item) => !hidden[item.id]);
+  const nums = visible.flatMap((item) => item.values.map((value) => value.value)).filter((value) => value != null && Number.isFinite(value));
+  const max = niceMax(Math.max(1, ...nums.map((value) => Math.abs(value))));
+  const active = points.find((point) => point.id === (focusId || selectedId)) || points[0];
+  const readout = active
+    ? `${active.label} · ${visible.map((item) => `${item.label} ${moneyText(item.values.find((entry) => entry.id === active.id)?.value, format)}`).join(' · ')}`
+    : 'Select a month';
+
+  return (
+    <figure className="finance-plot" data-chart={name}>
+      <figcaption>
+        <strong>{name}</strong>
+        <ChartLegend name={name} series={series} hidden={hidden} setHidden={setHidden} />
+      </figcaption>
+      <div className="col-chart">
+        <div className="col-axis" aria-hidden="true">
+          <span>{axisText(max)}</span>
+          <span>{axisText(max / 2)}</span>
+          <span>{axisText(0)}</span>
+        </div>
+        <div className="col-plot" role="group" aria-label={name}>
+          <div className="col-grid" aria-hidden="true" />
+          {points.map((point) => (
+            <button
+              key={point.id}
+              type="button"
+              className="col-slot"
+              data-chart-point={point.id}
+              aria-pressed={point.id === selectedId}
+              aria-label={`${point.label}. ${visible.map((item) => `${item.label} ${moneyText(item.values.find((entry) => entry.id === point.id)?.value, format)}`).join('. ')}.`}
+              onClick={() => onSelect?.(point.id)}
+              onFocus={() => setFocusId(point.id)}
+              onBlur={() => setFocusId('')}
+              onMouseEnter={() => setFocusId(point.id)}
+              onMouseLeave={(event) => { if (event.currentTarget !== document.activeElement) setFocusId(''); }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onSelect?.(point.id);
+                }
+              }}
+            >
+              <span className="col-bars">
+                {visible.map((item) => {
+                  const value = item.values.find((entry) => entry.id === point.id)?.value;
+                  if (value == null || !Number.isFinite(value)) return null;
+                  const height = value === 0 ? undefined : `${Math.max(2, (Math.abs(value) / max) * 100)}%`;
+                  return <i key={item.id} data-bar={item.id} data-state={value === 0 ? 'zero' : 'value'} style={{ height, background: point.id === selectedId && item.id === 'plan' ? 'var(--orange)' : item.color }} />;
+                })}
+              </span>
+              <span className="col-label">{point.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="chart-readout" role="status">{readout}</p>
+    </figure>
+  );
+}
+
+export function HorizontalBars({ name, points, series, format }) {
+  const [hidden, setHidden] = useState({});
+  const [focusId, setFocusId] = useState('');
+  const visible = series.filter((item) => !hidden[item.id]);
+  const nums = visible.flatMap((item) => item.values.map((value) => value.value)).filter((value) => value != null && Number.isFinite(value));
+  const max = Math.max(1, ...nums.map((value) => Math.abs(value)));
+  const single = visible.length <= 1;
+  const active = points.find((point) => point.id === focusId);
+  const readout = active
+    ? `${active.label} · ${visible.map((item) => `${item.label} ${moneyText(item.values.find((entry) => entry.id === active.id)?.value, format)}`).join(' · ')}`
+    : `${points[0]?.label || name} · ${visible.map((item) => `${item.label} ${moneyText(item.values.find((entry) => entry.id === points[0]?.id)?.value, format)}`).join(' · ')}`;
+
+  return (
+    <figure className="finance-plot" data-chart={name}>
+      <figcaption>
+        <strong>{name}</strong>
+        <ChartLegend name={name} series={series} hidden={hidden} setHidden={setHidden} />
+      </figcaption>
+      <div className="hbar-list" role="group" aria-label={name}>
+        {points.map((point) => (
+          <div className="hbar-group" key={point.id}>
+            <span className="hbar-name">{point.label}</span>
+            <div className="hbar-series">
+              {visible.map((item) => {
+                const value = item.values.find((entry) => entry.id === point.id)?.value;
+                const known = value != null && Number.isFinite(value);
+                const width = !known || value === 0 ? undefined : `${Math.max(2, (Math.abs(value) / max) * 100)}%`;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={single ? 'hbar single' : 'hbar'}
+                    data-chart-point={point.id}
+                    data-series={item.id}
+                    aria-label={`${point.label}. ${item.label} ${moneyText(value, format)}.`}
+                    onFocus={() => setFocusId(point.id)}
+                    onBlur={() => setFocusId('')}
+                    onMouseEnter={() => setFocusId(point.id)}
+                    onMouseLeave={(event) => { if (event.currentTarget !== document.activeElement) setFocusId(''); }}
+                  >
+                    {!single && <span className="hbar-key">{item.label}</span>}
+                    <span className="hbar-track">{known ? <i data-bar={item.id} data-state={value === 0 ? 'zero' : 'value'} style={{ width, background: item.color }} /> : null}</span>
+                    <span className="hbar-value">{moneyText(value, format)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="chart-readout" role="status">{readout}</p>
+    </figure>
+  );
+}
+
 export function ComparisonBars({ name, items, format, caption }) {
   const [hidden, setHidden] = useState({});
   const [tip, setTip] = useState(null);

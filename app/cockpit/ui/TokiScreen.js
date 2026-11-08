@@ -5,14 +5,20 @@ import { automationBoard } from '../../../lib/finance/screen';
 import { workingMonthLines, sumLines } from '../../../lib/planning/entries';
 import { syntheticWorkflows, syntheticEvents, SYNTHETIC_BANNER } from '../../../lib/fixtures/synthetic';
 import { TOKI_VIEWS } from '../../../lib/nav/sidebar';
-import { CompactColumns } from './charts';
+import { HorizontalBars, YearColumns } from './charts';
 
 const MONTHS = [
   ['01', 'Jan', 'January'], ['02', 'Feb', 'February'], ['03', 'Mar', 'March'], ['04', 'Apr', 'April'],
   ['05', 'May', 'May'], ['06', 'Jun', 'June'], ['07', 'Jul', 'July'], ['08', 'Aug', 'August'],
   ['09', 'Sep', 'September'], ['10', 'Oct', 'October'], ['11', 'Nov', 'November'], ['12', 'Dec', 'December'],
 ];
-const COST_GROUPS = [['administration', 'Administration'], ['people', 'People'], ['premises', 'Premises'], ['finance', 'Finance'], ['selling', 'Selling']];
+const COST_GROUPS = [
+  ['administration', 'Administration and software'],
+  ['people', 'People, payroll and pensions'],
+  ['premises', 'Premises and studio rent'],
+  ['finance', 'Finance charges and fees'],
+  ['selling', 'Selling, travel and entertainment'],
+];
 
 function showMoney(minor) {
   if (minor == null || !Number.isFinite(minor)) return 'Missing information';
@@ -21,7 +27,7 @@ function showMoney(minor) {
 
 export function TokiScreen({ example, baseline, actuals, evidence, plan, planNote, onSave, onRemove, formError, forecastError, section = 'toki', onSection }) {
   const [month, setMonth] = useState('2026-01');
-  const [board, setBoard] = useState('summary');
+  const [board, setBoard] = useState('year');
   const [editAll, setEditAll] = useState(false);
   const [editingKey, setEditingKey] = useState('');
   const [drafts, setDrafts] = useState({});
@@ -33,11 +39,17 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
 
   useLayoutEffect(() => {
     const strip = monthStripRef.current;
-    if (!strip) return;
-    const selected = strip.querySelector('[aria-pressed="true"]');
-    if (!selected) return;
-    const left = selected.offsetLeft - (strip.clientWidth - selected.offsetWidth) / 2;
-    strip.scrollTo({ left: Math.max(0, left) });
+    if (!strip) return undefined;
+    const scrollSelected = () => {
+      const selected = strip.querySelector('[aria-pressed="true"]');
+      if (!selected) return;
+      const left = selected.offsetLeft - (strip.clientWidth - selected.offsetWidth) / 2;
+      strip.scrollTo({ left: Math.max(0, left) });
+    };
+    scrollSelected();
+    const observer = new ResizeObserver(scrollSelected);
+    observer.observe(strip);
+    return () => observer.disconnect();
   }, [month, page]);
   const year = month.slice(0, 4);
   const lines = useMemo(() => (baseline ? workingMonthLines(baseline.rows, plan, month) : []), [baseline, plan, month]);
@@ -225,28 +237,28 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
 
       {page === 'toki' && chartSeries && (
         <>
-          <div className="toki-panel-tabs" role="tablist" aria-label="Toki panels">
-            {[['summary', 'Summary'], ['year', 'Year'], ['groups', 'Groups']].map(([id, label]) => (
-              <button key={id} type="button" aria-selected={board === id} onClick={() => setBoard(id)}>{label}</button>
+          <div className="toki-panel-tabs" role="tablist" aria-label="Toki charts">
+            {[['month', 'This month'], ['year', 'Year'], ['groups', 'Groups']].map(([id, label]) => (
+              <button key={id} type="button" role="tab" aria-selected={board === id} onClick={() => setBoard(id)}>{label}</button>
             ))}
           </div>
-          <div className="stats" data-panel="summary" data-on={board === 'summary' ? 'true' : 'false'}>
+          <div className="stats" data-panel="month" data-on={board === 'month' ? 'true' : 'false'}>
             <Tile label="Income" value={showMoney(billingShown)} />
             <Tile label="Costs" value={showMoney(costShown)} />
             <Tile label="Result" value={showMoney(billingShown == null || costShown == null ? null : billingShown - costShown)} />
           </div>
-          <div className="toki-panels">
-            <div data-panel="year" data-on={board === 'year' ? 'true' : 'false'}>
-              <CompactColumns name="Income through the year" points={chartSeries.year.points} series={chartSeries.year.series} selectedId={month} onSelect={setMonth} format={formatPounds} />
-            </div>
-            <div data-panel="groups" data-on={board === 'groups' ? 'true' : 'false'}>
-              <CompactColumns name="Income and costs" points={chartSeries.compare.points} series={chartSeries.compare.series} selectedId="" onSelect={() => {}} format={formatPounds} />
-            </div>
-            <div data-panel="groups" data-on={board === 'groups' ? 'true' : 'false'}>
-              <CompactColumns name="Cost groups" points={chartSeries.groups.points} series={chartSeries.groups.series} selectedId="" onSelect={() => {}} format={formatPounds} />
-            </div>
+          <div className="chart-panel" data-panel="month" data-on={board === 'month' ? 'true' : 'false'}>
+            <p className="phone-result">Result {showMoney(billingShown == null || costShown == null ? null : billingShown - costShown)}</p>
+            <HorizontalBars name="Income and costs" points={chartSeries.compare.points} series={chartSeries.compare.series} format={formatPounds} />
           </div>
-          <p className="quiet">{baseline.grossProfitMeaning} A gap on a chart is missing information, not zero.</p>
+          <div className="chart-panel" data-panel="year" data-on={board === 'year' ? 'true' : 'false'}>
+            <YearColumns name="Income through the year" points={chartSeries.year.points} series={chartSeries.year.series} selectedId={month} onSelect={setMonth} format={formatPounds} />
+          </div>
+          <div className="chart-panel" data-panel="groups" data-on={board === 'groups' ? 'true' : 'false'}>
+            <HorizontalBars name="Cost groups" points={chartSeries.groups.points} series={chartSeries.groups.series} format={formatPounds} />
+          </div>
+          <p className="quiet quiet-full">{baseline.grossProfitMeaning} A gap on a chart is missing information, not zero.</p>
+          <p className="quiet quiet-short">Not profit after costs. A gap means missing, not zero.</p>
         </>
       )}
 

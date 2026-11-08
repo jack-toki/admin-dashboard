@@ -1,6 +1,6 @@
 'use client';
 import { Fragment, useEffect, useState } from 'react';
-import { syntheticActuals, syntheticBaseline } from '../../../lib/fixtures/synthetic';
+import { syntheticDashboard, syntheticDashboardActuals } from '../../../lib/fixtures/synthetic';
 import { validateEntry } from '../../../lib/planning/entries';
 import { TokiScreen, AutomationsScreen } from './TokiScreen';
 import JrlScreen from './JrlScreen';
@@ -109,8 +109,8 @@ export default function App({ role, areas, client }) {
     setCollapsed(toggleCollapsed(window.localStorage));
   }
 
-  const baseline = example ? syntheticBaseline() : storedForecast;
-  const actuals = example ? syntheticActuals() : evidence?.actuals || null;
+  const baseline = example ? syntheticDashboard() : storedForecast;
+  const actuals = example ? syntheticDashboardActuals() : evidence?.actuals || null;
 
   async function onSave(form) {
     const result = validateEntry({
