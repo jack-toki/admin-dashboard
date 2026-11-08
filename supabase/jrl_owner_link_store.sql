@@ -1,7 +1,9 @@
 -- NOT APPLIED. Cockpit store only (hcjybjpimqzsueyslxvl, schema cockpit).
 -- Do not run this until the owner approves it. It does not touch uxkpqmyzxtjmmixlycio.
--- It lets the off-by-default JRL owner link persist an encrypted rotating refresh token.
--- The provider check today allows only xero and google, so provider jrl cannot be saved yet.
+-- Approval scope is this table only: allow provider jrl, and add generation for compare-and-swap.
+-- The app updates one row with WHERE generation = expected and increments generation.
+-- If this column or the provider check is missing, the app refuses the link.
+-- A file store is also refused. Two processes cannot share its lock.
 -- No personal row, email, or key is written by this file.
 
 begin;

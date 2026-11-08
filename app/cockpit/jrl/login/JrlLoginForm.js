@@ -20,7 +20,7 @@ export default function JrlLoginForm({ returnTo }) {
     try {
       const res = await fetch('/api/cockpit/jrl/session', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: { 'content-type': 'application/json', 'x-cockpit-link': '1' },
         body: JSON.stringify({ email: enteredEmail, password: enteredPassword }),
       });
       const body = await res.json().catch(() => ({}));

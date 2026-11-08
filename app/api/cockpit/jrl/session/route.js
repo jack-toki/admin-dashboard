@@ -1,7 +1,7 @@
 import { canAccess, readSession } from '../../../../../lib/auth.js';
 import { loginGate, noteLoginFailure } from '../../../../../lib/auth/throttle.js';
 import { clearJrlSessionCookie, jrlSessionCookie, sealJrlSession, signInJrlPassword } from '../../../../../lib/jrl/session.js';
-import { establishOwnerLink, ownerLinkEnabled, ownerLinkStore, revokeOwnerLink } from '../../../../../lib/jrl/ownerLink.js';
+import { establishOwnerLink, ownerLinkEnabled, ownerLinkStore, rejectCrossSiteMutation, revokeOwnerLink } from '../../../../../lib/jrl/ownerLink.js';
 import { openAppStore, supabaseGuard } from '../../../../../lib/store/index.js';
 
 export const runtime = 'nodejs';
@@ -19,9 +19,15 @@ function cockpit(req) {
   return { session, response: null };
 }
 
+function noStore(body, status) {
+  return Response.json(body, { status, headers: { 'cache-control': 'private, no-store' } });
+}
+
 export async function POST(req) {
   const checked = cockpit(req);
   if (checked.response) return checked.response;
+  const guard = rejectCrossSiteMutation(req);
+  if (!guard.ok) return noStore({ ok: false, error: 'cross_site', linked: false }, 403);
   const opened = openAppStore();
   const store = opened.ok && (opened.status.backend === 'file' || supabaseGuard().ok) ? opened.store : null;
   const subject = subjectFor(req);
@@ -37,8 +43,8 @@ export async function POST(req) {
   let linked = { ok: false, skipped: true };
   if (ownerLinkEnabled()) {
     linked = await establishOwnerLink({ store: ownerLinkStore(store), session: signed.session });
-    if (!linked.ok && linked.error === 'cross_owner') {
-      return Response.json({ ok: false, error: 'cross_owner', linked: false }, { status: 403, headers: { 'cache-control': 'private, no-store' } });
+    if (!linked.ok && (linked.error === 'cross_owner' || linked.error === 'owner_sub_not_configured')) {
+      return noStore({ ok: false, error: linked.error, linked: false }, 403);
     }
   }
   const sealed = sealJrlSession(signed.session);
@@ -53,7 +59,11 @@ export async function POST(req) {
 }
 
 export async function DELETE(req) {
-  if (ownerLinkEnabled() && readSession(req)) {
+  const guard = rejectCrossSiteMutation(req);
+  if (!guard.ok) return noStore({ ok: false, error: 'cross_site', linked: false }, 403);
+  const checked = cockpit(req);
+  if (checked.response) return checked.response;
+  if (ownerLinkEnabled()) {
     const opened = openAppStore();
     const linkStore = ownerLinkStore(opened.ok ? opened.store : null);
     if (linkStore.ready) await revokeOwnerLink(linkStore);

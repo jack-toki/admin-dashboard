@@ -7,6 +7,28 @@
 -- Supabase service_role typically has BYPASSRLS. FORCE ROW LEVEL SECURITY does not remove that.
 -- The original Sora edge function uses that role today. This script leaves it unchanged so that function keeps working.
 -- The original JRL app reads and writes as the signed-in authenticated user. Those commands stay, narrowed to the pinned owner.
+--
+-- Approval scope, if the owner later runs this file: project uxkpqmyzxtjmmixlycio, schema public.
+-- It creates jrl_owner_pin and jrl_is_owner(), replaces the audited policies on the seven tables,
+-- forces row security, revokes anon and public on those tables, and narrows monthly_finance to
+-- select for authenticated. It does not read rows, alter a role, change signup, or set an env var.
+-- The companion cockpit file jrl_owner_link_store.sql is a separate approval: project
+-- hcjybjpimqzsueyslxvl, schema cockpit, provider jrl and the generation column only.
+--
+-- Bootstrap, not inferred from whoever signs in first:
+-- 1. Set app.jrl_owner_sub to the known auth.users id for this transaction only.
+-- 2. This script copies that uuid into jrl_owner_pin and then does not read the setting again.
+-- 3. Set the cockpit env JRL_OWNER_SUB to that same uuid. The app does not query auth.users.
+-- 4. Apply the cockpit generation column. The app refuses a file store and refuses a store
+--    whose generation column or provider check is missing.
+-- 5. Only then may JRL_OWNER_LINK be set to on, and only a token whose sub equals JRL_OWNER_SUB
+--    can be stored. A missing or malformed id aborts this transaction before policies change.
+--
+-- monthly_finance in the repository migration reads only monthly_entry. This file does not
+-- treat that as the live definition. Preflight and postflight abort if the view depends on
+-- any other relation. The 2026-11-08 audit granted the view to anon and authenticated.
+-- Those grants are not proof of anonymous access. This script revokes them and grants select
+-- to authenticated only. security_invoker stays on, so the view uses the caller's monthly_entry policy.
 
 begin;
 
@@ -29,13 +51,15 @@ returns boolean
 language sql
 stable
 security definer
-set search_path = public
+set search_path = pg_catalog, public
 as $$
   select auth.uid() is not null
     and auth.uid() = (select owner_sub from public.jrl_owner_pin where id)
 $$;
 
-revoke all on function public.jrl_is_owner() from public, anon;
+alter table public.jrl_owner_pin owner to current_user;
+alter function public.jrl_is_owner() owner to current_user;
+revoke all on function public.jrl_is_owner() from public, anon, authenticated;
 grant execute on function public.jrl_is_owner() to authenticated;
 
 -- Supply the stable auth.users id only for this transaction, then discard the setting.
@@ -186,7 +210,7 @@ begin
 end $$;
 
 alter view public.monthly_finance set (security_invoker = on);
-revoke all on table public.monthly_finance from anon, public;
+revoke all on table public.monthly_finance from anon, public, authenticated;
 grant select on table public.monthly_finance to authenticated;
 
 do $$
@@ -278,6 +302,86 @@ begin
     where schemaname = 'public' and tablename = 'jrl_owner_pin'
   ) then
     raise exception 'postflight_owner_pin_policy';
+  end if;
+
+  if (
+    select count(*) from pg_policies
+    where schemaname = 'public'
+      and tablename in (
+        'monthly_entry', 'finance_setting', 'finance_target', 'purchase',
+        'sora_conversation', 'sora_alerts', 'sora_research'
+      )
+  ) <> 19 then
+    raise exception 'postflight_policy_count';
+  end if;
+
+  if not exists (
+    select 1
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    join pg_roles owner_role on owner_role.oid = p.proowner
+    where n.nspname = 'public'
+      and p.proname = 'jrl_is_owner'
+      and p.prosecdef
+      and owner_role.rolname not in ('authenticated', 'anon', 'public')
+      and (owner_role.rolsuper or owner_role.rolbypassrls)
+      and position('current_setting' in p.prosrc) = 0
+      and exists (
+        select 1 from unnest(coalesce(p.proconfig, array[]::text[])) as cfg
+        where cfg like 'search_path=%' and cfg like '%pg_catalog%'
+      )
+  ) then
+    raise exception 'postflight_owner_helper_unsafe';
+  end if;
+
+  if not exists (
+    select 1
+    from pg_class c
+    join pg_namespace n on n.oid = c.relnamespace
+    join pg_roles owner_role on owner_role.oid = c.relowner
+    where n.nspname = 'public'
+      and c.relname = 'jrl_owner_pin'
+      and owner_role.rolname not in ('authenticated', 'anon', 'public')
+      and (owner_role.rolsuper or owner_role.rolbypassrls)
+  ) then
+    raise exception 'postflight_pin_owner_unsafe';
+  end if;
+
+  if has_table_privilege('authenticated', 'public.jrl_owner_pin', 'select')
+    or has_table_privilege('authenticated', 'public.jrl_owner_pin', 'insert')
+    or has_table_privilege('authenticated', 'public.jrl_owner_pin', 'update')
+    or has_table_privilege('authenticated', 'public.jrl_owner_pin', 'delete')
+    or has_table_privilege('anon', 'public.jrl_owner_pin', 'select')
+    or has_function_privilege('anon', 'public.jrl_is_owner()', 'execute')
+    or has_function_privilege('public', 'public.jrl_is_owner()', 'execute')
+  then
+    raise exception 'postflight_pin_grant';
+  end if;
+
+  if has_table_privilege('anon', 'public.monthly_finance', 'select')
+    or has_table_privilege('public', 'public.monthly_finance', 'select')
+    or has_table_privilege('authenticated', 'public.monthly_finance', 'insert')
+    or has_table_privilege('authenticated', 'public.monthly_finance', 'update')
+    or has_table_privilege('authenticated', 'public.monthly_finance', 'delete')
+    or not has_table_privilege('authenticated', 'public.monthly_finance', 'select')
+  then
+    raise exception 'postflight_view_privilege';
+  end if;
+
+  if exists (
+    select 1
+    from pg_rewrite rw
+    join pg_class v on v.oid = rw.ev_class
+    join pg_namespace vn on vn.oid = v.relnamespace
+    join pg_depend d on d.objid = rw.oid and d.deptype = 'n'
+    join pg_class ref on ref.oid = d.refobjid
+    where vn.nspname = 'public'
+      and v.relname = 'monthly_finance'
+      and ref.relkind in ('r', 'p', 'v', 'm', 'f')
+      and ref.oid <> v.oid
+      and ref.relname <> 'monthly_entry'
+  ) then
+    raise exception 'postflight_view_dependency_unexpected';
   end if;
 
   if exists (
