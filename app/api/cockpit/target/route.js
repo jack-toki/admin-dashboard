@@ -11,10 +11,11 @@ export async function GET(req) {
   if (!canAccess(session, 'toki')) return Response.json({ error: 'forbidden' }, { status: 403 });
   const guard = supabaseGuard();
   const probe = await probeCockpitSchema(process.env);
+  const connected = probe.reachable === true;
   return Response.json({
     ok: true,
-    connected: false,
-    target: guard.target,
+    connected,
+    target: { ...guard.target, connected },
     access: {
       schema: COCKPIT_ACCESS.schema,
       schemaRoute: COCKPIT_ACCESS.schemaRoute,

@@ -53,7 +53,7 @@ export async function GET(req) {
   }
   return Response.json({
     ok: true,
-    connected: false,
+    connected: true,
     storedCount: cells.length,
     testedAgainstPreview: false,
     cells,

@@ -55,8 +55,13 @@ test('supabase forecast reads stay closed until the project ref and schema flag 
   });
   assert.equal(report.match, true);
   assert.equal(report.reason, 'match');
-  assert.equal(report.connected, false);
   assert.equal(report.writesAllowed, false);
+  const openWrites = targetCheck({
+    SUPABASE_URL: `https://${EXPECTED_PROJECT_REF}.supabase.co`,
+    SUPABASE_SERVICE_KEY: serviceJwt(EXPECTED_PROJECT_REF),
+    COCKPIT_DB_SCHEMA: 'cockpit',
+  });
+  assert.equal(openWrites.writesAllowed, true);
   assert.equal(report.importGateOpen, false);
   assert.equal(JSON.stringify(report).includes(serviceJwt(EXPECTED_PROJECT_REF)), false);
   const publishable = targetCheck({

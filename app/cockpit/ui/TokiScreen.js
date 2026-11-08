@@ -15,7 +15,7 @@ const SECTIONS = [
   ['commentary', 'This week'],
 ];
 
-export function TokiScreen({ example, baseline, actuals, evidence, plan, planNote, onSave, formError, forecastError }) {
+export function TokiScreen({ example, baseline, actuals, evidence, plan, planNote, onSave, onRemove, formError, forecastError }) {
   const [section, setSection] = useState('overview');
   const [month, setMonth] = useState('2026-01');
   const [mode, setMode] = useState('base');
@@ -37,7 +37,9 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
         { id: 'plan', label: 'Plan', color: 'var(--ink)', values: points.map((point) => ({ id: point.id, value: billingAt(point.id)?.forecast.minor ?? null, status: baseline.synthetic ? 'Example forecast. The workbook is not read.' : 'Stored forecast. The workbook is not read.' })) },
         { id: 'actual', label: 'Accounting actual', color: 'var(--c1)', values: points.map((point) => {
           const group = billingAt(point.id);
-          return { id: point.id, value: group?.actual.known ? group.actual.minor : null, status: group?.actual.known ? 'Example actual. Not from Xero.' : 'Not on record' };
+          const coverage = actuals?.months?.[point.id]?.coverage;
+          const partial = coverage === 'partial';
+          return { id: point.id, value: group?.actual.known ? group.actual.minor : null, status: partial ? 'Partial accounting export. Not a complete profit and loss.' : group?.actual.known ? 'Historical accounting export. Not live Xero.' : 'Not on record' };
         }) },
       ],
     };
@@ -74,9 +76,11 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
         ))}
       </div>
       <div style={pills}>
-        {baseline.months.map((item) => (
-          <button key={item.key} type="button" onClick={() => setMonth(item.key)} style={pill(month === item.key)}>{item.header}</button>
-        ))}
+        {baseline.months.map((item) => {
+          const coverage = actuals?.months?.[item.key]?.coverage;
+          const suffix = coverage === 'partial' ? ' · partial' : coverage === 'missing' ? ' · missing' : '';
+          return <button key={item.key} type="button" onClick={() => setMonth(item.key)} style={pill(month === item.key)}>{item.header}{suffix}</button>;
+        })}
       </div>
       <div className="tgt-modes">
         {[['base', 'Base'], ['best', 'Higher'], ['worst', 'Lower']].map(([id, label]) => (
@@ -85,7 +89,7 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
       </div>
       {chartSeries && (
         <>
-          <InteractiveSeriesChart name="billing" points={chartSeries.points} series={chartSeries.series} selectedId={month} onSelect={setMonth} format={formatPounds} caption="Example data. A missing actual stays unknown. Higher and lower recompute the plan line only." />
+          <InteractiveSeriesChart name="billing" points={chartSeries.points} series={chartSeries.series} selectedId={month} onSelect={setMonth} format={formatPounds} caption={baseline.synthetic ? 'Example data. A missing actual stays unknown.' : 'Stored forecast. A missing actual stays unknown. January 2027 group totals are recomputed from inputs.'} />
           <p id="toki-month-detail" aria-live="polite">{baseline.months.find((item) => item.key === month)?.header} selected. Xero is not connected.</p>
         </>
       )}
@@ -99,6 +103,10 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
           </div>
           <GroupTable groups={view.groups} />
           <p style={muted}>{baseline.grossProfitMeaning} {baseline.anomaly?.message}</p>
+          {(baseline.formulaFlags || []).map((flag) => (
+            <p key={flag.month} role="status">January 2027 totals on screen are recomputed from stored input lines. The source total omits {formatPounds(flag.omittedMinor)}. The stored source cell is not replaced.</p>
+          ))}
+          {actuals?.months?.[month]?.coverage === 'partial' && <p role="status">This month is a partial accounting export. It is not a complete profit and loss. People actuals stay unknown.</p>}
         </>
       )}
 
@@ -154,7 +162,11 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
           {formError && <p role="alert">{formError}</p>}
           {planNote && <p style={muted}>{planNote} The workbook and Xero are not written.</p>}
           <ul>
-            {plan.map((entry) => <li key={entry.id}>{entry.kind} {formatPounds(entry.amountMinor)} · {entry.party} · {entry.month} · {entry.timing}</li>)}
+            {plan.map((entry) => (
+              <li key={entry.id}>{entry.kind} {formatPounds(entry.amountMinor)} · {entry.party} · {entry.month} · {entry.timing}
+                {onRemove && <button type="button" onClick={() => onRemove(entry.id)}>Remove</button>}
+              </li>
+            ))}
           </ul>
         </form>
       )}

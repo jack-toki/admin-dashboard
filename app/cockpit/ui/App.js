@@ -123,6 +123,19 @@ export default function App({ role, areas, client }) {
     setPlan((current) => [...current.filter((entry) => entry.id !== body.entry.id), body.entry]);
   }
 
+  async function onRemove(id) {
+    const res = await fetch('/api/cockpit/plan', {
+      method: 'DELETE',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    if (!res.ok) {
+      setFormError('The plan row was not removed.');
+      return;
+    }
+    setPlan((current) => current.filter((entry) => entry.id !== id));
+  }
+
   const items = visibleNav(areas);
 
   async function onSignOut() {
@@ -178,7 +191,7 @@ export default function App({ role, areas, client }) {
               <button type="button" className="toggle glass signout" onClick={onSignOut}>Sign out</button>
             </div>
           </div>
-          {area === 'toki' && <TokiScreen example={example} baseline={baseline} actuals={actuals} evidence={example ? null : evidence} plan={plan} planNote={planNote} onSave={onSave} formError={formError} forecastError={forecastError} />}
+          {area === 'toki' && <TokiScreen example={example} baseline={baseline} actuals={actuals} evidence={example ? null : evidence} plan={plan} planNote={planNote} onSave={onSave} onRemove={onRemove} formError={formError} forecastError={forecastError} />}
           {area === 'automations' && (
             <>
               <AutomationsScreen example={example} />
