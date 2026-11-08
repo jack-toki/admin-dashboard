@@ -26,6 +26,7 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
   const [editingKey, setEditingKey] = useState('');
   const [drafts, setDrafts] = useState({});
   const [adding, setAdding] = useState(null);
+  const [sheetError, setSheetError] = useState('');
 
   const page = section === 'sources' || section === 'plan' ? 'sources' : 'toki';
   const year = month.slice(0, 4);
@@ -139,13 +140,31 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
     return ok;
   }
 
+  function isChanged(line) {
+    const draft = drafts[line.key];
+    if (!draft) return false;
+    const amount = line.minor == null ? '' : String(line.minor / 100);
+    const groupId = line.groupKnown ? line.groupId : '';
+    return draft.amount !== amount || draft.party !== line.party || (draft.workType || '') !== (line.workType || '') || (draft.groupId || '') !== groupId;
+  }
+
   async function saveAll() {
-    for (const line of lines) {
-      if (!drafts[line.key]) continue;
+    const dirty = lines.filter(isChanged);
+    for (const line of dirty) {
+      const draft = draftFor(line);
+      if (line.kind === 'cost' && !draft.groupId) {
+        setSheetError('Choose a cost group before saving.');
+        return;
+      }
       const ok = await saveLine(line);
-      if (!ok) return;
+      if (!ok) {
+        setSheetError('That line was not saved.');
+        return;
+      }
     }
+    setSheetError('');
     setEditAll(false);
+    setEditingKey('');
   }
 
   function rowOpen(line) {
@@ -210,7 +229,7 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
             <div data-panel="year" data-on={board === 'year' ? 'true' : 'false'}>
               <CompactColumns name="Income through the year" points={chartSeries.year.points} series={chartSeries.year.series} selectedId={month} onSelect={setMonth} format={formatPounds} />
             </div>
-            <div data-panel="summary" data-on={board === 'summary' ? 'true' : 'false'}>
+            <div data-panel="groups" data-on={board === 'groups' ? 'true' : 'false'}>
               <CompactColumns name="Income and costs" points={chartSeries.compare.points} series={chartSeries.compare.series} selectedId="" onSelect={() => {}} format={formatPounds} />
             </div>
             <div data-panel="groups" data-on={board === 'groups' ? 'true' : 'false'}>
@@ -224,17 +243,17 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
       {page === 'sources' && (
         <div className="month-sheet">
           <div className="sheet-tools">
-            <button type="button" onClick={() => { if (editAll) { setEditAll(false); setDrafts({}); } else { const next = {}; lines.forEach((line) => { next[line.key] = draftFor(line); }); setDrafts(next); setEditAll(true); } }}>{editAll ? 'Cancel' : 'Edit all'}</button>
-            {editAll && <button type="button" onClick={saveAll}>Save</button>}
+            <button type="button" onClick={() => { if (editAll) { setEditAll(false); setEditingKey(''); setDrafts({}); } else { const next = {}; lines.forEach((line) => { next[line.key] = draftFor(line); }); setDrafts(next); setEditAll(true); } }}>{editAll ? 'Cancel all' : 'Edit all'}</button>
+            {editAll && <button type="button" onClick={saveAll}>Save all</button>}
           </div>
-          {formError && <p role="alert">{formError}</p>}
+          {(sheetError || formError) && <p role="alert">{sheetError || formError}</p>}
           {planNote && <p className="quiet">{planNote} These edits are a working forecast. Xero is not written.</p>}
-          <SheetBlock title="Income" lines={income} rowOpen={rowOpen} draftFor={draftFor} setDrafts={setDrafts} openEdit={openEdit} saveLine={saveLine} onRemove={onRemove} setEditingKey={setEditingKey} />
+          <SheetBlock title="Income" lines={income} bulk={editAll} rowOpen={rowOpen} draftFor={draftFor} setDrafts={setDrafts} openEdit={openEdit} saveLine={saveLine} onRemove={onRemove} setEditingKey={setEditingKey} />
           <div className="sheet-add">
             <button type="button" onClick={() => setAdding({ kind: 'sale', workType: 'retainer', party: '', amount: '', groupId: 'billing' })}>Add a retainer</button>
             <button type="button" onClick={() => setAdding({ kind: 'sale', workType: 'project', party: '', amount: '', groupId: 'billing' })}>Add project work</button>
           </div>
-          <SheetBlock title="Costs" lines={costs} rowOpen={rowOpen} draftFor={draftFor} setDrafts={setDrafts} openEdit={openEdit} saveLine={saveLine} onRemove={onRemove} setEditingKey={setEditingKey} />
+          <SheetBlock title="Costs" lines={costs} bulk={editAll} rowOpen={rowOpen} draftFor={draftFor} setDrafts={setDrafts} openEdit={openEdit} saveLine={saveLine} onRemove={onRemove} setEditingKey={setEditingKey} />
           <div className="sheet-add">
             <button type="button" onClick={() => setAdding({ kind: 'cost', workType: '', party: '', amount: '', groupId: '' })}>Add a cost</button>
           </div>
@@ -262,7 +281,7 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
   );
 }
 
-function SheetBlock({ title, lines, rowOpen, draftFor, setDrafts, openEdit, saveLine, onRemove, setEditingKey }) {
+function SheetBlock({ title, lines, bulk, rowOpen, draftFor, setDrafts, openEdit, saveLine, onRemove, setEditingKey }) {
   return (
     <section className="sheet-block">
       <h2>{title}</h2>
@@ -291,7 +310,7 @@ function SheetBlock({ title, lines, rowOpen, draftFor, setDrafts, openEdit, save
               )}
               {open ? <input aria-label="Amount in pounds" value={draft.amount} onChange={(event) => setDrafts((current) => ({ ...current, [line.key]: { ...draft, amount: event.target.value } }))} /> : <span className="num">{showMoney(line.minor)}</span>}
               {open ? <button type="button" onClick={() => saveLine(line)}>Save</button> : <button type="button" onClick={() => openEdit(line)}>Edit</button>}
-              {open && <button type="button" onClick={() => { setEditingKey(''); setDrafts((current) => { const next = { ...current }; delete next[line.key]; return next; }); }}>Cancel</button>}
+              {open && !bulk && <button type="button" onClick={() => { setEditingKey(''); setDrafts((current) => { const next = { ...current }; delete next[line.key]; return next; }); }}>Cancel</button>}
               {line.planId && onRemove ? <button type="button" onClick={() => onRemove(line.planId)}>Remove</button> : null}
               {line.overridden && line.baseMinor != null ? <span className="quiet">Was {showMoney(line.baseMinor)}</span> : null}
             </li>
