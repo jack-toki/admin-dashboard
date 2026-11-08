@@ -48,11 +48,7 @@
   .glass-nav, .glass-nav * { transition: none !important; }
 }
 
-.jrl-root .side nav a .nav-mark,
-.jrl-root nav a.on .ic,
-.jrl-root nav a.on .nav-mark,
-.jrl-root nav a.on .ic .nav-mark { color: var(--ink) !important; }
-.jrl-root .nav-mark { width: 18px; height: 18px; display: block; }
+.jrl-root .nav-mark { width: 18px; height: 18px; display: block; color: inherit; }
 .jrl-mark { display: grid; place-items: center; font-size: 9px; font-weight: 700; letter-spacing: -0.04em; }
 .jrl-root .side[data-collapsed="true"] { width: 84px; padding-left: 12px; padding-right: 12px; }
 .jrl-root .side[data-collapsed="true"] .lbl,
@@ -258,7 +254,9 @@
 .chart-segments { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-radius: 999px; padding: 3px; background: var(--track); }
 .chart-segments button { appearance: none; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: .78rem; min-height: 28px; border-radius: 999px; cursor: pointer; }
 .col-plot { position: relative; }
-.col-average { position: absolute; left: 0; right: 0; height: 0; border-top: 1.5px dashed var(--ink); pointer-events: none; }
+.col-average { position: absolute; left: 0; right: 4px; z-index: 2; height: 0; border-top: 1.5px dashed var(--ink); pointer-events: none; }
+.col-average::after { content: "Avg"; position: absolute; right: 0; top: -13px; font-size: 10px; letter-spacing: .04em; color: var(--ink); }
+.avg-swatch { width: 18px; height: 0; border-top: 1.5px dashed currentColor; background: none !important; display: inline-block; }
 .chart-key:disabled { opacity: .35; cursor: not-allowed; }
 .income-board { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .income-tabs, .income-kind-tabs, .income-row-actions { display: flex; gap: 6px; flex-wrap: wrap; }

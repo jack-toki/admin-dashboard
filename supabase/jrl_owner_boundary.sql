@@ -10,8 +10,10 @@
 --
 -- Approval scope, if the owner later runs this file: project uxkpqmyzxtjmmixlycio, schema public.
 -- It creates jrl_owner_pin and jrl_is_owner(), replaces the audited policies on the seven tables,
--- forces row security, revokes anon and public on those tables, and narrows monthly_finance to
--- select for authenticated. It does not read rows, alter a role, change signup, or set an env var.
+-- forces row security, revokes anon, public, and authenticated on those tables, then grants
+-- authenticated only the 19 audited commands. TRUNCATE, TRIGGER, REFERENCES, and MAINTAIN
+-- stay revoked. TRUNCATE would bypass row security. It does not read rows, alter a role,
+-- change signup, or set an env var.
 -- The companion cockpit file jrl_owner_link_store.sql is a separate approval: project
 -- hcjybjpimqzsueyslxvl, schema cockpit, provider jrl and the generation column only.
 --
@@ -73,6 +75,12 @@ declare
 begin
   if owner_sub is null or owner_sub !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' then
     raise exception 'preflight_owner_sub_missing';
+  end if;
+  if to_regclass('auth.users') is null then
+    raise exception 'preflight_auth_users_missing';
+  end if;
+  if not exists (select 1 from auth.users where id = owner_sub::uuid) then
+    raise exception 'preflight_owner_sub_unknown';
   end if;
   if (select count(*) from public.jrl_owner_pin) > 1 then
     raise exception 'preflight_owner_pin_ambiguous';
@@ -158,7 +166,7 @@ begin
   loop
     execute format('alter table public.%I enable row level security', t);
     execute format('alter table public.%I force row level security', t);
-    execute format('revoke all on table public.%I from anon, public', t);
+    execute format('revoke all on table public.%I from public, anon, authenticated', t);
   end loop;
 
   for spec in
@@ -207,6 +215,15 @@ begin
       );
     end if;
   end loop;
+
+  -- Least privilege for the 19 commands. Not TRUNCATE, TRIGGER, REFERENCES, or MAINTAIN.
+  execute 'grant select, insert, update, delete on table public.monthly_entry to authenticated';
+  execute 'grant select, insert, update, delete on table public.finance_target to authenticated';
+  execute 'grant select, insert, update on table public.finance_setting to authenticated';
+  execute 'grant select, insert, delete on table public.purchase to authenticated';
+  execute 'grant select, delete on table public.sora_conversation to authenticated';
+  execute 'grant select, delete on table public.sora_research to authenticated';
+  execute 'grant select on table public.sora_alerts to authenticated';
 end $$;
 
 alter view public.monthly_finance set (security_invoker = on);
@@ -396,6 +413,27 @@ begin
       )
   ) then
     raise exception 'postflight_operation_expanded';
+  end if;
+
+  -- TRUNCATE bypasses row security, so authenticated must not keep it.
+  -- TRIGGER, REFERENCES, and MAINTAIN are not one of the 19 commands.
+  -- MAINTAIN exists on PostgreSQL 17, including 17.6.
+  if current_setting('server_version_num')::int < 170000 then
+    raise exception 'postflight_pg17_required';
+  end if;
+  if exists (
+    select 1
+    from (
+      values
+        ('monthly_entry'), ('finance_setting'), ('finance_target'), ('purchase'),
+        ('sora_conversation'), ('sora_alerts'), ('sora_research')
+    ) as tables(name)
+    where has_table_privilege('authenticated', format('public.%I', tables.name), 'TRUNCATE')
+       or has_table_privilege('authenticated', format('public.%I', tables.name), 'TRIGGER')
+       or has_table_privilege('authenticated', format('public.%I', tables.name), 'REFERENCES')
+       or has_table_privilege('authenticated', format('public.%I', tables.name), 'MAINTAIN')
+  ) then
+    raise exception 'postflight_excess_privilege';
   end if;
 end $$;
 

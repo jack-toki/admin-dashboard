@@ -26,31 +26,31 @@ begin
   end loop;
 end $$;
 
-create policy monthly_entry_select on public.monthly_entry for select to authenticated using (true);
+create policy monthly_entry_read on public.monthly_entry for select to authenticated using (true);
 create policy monthly_entry_insert on public.monthly_entry for insert to authenticated with check (true);
 create policy monthly_entry_update on public.monthly_entry for update to authenticated using (true) with check (true);
 create policy monthly_entry_delete on public.monthly_entry for delete to authenticated using (true);
 
-create policy finance_target_select on public.finance_target for select to authenticated using (true);
+create policy finance_target_read on public.finance_target for select to authenticated using (true);
 create policy finance_target_insert on public.finance_target for insert to authenticated with check (true);
 create policy finance_target_update on public.finance_target for update to authenticated using (true) with check (true);
 create policy finance_target_delete on public.finance_target for delete to authenticated using (true);
 
-create policy finance_setting_select on public.finance_setting for select to authenticated using (true);
+create policy finance_setting_read on public.finance_setting for select to authenticated using (true);
 create policy finance_setting_insert on public.finance_setting for insert to authenticated with check (true);
 create policy finance_setting_update on public.finance_setting for update to authenticated using (true) with check (true);
 
-create policy purchase_select on public.purchase for select to authenticated using (true);
+create policy purchase_read on public.purchase for select to authenticated using (true);
 create policy purchase_insert on public.purchase for insert to authenticated with check (true);
 create policy purchase_delete on public.purchase for delete to authenticated using (true);
 
-create policy sora_conversation_select on public.sora_conversation for select to authenticated using (true);
+create policy sora_conversation_read on public.sora_conversation for select to authenticated using (true);
 create policy sora_conversation_delete on public.sora_conversation for delete to authenticated using (true);
 
-create policy sora_research_select on public.sora_research for select to authenticated using (true);
+create policy sora_research_read on public.sora_research for select to authenticated using (true);
 create policy sora_research_delete on public.sora_research for delete to authenticated using (true);
 
-create policy sora_alerts_select on public.sora_alerts for select to authenticated using (true);
+create policy sora_alerts_read on public.sora_alerts for select to authenticated using (true);
 
 do $$
 declare t text;

@@ -137,7 +137,7 @@ test('owner boundary SQL is prepared offline and does not open the ledger to ano
   assert.match(sql, /NOT APPLIED/);
   assert.match(sql, /security_invoker = on/);
   assert.match(sql, /jrl_is_owner/);
-  assert.match(sql, /revoke all on table public\.%I from anon, public/);
+  assert.match(sql, /revoke all on table public\.%I from public, anon, authenticated/);
   assert.equal(/create policy[\s\S]*to anon/i.test(sql), false);
   assert.equal(/enable signup|signups enabled/i.test(sql), false);
 });

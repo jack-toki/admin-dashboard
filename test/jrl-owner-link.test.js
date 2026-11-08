@@ -103,6 +103,14 @@ test('the owner boundary covers every audited command and does not guess an iden
   assert.equal(/for all to authenticated/i.test(sql), false);
   assert.equal(/create policy[\s\S]*to anon/i.test(sql), false);
   assert.match(sql, /does not ALTER ROLE/);
+  assert.match(sql, /preflight_owner_sub_unknown/);
+  assert.match(sql, /revoke all on table public\.%I from public, anon, authenticated/);
+  assert.match(sql, /postflight_excess_privilege/);
+  assert.match(sql, /'MAINTAIN'/);
+  assert.equal(/grant truncate/i.test(sql), false);
+  assert.match(denial, /begin;/);
+  assert.match(denial, /denial_asserts/);
+  assert.match(denial, /denial_truncate_succeeded/);
   const link = fs.readFileSync(rootFile('supabase/jrl_owner_link_store.sql'), 'utf8');
   assert.equal(/delete from/i.test(link), false);
   assert.equal(/grant delete/i.test(link), false);
@@ -132,7 +140,9 @@ test('the owner boundary covers every audited command and does not guess an iden
   for (const [table, commands] of TABLES) {
     for (const command of commands) {
       assert.match(sql, new RegExp(`'${table}', '${command}'`));
-      assert.match(rollback, new RegExp(`${table}_${command.toLowerCase()}`));
+      const policy = command === 'SELECT' ? `${table}_read` : `${table}_${command.toLowerCase()}`;
+      assert.match(rollback, new RegExp(policy));
+      assert.equal(rollback.includes(`${table}_select`), false);
       assert.match(denial, new RegExp(`${table}_other_owner`));
     }
   }

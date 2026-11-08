@@ -29,6 +29,19 @@ test('Acme November is scheduled 2 of 6 and an end date a month later changes th
   assert.equal(scheduleFor({ firstPaymentMonth: null, contractEndDate: null, comment: '2 of 6' }, '2026-11').state, 'unknown');
 });
 
+test('a known retainer needs an end date and an unknown import must not invent one', () => {
+  assert.equal(validateIncomeDetail({ kind: 'retainer', party: 'Acme Ltd', amountMinor: 150000 }).ok, false);
+  const unknown = validateIncomeDetail({ kind: 'retainer', party: 'Acme Ltd', amountMinor: 150000, source: 'snapshot', contractEndUnknown: true });
+  assert.equal(unknown.ok, true);
+  assert.equal(unknown.record.contractEndDate, null);
+  assert.equal(unknown.record.contractEndUnknown, true);
+  assert.equal(validateIncomeDetail({ kind: 'retainer', party: 'Acme Ltd', source: 'snapshot', contractEndUnknown: true, contractEndDate: '2027-03-31' }).ok, false);
+  assert.equal(validateIncomeDetail({ ...acme, sourceRowId: '../sheet' }).ok, false);
+  assert.equal(validateIncomeDetail({ ...acme, firstPaymentMonth: '2026-13' }).ok, false);
+  assert.equal(validateIncomeDetail({ ...acme, observedMonth: '2026-00' }).ok, false);
+  assert.equal(validateIncomeDetail({ ...acme, sourceRowId: 'sheet:3:retainer' }).record.sourceRowId, 'sheet:3:retainer');
+});
+
 test('a missing amount stays missing and an explicit zero is summed', () => {
   const month = '2026-11';
   const rows = [
@@ -102,7 +115,14 @@ test('the file store saves a client line without adding a forecast row, and a sh
       body: JSON.stringify({ ...acme, amount: 1500 }),
     }), {
       env,
-      openAppStore: () => ({ ok: true, status: { backend: 'supabase', shared: true }, store: { listPlans() { throw new Error('plans'); } } }),
+      openAppStore: () => ({
+        ok: true,
+        status: { backend: 'supabase', shared: true },
+        store: {
+          async saveIncomeDetail() { return { ok: false, error: 'income_detail_schema_required' }; },
+          listPlans() { throw new Error('plans'); },
+        },
+      }),
     });
     assert.equal(shared.status, 409);
     const gap = await shared.json();

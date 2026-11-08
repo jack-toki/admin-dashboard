@@ -247,8 +247,8 @@
 
 .jrl-root /* ── entry form ─────────────────────────────────────────────────────────── */
 .head-actions{display:flex; align-items:center; gap:8px}
-.jrl-root .signout{display:inline-flex; align-items:center; justify-content:center; color:var(--muted)}
-.jrl-root .signout:hover{color:var(--ink)}
+.jrl-root .head-actions .signout{display:inline-flex; align-items:center; justify-content:center; color:var(--ink); background:var(--surface); border:1px solid var(--line-quiet); box-shadow:none}
+.jrl-root .head-actions .signout:hover{color:var(--ink); background:var(--control-on)}
 
 .jrl-root .entry-head{display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap}
 .jrl-root .month-select{appearance:none; background:var(--glass-2); border:.5px solid var(--hair); color:var(--ink);
@@ -483,6 +483,15 @@
   .jrl-root nav a .lbl, .jrl-root nav a .lbl-short, .jrl-root .help { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
   .jrl-root .toki-subnav { display: none; }
   .jrl-root .toki-section-switch { display: flex; }
-  .jrl-root nav a.on, .jrl-root nav a:hover { color: #fff; background: rgba(255,255,255,.08); }
-  .jrl-root .toggle { color: #fff; background: transparent; border-color: rgba(255,255,255,.2); }
+  .jrl-root .side nav a,
+  .jrl-root .side nav a .ic,
+  .jrl-root .side nav a .nav-mark,
+  .jrl-root .side nav a.on,
+  .jrl-root .side nav a.on .ic,
+  .jrl-root .side nav a.on .nav-mark,
+  .jrl-root .side nav a.on .ic .nav-mark { color: #f4f7fb !important; }
+  .jrl-root .side nav a.on, .jrl-root .side nav a:hover { color: #f4f7fb; background: rgba(255,255,255,.08); }
+  .jrl-root .side > .toggle { color: #f4f7fb; background: transparent; border-color: rgba(255,255,255,.28); }
+  .jrl-root .side .nav-mark { width: 20px; height: 20px; }
+  .jrl-root .side .jrl-mark { font-size: 11px; }
 }

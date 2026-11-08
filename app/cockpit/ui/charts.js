@@ -279,6 +279,7 @@ function linePhrase(line, format) {
 
 export function YearColumns({ name, months, selectedId, onOpen, format }) {
   const [hidden, setHidden] = useState({});
+  const [showAverage, setShowAverage] = useState(true);
   const [focusId, setFocusId] = useState('');
   const legend = [
     ...(months[0]?.segments || []).map((item) => ({ id: item.id, label: item.label, color: item.color })),
@@ -306,7 +307,13 @@ export function YearColumns({ name, months, selectedId, onOpen, format }) {
     <figure className="finance-plot" data-chart={name}>
       <figcaption>
         <strong>{name}</strong>
-        <ChartLegend name={name} series={legend} hidden={hidden} setHidden={setHidden} ready={ready} />
+        <span className="year-legend">
+          <ChartLegend name={name} series={legend} hidden={hidden} setHidden={setHidden} ready={ready} />
+          <button type="button" className="chart-key" aria-pressed={showAverage} onClick={() => setShowAverage((current) => !current)}>
+            <i className="avg-swatch" />
+            Average
+          </button>
+        </span>
       </figcaption>
       <div className="col-chart">
         <div className="col-axis" aria-hidden="true">
@@ -316,7 +323,7 @@ export function YearColumns({ name, months, selectedId, onOpen, format }) {
         </div>
         <div className="col-plot" role="group" aria-label={name}>
           <div className="col-grid" aria-hidden="true" />
-          {average != null && <span className="col-average" style={{ bottom: `calc(22px + ${(Math.min(average, max) / max) * 78}%)` }} />}
+          {showAverage && average != null && <span className="col-average" style={{ bottom: `calc(22px + ${(Math.min(average, max) / max)} * (100% - 22px))` }} />}
           {months.map((month) => (
             <button
               key={month.id}
