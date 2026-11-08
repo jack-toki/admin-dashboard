@@ -8,6 +8,8 @@ import { afford } from '../../../vendor/jrl-finance/code/lib/afford.ts';
 import { monthsToTarget, projectPath } from '../../../vendor/jrl-finance/code/lib/targets.ts';
 import { confirmDelete, dayGroup, filterConversations, pageConversations } from '../../../lib/jrl/sora';
 import { ComparisonBars, InteractiveSeriesChart } from './charts';
+import { PotCard } from './PotCard';
+import { blankPotRecord, latestPortfolioValue } from '../../../lib/jrl/pots';
 import '../jrl.css';
 
 const LINKS = [
@@ -43,6 +45,7 @@ export default function JrlScreen({ gate }) {
   const [budget, setBudget] = useState('');
   const [floor, setFloor] = useState('500');
   const [savingsFirst, setSavingsFirst] = useState('0');
+  const [potRecord, setPotRecord] = useState(blankPotRecord);
   const window = useMemo(() => monthWindow(new Date('2026-11-08T12:00:00Z')), []);
 
   useEffect(() => {
@@ -76,6 +79,31 @@ export default function JrlScreen({ gate }) {
     setTheme(next);
     window.localStorage.setItem('jrl-theme', next);
     window.dispatchEvent(new Event('jrl-theme'));
+  }
+
+  const signedIn = Boolean(gate?.body?.auth?.supabaseUser);
+
+  useEffect(() => {
+    if (!signedIn) return undefined;
+    let cancel = false;
+    fetch('/api/cockpit/jrl/pots').then(async (res) => {
+      if (!res.ok || cancel) return;
+      const body = await res.json();
+      if (body.record) setPotRecord({ ...blankPotRecord(), ...body.record });
+    }).catch(() => {});
+    return () => { cancel = true; };
+  }, [signedIn]);
+
+  async function onPots(next) {
+    const res = await fetch('/api/cockpit/jrl/pots', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(next),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || !body.record) return false;
+    setPotRecord({ ...blankPotRecord(), ...body.record });
+    return true;
   }
 
   const ledger = useMemo(() => deriveLedger(entries), [entries]);
@@ -116,7 +144,12 @@ export default function JrlScreen({ gate }) {
               <span>{auth?.expired ? 'The JRL session expired. Sign in again. The ledger was not filled in.' : auth?.supabaseUser ? `Signed in to JRL. The session expires ${auth.expiresAt ? new Date(auth.expiresAt).toLocaleString('en-GB') : 'on its own'}.` : (!auth?.configured ? `JRL sign-in needs ${(auth?.missing || ['JRL_SUPABASE_URL', 'JRL_SUPABASE_ANON_KEY']).join(' and ')} on this server. The legacy anon key is accepted. No service role is used.` : 'Sign in with the JRL account. The cockpit password does not open the ledger.')}</span>
               {auth?.supabaseUser ? <button type="button" className="nudge-btn" onClick={async () => { await fetch('/api/cockpit/jrl/session', { method: 'DELETE', headers: { 'x-cockpit-link': '1' } }); window.location.assign('/cockpit#jrl'); }}>Sign out of JRL</button> : auth?.configured ? <a className="nudge-btn" href={auth?.handoff || '/cockpit/jrl/login?return=/cockpit%23jrl'}>JRL sign-in</a> : null}
           </div>
-          {auth?.supabaseUser && section === 'overview' && <Overview ledger={ledger} targets={targets} />}
+          {auth?.supabaseUser && section === 'overview' && (
+            <>
+              <PotCard record={potRecord} ledger={ledger} portfolioAvailable={Boolean(latestPortfolioValue(ledger))} onChange={onPots} />
+              <Overview ledger={ledger} targets={targets} />
+            </>
+          )}
           {auth?.supabaseUser && section === 'month' && (
             <MonthForm form={form} setForm={setForm} period={period} setPeriod={setPeriod} options={window.options} ledger={ledger} onSave={onSave} note={saveNote} />
           )}

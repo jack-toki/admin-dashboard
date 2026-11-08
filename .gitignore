@@ -7,4 +7,5 @@ var/
 *.enc
 private/
 toki-dashboard-source/
+toki-dashboard-private/
 zapier-docs/
