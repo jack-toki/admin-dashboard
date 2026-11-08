@@ -10,22 +10,36 @@
 
 begin;
 
+-- The custom setting is copied once into jrl_owner_pin and is not read again.
+-- A later session SET app.jrl_owner_sub does not change jrl_is_owner().
+-- Any role can SET an undefined custom GUC in its own session, so the setting is not the guard.
+-- Authenticated and anon have no grant and no policy on the pin. FORCE ROW LEVEL SECURITY
+-- also binds a non-superuser table owner. Superuser and BYPASSRLS, including the usual
+-- Supabase service_role, can still change the pin. This script does not alter that role.
+create table if not exists public.jrl_owner_pin (
+  id boolean primary key default true check (id),
+  owner_sub uuid not null
+);
+alter table public.jrl_owner_pin enable row level security;
+alter table public.jrl_owner_pin force row level security;
+revoke all on table public.jrl_owner_pin from public, anon, authenticated;
+
 create or replace function public.jrl_is_owner()
 returns boolean
 language sql
 stable
-security invoker
+security definer
 set search_path = public
 as $$
   select auth.uid() is not null
-    and auth.uid()::text = nullif(current_setting('app.jrl_owner_sub', true), '')
+    and auth.uid() = (select owner_sub from public.jrl_owner_pin where id)
 $$;
 
 revoke all on function public.jrl_is_owner() from public, anon;
 grant execute on function public.jrl_is_owner() to authenticated;
 
--- Set this once, outside the file, to the stable auth.users id captured at the one-time link.
--- alter database postgres set app.jrl_owner_sub = '<owner uuid>';
+-- Supply the stable auth.users id only for this transaction, then discard the setting.
+-- select set_config('app.jrl_owner_sub', '<owner uuid>', true);
 
 do $$
 declare
@@ -35,6 +49,15 @@ declare
 begin
   if owner_sub is null or owner_sub !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' then
     raise exception 'preflight_owner_sub_missing';
+  end if;
+  if (select count(*) from public.jrl_owner_pin) > 1 then
+    raise exception 'preflight_owner_pin_ambiguous';
+  end if;
+  insert into public.jrl_owner_pin (id, owner_sub)
+  select true, owner_sub::uuid
+  where not exists (select 1 from public.jrl_owner_pin);
+  if (select count(*) from public.jrl_owner_pin) <> 1 then
+    raise exception 'preflight_owner_pin_missing';
   end if;
 
   select coalesce(array_to_string(c.reloptions, ','), '')
@@ -189,8 +212,11 @@ begin
       and p.tablename = expected.tablename
       and p.cmd = expected.cmd
       and p.roles::text[] @> array['authenticated']::text[]
-      and p.qual like '%jrl_is_owner%'
-      and (expected.cmd not in ('INSERT', 'UPDATE') or p.with_check like '%jrl_is_owner%')
+      and (
+        (expected.cmd in ('SELECT', 'DELETE') and p.qual like '%jrl_is_owner%' and p.with_check is null)
+        or (expected.cmd = 'INSERT' and p.with_check like '%jrl_is_owner%' and p.qual is null)
+        or (expected.cmd = 'UPDATE' and p.qual like '%jrl_is_owner%' and p.with_check like '%jrl_is_owner%')
+      )
   );
   if missing <> 0 then
     raise exception 'postflight_owner_policy_missing: %', missing;
@@ -236,11 +262,36 @@ begin
     where n.nspname = 'public'
       and c.relname in (
         'monthly_entry', 'finance_setting', 'finance_target', 'purchase',
-        'sora_conversation', 'sora_alerts', 'sora_research'
+        'sora_conversation', 'sora_alerts', 'sora_research', 'jrl_owner_pin'
       )
       and (c.relrowsecurity is not true or c.relforcerowsecurity is not true)
   ) then
     raise exception 'postflight_rls_not_forced';
+  end if;
+
+  if (select count(*) from public.jrl_owner_pin) <> 1 then
+    raise exception 'postflight_owner_pin_count';
+  end if;
+
+  if exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'jrl_owner_pin'
+  ) then
+    raise exception 'postflight_owner_pin_policy';
+  end if;
+
+  if exists (
+    select 1 from pg_policies
+    where schemaname = 'public'
+      and (
+        (tablename = 'finance_setting' and cmd = 'DELETE')
+        or (tablename = 'purchase' and cmd = 'UPDATE')
+        or (tablename = 'sora_conversation' and cmd in ('INSERT', 'UPDATE'))
+        or (tablename = 'sora_research' and cmd in ('INSERT', 'UPDATE'))
+        or (tablename = 'sora_alerts' and cmd <> 'SELECT')
+      )
+  ) then
+    raise exception 'postflight_operation_expanded';
   end if;
 end $$;
 

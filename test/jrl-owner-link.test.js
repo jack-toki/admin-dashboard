@@ -48,7 +48,9 @@ test('the owner boundary covers every audited command and does not guess an iden
     assert.equal(file.replace(/00000000-0000-4000-8000-000000000002/g, '').includes('you@example.com'), false);
     assert.equal(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(file), false);
   }
-  assert.match(sql, /auth\.uid\(\)::text/);
+  assert.match(sql, /auth\.uid\(\) = \(select owner_sub from public\.jrl_owner_pin where id\)/);
+  assert.match(sql, /preflight_owner_sub_missing/);
+  assert.match(sql, /security definer/);
   assert.match(sql, /app\.jrl_owner_sub/);
   assert.equal(/auth\.email\(\)/.test(sql), false);
   assert.equal(/for all to authenticated/i.test(sql), false);
