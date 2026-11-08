@@ -1,6 +1,7 @@
 import { canAccess, readSession } from '../../../../lib/auth.js';
 import { importBaseline, importNormalized } from '../../../../lib/forecast/import.js';
 import { modelFromStoredCells, DELETION_AUDIT } from '../../../../lib/forecast/model.js';
+import { validateAdditionalPacket, evidenceView } from '../../../../lib/forecast/additional.js';
 import { openAppStore, supabaseGuard } from '../../../../lib/store/index.js';
 
 export const runtime = 'nodejs';
@@ -40,8 +41,11 @@ export async function GET(req) {
   const closed = storeClosed(opened);
   if (closed) return closed;
   let cells = [];
+  let evidence = null;
   try {
     cells = await opened.store.listBaseline();
+    const storedEvidence = await opened.store.listEvidence();
+    evidence = storedEvidence ? evidenceView(storedEvidence) : null;
   } catch (error) {
     const closedRead = readClosed(error);
     if (closedRead) return closedRead;
@@ -54,7 +58,8 @@ export async function GET(req) {
     testedAgainstPreview: false,
     cells,
     model: modelFromStoredCells(cells),
-    actuals: null,
+    actuals: evidence?.actuals || null,
+    evidence,
     sheetRuntime: false,
     sheetFallback: false,
     workbookRequiredAtRuntime: false,
@@ -69,6 +74,21 @@ export async function POST(req) {
   if (block) return block;
   let body = {};
   try { body = await req.json(); } catch { body = {}; }
+  if (body.confirm === 'import-forecast-evidence') {
+    const validated = validateAdditionalPacket(body.packet);
+    if (!validated.ok) return Response.json({ ok: false, connected: false, error: validated.error, counts: validated.counts }, { status: 422 });
+    const opened = openAppStore();
+    const closed = storeClosed(opened);
+    if (closed) return closed;
+    try {
+      await opened.store.saveEvidence(validated.stored);
+    } catch (error) {
+      const closedRead = readClosed(error);
+      if (closedRead) return closedRead;
+      throw error;
+    }
+    return Response.json({ ok: true, connected: false, counts: validated.counts, sheetRuntime: false, sheetFallback: false }, { status: 201 });
+  }
   if (body.confirm !== 'import-forecast-baseline') {
     return Response.json({ ok: false, error: 'confirm_required' }, { status: 400 });
   }

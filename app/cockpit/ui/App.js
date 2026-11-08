@@ -21,6 +21,7 @@ export default function App({ role, areas, client }) {
   const [planNote, setPlanNote] = useState('');
   const [formError, setFormError] = useState('');
   const [storedForecast, setStoredForecast] = useState(null);
+  const [evidence, setEvidence] = useState(null);
   const [forecastError, setForecastError] = useState('');
 
   useEffect(() => {
@@ -41,13 +42,16 @@ export default function App({ role, areas, client }) {
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
         setStoredForecast(null);
+        setEvidence(null);
         setForecastError(body.error || 'store_unavailable');
         return;
       }
       setForecastError('');
       setStoredForecast(body.model?.rows?.length ? body.model : null);
+      setEvidence(body.evidence || null);
     }).catch(() => {
       setStoredForecast(null);
+      setEvidence(null);
       setForecastError('store_unavailable');
     });
   }, [areas]);
@@ -82,7 +86,7 @@ export default function App({ role, areas, client }) {
   }
 
   const baseline = example ? syntheticBaseline() : storedForecast;
-  const actuals = example ? syntheticActuals() : null;
+  const actuals = example ? syntheticActuals() : evidence?.actuals || null;
 
   async function onSave(form) {
     const result = validateEntry({
@@ -174,7 +178,7 @@ export default function App({ role, areas, client }) {
               <button type="button" className="toggle glass signout" onClick={onSignOut}>Sign out</button>
             </div>
           </div>
-          {area === 'toki' && <TokiScreen example={example} baseline={baseline} actuals={actuals} plan={plan} planNote={planNote} onSave={onSave} formError={formError} forecastError={forecastError} />}
+          {area === 'toki' && <TokiScreen example={example} baseline={baseline} actuals={actuals} evidence={example ? null : evidence} plan={plan} planNote={planNote} onSave={onSave} formError={formError} forecastError={forecastError} />}
           {area === 'automations' && (
             <>
               <AutomationsScreen example={example} />

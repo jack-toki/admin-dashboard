@@ -15,7 +15,7 @@ const SECTIONS = [
   ['commentary', 'This week'],
 ];
 
-export function TokiScreen({ example, baseline, actuals, plan, planNote, onSave, formError, forecastError }) {
+export function TokiScreen({ example, baseline, actuals, evidence, plan, planNote, onSave, formError, forecastError }) {
   const [section, setSection] = useState('overview');
   const [month, setMonth] = useState('2026-01');
   const [mode, setMode] = useState('base');
@@ -43,7 +43,13 @@ export function TokiScreen({ example, baseline, actuals, plan, planNote, onSave,
     };
   }, [baseline, actuals, mode]);
   const rows = useMemo(() => (baseline ? drilldown(mode === 'base' ? baseline : { rows: withScenario(baseline.rows, mode) }, month) : []), [baseline, month, mode]);
-  const pipeline = example ? syntheticPipeline().map(pipelineRow) : [];
+  const pipeline = example ? syntheticPipeline().map(pipelineRow) : (evidence?.planning?.rows || []).filter((row) => row.planKind === 'pipeline').map((row) => pipelineRow({
+    leadId: row.id,
+    label: row.party || 'Pipeline evidence',
+    status: row.status || 'Unknown',
+    amountMinor: row.amountMinor,
+    probability: null,
+  }));
   const activity = example ? reviewActivity(syntheticContacts()) : [];
   const notes = example ? weeklyCommentary(syntheticFacts()) : [];
 
@@ -114,7 +120,8 @@ export function TokiScreen({ example, baseline, actuals, plan, planNote, onSave,
               </tbody>
             </table>
           </div>
-          <p style={muted}>Gross profit in the stored forecast is the billing total, not profit after costs. People actuals are missing, not zero. A partial month is not a finished result.</p>
+          <p style={muted}>Gross profit in the stored forecast is the billing total, not profit after costs. People actuals are missing, not zero. A partial month is not a finished result. September to December are missing, not zero.</p>
+          {evidence?.invoices && <p style={muted}>Historical invoice copy: {evidence.invoices.rows.length}. This is not live Xero.</p>}
         </>
       )}
 
@@ -162,11 +169,13 @@ export function TokiScreen({ example, baseline, actuals, plan, planNote, onSave,
             <Tile label="Result in this what-if" value={formatPounds(overview({ rows: mode === 'base' ? baseline.rows : withScenario(baseline.rows, mode) }, actuals, month).resultMinor)} accent />
           </div>
           <p style={muted}>This recalculates from the cells on screen. The saved plan is not changed, and the workbook is not read.</p>
+          {evidence?.alternative && <p style={muted}>The V2 scenario has {evidence.alternative.cells.length} stored cells. They are not added to this baseline.</p>}
         </>
       )}
 
       {section === 'pipeline' && (
         <div style={tableWrap}>
+          <p style={muted}>Pipeline evidence is not a sale and is not an accounting actual.</p>
           <table style={table}>
             <thead><tr><th style={th}>Prospect</th><th style={th}>Stage</th><th style={th}>Amount</th><th style={th}>Probability</th></tr></thead>
             <tbody>
