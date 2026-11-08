@@ -6,6 +6,7 @@ import { workingMonthLines, sumLines, incomeBreakdown } from '../../../lib/plann
 import { syntheticWorkflows, syntheticEvents, SYNTHETIC_BANNER } from '../../../lib/fixtures/synthetic';
 import { TOKI_VIEWS } from '../../../lib/nav/sidebar';
 import { HorizontalBars, YearColumns } from './charts';
+import { IncomeBoard } from './IncomeBoard';
 
 const MONTHS = [
   ['01', 'Jan', 'January'], ['02', 'Feb', 'February'], ['03', 'Mar', 'March'], ['04', 'Apr', 'April'],
@@ -30,7 +31,7 @@ function showMoney(minor) {
   return formatPounds(minor);
 }
 
-export function TokiScreen({ example, baseline, actuals, evidence, plan, planNote, onSave, onRemove, formError, forecastError, section = 'toki', onSection }) {
+export function TokiScreen({ example, baseline, actuals, evidence, plan, planNote, onSave, onRemove, formError, forecastError, section = 'toki', onSection, details = [], detailStored = false, onSaveDetail, onRemoveDetail }) {
   const [month, setMonth] = useState('2026-01');
   const [board, setBoard] = useState('year');
   const [editAll, setEditAll] = useState(false);
@@ -247,12 +248,7 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
       {baseline.synthetic && <p className="caveat">{SYNTHETIC_BANNER}</p>}
 
       {page === 'toki' && chartSeries && (
-        <>
-          <div className="toki-panel-tabs" role="tablist" aria-label="Toki charts">
-            {[['month', 'This month'], ['year', 'Year'], ['groups', 'Groups']].map(([id, label]) => (
-              <button key={id} type="button" role="tab" aria-selected={board === id} onClick={() => setBoard(id)}>{label}</button>
-            ))}
-          </div>
+        <div className="chart-carousel">
           <div className="stats" data-panel="month" data-on={board === 'month' ? 'true' : 'false'}>
             <Tile label="Income" value={showMoney(billingShown)} />
             <Tile label="Costs" value={showMoney(costShown)} />
@@ -268,9 +264,19 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
           <div className="chart-panel" data-panel="groups" data-on={board === 'groups' ? 'true' : 'false'}>
             <HorizontalBars name="Cost groups" points={chartSeries.groups.points} series={chartSeries.groups.series} format={formatPounds} />
           </div>
+          <div className="chart-segments" role="tablist" aria-label="Toki charts" onKeyDown={(event) => {
+            const order = ['month', 'year', 'groups'];
+            const index = order.indexOf(board);
+            if (event.key === 'ArrowRight') setBoard(order[(index + 1) % order.length]);
+            if (event.key === 'ArrowLeft') setBoard(order[(index + order.length - 1) % order.length]);
+          }}>
+            {[['month', 'This month'], ['year', 'Year'], ['groups', 'Groups']].map(([id, label]) => (
+              <button key={id} type="button" role="tab" aria-selected={board === id} onClick={() => setBoard(id)}>{label}</button>
+            ))}
+          </div>
           <p className="quiet quiet-full">{baseline.grossProfitMeaning} A gap on a chart is missing information, not zero.</p>
           <p className="quiet quiet-short">Not profit after costs. A gap means missing, not zero.</p>
-        </>
+        </div>
       )}
 
       {page === 'sources' && (
@@ -281,12 +287,8 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
           </div>
           {(sheetError || formError) && <p role="alert">{sheetError || formError}</p>}
           {planNote && <p className="quiet">{planNote} These edits are a working forecast.</p>}
-          <SheetBlock title="Income" lines={income} bulk={editAll} rowOpen={rowOpen} draftFor={draftFor} setDrafts={setDrafts} openEdit={openEdit} saveLine={saveLine} onRemove={onRemove} setEditingKey={setEditingKey} />
-          <div className="sheet-add">
-            <button type="button" onClick={() => setAdding({ kind: 'sale', workType: 'retainer', party: '', amount: '', groupId: 'billing' })}>Add a retainer</button>
-            <button type="button" onClick={() => setAdding({ kind: 'sale', workType: 'project', party: '', amount: '', groupId: 'billing' })}>Add project work</button>
-          </div>
-          <SheetBlock title="Costs" lines={costs} bulk={editAll} rowOpen={rowOpen} draftFor={draftFor} setDrafts={setDrafts} openEdit={openEdit} saveLine={saveLine} onRemove={onRemove} setEditingKey={setEditingKey} />
+          <IncomeBoard month={month} records={details} stored={detailStored} baselineRetainer={incomeBreakdown(lines).retainer} baselineProject={incomeBreakdown(lines).project} onSave={onSaveDetail} onRemove={onRemoveDetail} />
+          <SheetBlock title="Forecast costs" lines={costs} bulk={editAll} rowOpen={rowOpen} draftFor={draftFor} setDrafts={setDrafts} openEdit={openEdit} saveLine={saveLine} onRemove={onRemove} setEditingKey={setEditingKey} />
           <div className="sheet-add">
             <button type="button" onClick={() => setAdding({ kind: 'cost', workType: '', party: '', amount: '', groupId: '' })}>Add a cost</button>
           </div>

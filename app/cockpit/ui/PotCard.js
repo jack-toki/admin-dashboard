@@ -17,7 +17,7 @@ function dated(value) {
   return day ? `${Number(day)} ${label}` : label;
 }
 
-export function PotCard({ record, ledger, portfolioAvailable, onChange }) {
+export function PotCard({ record, ledger, portfolioAvailable, onChange, editable = true }) {
   const pots = potViews(record, ledger);
   const [editing, setEditing] = useState('');
   const [draft, setDraft] = useState({ amount: '', asOf: '', target: '' });
@@ -50,7 +50,10 @@ export function PotCard({ record, ledger, portfolioAvailable, onChange }) {
     <section className="pot-card" aria-label="Four money pots">
       <header className="pot-head">
         <h2>Four money pots</h2>
-        <p>A purpose split, not an adviser rule. £10,000 in each square is a placeholder, not a recommendation.</p>
+        <details className="pot-help">
+          <summary>About these pots</summary>
+          <p>A purpose split, not an adviser rule. £10,000 is a placeholder, not a recommendation. Lifestyle is money set aside to spend, not a spending history. A manual amount is not checked against the other pots. Investments use a valuation, not the amount paid in.</p>
+        </details>
       </header>
       <div className="pot-grid">
         {pots.map((pot) => (
@@ -60,24 +63,20 @@ export function PotCard({ record, ledger, portfolioAvailable, onChange }) {
               <strong className="num">{pounds(pot.target)}</strong>
             </div>
             <h3>{pot.label}</h3>
-            <p className="pot-detail">{pot.detail}</p>
             <p className="pot-balance num">{pot.known ? pounds(pot.balance) : 'Not set'}</p>
             <div className="pot-meter" aria-hidden="true">
               <i style={{ width: pot.known ? `${pot.progress * 100}%` : '0%' }} />
             </div>
             <p className="pot-status">
-              {!pot.known && 'Add a balance to see progress.'}
-              {pot.known && pot.over > 0 && `${pounds(pot.over)} over the target.`}
-              {pot.known && pot.over === 0 && pot.remaining > 0 && `${pounds(pot.remaining)} still to set aside.`}
-              {pot.known && pot.over === 0 && pot.remaining === 0 && 'At the target.'}
-              {pot.known && pot.percent != null ? ` ${pot.percent}% of the target.` : ''}
+              {!pot.known && 'Not set'}
+              {pot.known && pot.over > 0 && `${pounds(pot.over)} over · ${pot.percent}%`}
+              {pot.known && pot.over === 0 && pot.remaining > 0 && `${pounds(pot.remaining)} left · ${pot.percent}%`}
+              {pot.known && pot.remaining === 0 && pot.over === 0 && 'At target · 100%'}
             </p>
-            <p className="pot-meta">
-              {pot.source === 'hl_value' && `Portfolio value ${dated(pot.asOf) || 'on the latest reading'}. Not the amount paid in.`}
-              {pot.manual && `Manual amount${dated(pot.asOf) ? `, ${dated(pot.asOf)}` : ''}. Not checked against the other pots.`}
-              {!pot.known && pot.id === 'investments' && 'Contributions are not used as the value.'}
-            </p>
-            {editing === pot.id ? (
+            {(pot.asOf || pot.manual || pot.source === 'hl_value') && (
+              <p className="pot-meta">{pot.source === 'hl_value' ? 'Valuation' : pot.manual ? 'Manual' : ''}{dated(pot.asOf) ? ` · ${dated(pot.asOf)}` : ''}</p>
+            )}
+            {editable && editing === pot.id ? (
               <form className="pot-form" onSubmit={(event) => { event.preventDefault(); save(pot); }}>
                 <label>Target<input aria-label={`${pot.label} target`} inputMode="decimal" value={draft.target} onChange={(event) => setDraft({ ...draft, target: event.target.value })} /></label>
                 <label>Balance<input aria-label={`${pot.label} balance`} inputMode="decimal" placeholder="Amount" value={draft.amount} onChange={(event) => setDraft({ ...draft, amount: event.target.value })} /></label>
@@ -89,9 +88,9 @@ export function PotCard({ record, ledger, portfolioAvailable, onChange }) {
               </form>
             ) : (
               <div className="pot-actions">
-                {!pot.known && <button type="button" onClick={() => open(pot)}>Add balance</button>}
-                {pot.known && <button type="button" onClick={() => open(pot)}>Edit</button>}
-                {pot.id === 'investments' && portfolioAvailable && pot.source !== 'hl_value' && (
+                {editable && !pot.known && <button type="button" onClick={() => open(pot)}>Add balance</button>}
+                {editable && pot.known && <button type="button" onClick={() => open(pot)}>Edit</button>}
+                {editable && pot.id === 'investments' && portfolioAvailable && pot.source !== 'hl_value' && (
                   <button type="button" onClick={() => {
                     const manual = { ...record.manual };
                     delete manual.investments;
@@ -103,6 +102,7 @@ export function PotCard({ record, ledger, portfolioAvailable, onChange }) {
           </article>
         ))}
       </div>
+      {!editable && <p className="pot-meta">Not saved on this server yet.</p>}
     </section>
   );
 }

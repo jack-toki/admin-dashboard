@@ -250,15 +250,18 @@ function niceMax(minor) {
   return Math.ceil(pounds / step) * step * 100;
 }
 
-function ChartLegend({ name, series, hidden, setHidden }) {
+function ChartLegend({ name, series, hidden, setHidden, ready = {} }) {
   return (
     <span className="year-legend" role="group" aria-label={`${name} series`}>
-      {series.map((item) => (
-        <button key={item.id} type="button" className="chart-key" aria-pressed={!hidden[item.id]} onClick={() => setHidden((current) => ({ ...current, [item.id]: !current[item.id] }))}>
-          <i style={{ background: item.color }} />
-          {item.label}
-        </button>
-      ))}
+      {series.map((item) => {
+        const available = ready[item.id] !== false;
+        return (
+          <button key={item.id} type="button" className="chart-key" aria-pressed={available && !hidden[item.id]} disabled={!available} onClick={() => { if (available) setHidden((current) => ({ ...current, [item.id]: !current[item.id] })); }}>
+            <i style={{ background: item.color }} />
+            {item.label}{available ? '' : ' unavailable'}
+          </button>
+        );
+      })}
     </span>
   );
 }
@@ -281,7 +284,15 @@ export function YearColumns({ name, months, selectedId, onOpen, format }) {
     ...(months[0]?.segments || []).map((item) => ({ id: item.id, label: item.label, color: item.color })),
     { id: 'actual', label: 'Actual', color: 'var(--series-actual)' },
   ];
-  const visible = new Set(legend.map((item) => item.id).filter((id) => !hidden[id]));
+  const ready = {
+    actual: months.some((month) => month.actual != null && Number.isFinite(month.actual)),
+  };
+  for (const item of months[0]?.segments || []) {
+    ready[item.id] = months.some((month) => month.segments.some((segment) => segment.id === item.id && segment.value != null && Number.isFinite(segment.value)));
+  }
+  const knownTotals = months.map((month) => month.total).filter((value) => value != null && Number.isFinite(value));
+  const average = knownTotals.length ? Math.round(knownTotals.reduce((sum, value) => sum + value, 0) / knownTotals.length) : null;
+  const visible = new Set(legend.map((item) => item.id).filter((id) => ready[id] !== false && !hidden[id]));
   const nums = months.flatMap((month) => [
     ...month.segments.filter((item) => visible.has(item.id)).map((item) => item.value),
     visible.has('actual') ? month.actual : null,
@@ -295,7 +306,7 @@ export function YearColumns({ name, months, selectedId, onOpen, format }) {
     <figure className="finance-plot" data-chart={name}>
       <figcaption>
         <strong>{name}</strong>
-        <ChartLegend name={name} series={legend} hidden={hidden} setHidden={setHidden} />
+        <ChartLegend name={name} series={legend} hidden={hidden} setHidden={setHidden} ready={ready} />
       </figcaption>
       <div className="col-chart">
         <div className="col-axis" aria-hidden="true">
@@ -305,6 +316,7 @@ export function YearColumns({ name, months, selectedId, onOpen, format }) {
         </div>
         <div className="col-plot" role="group" aria-label={name}>
           <div className="col-grid" aria-hidden="true" />
+          {average != null && <span className="col-average" style={{ bottom: `calc(22px + ${(Math.min(average, max) / max) * 78}%)` }} />}
           {months.map((month) => (
             <button
               key={month.id}
@@ -343,7 +355,7 @@ export function YearColumns({ name, months, selectedId, onOpen, format }) {
       </div>
     </figure>
     <div className="chart-breakdown" role="status" aria-live="polite">
-      <p>{active ? `${active.label} · Income ${moneyText(active.total, format)} · Actual ${moneyText(active.actual, format)}` : 'Select a month'}</p>
+      <p>{active ? `${active.label} · Income ${moneyText(active.total, format)} · Actual ${moneyText(active.actual, format)}` : 'Select a month'}{average != null ? ` · Average ${moneyText(average, format)} of ${knownTotals.length} known months. Missing months are left out. A stored zero is included.` : ''}</p>
       {shownLines.length > 0 && (
         <ul>
           {shownLines.map((line) => (

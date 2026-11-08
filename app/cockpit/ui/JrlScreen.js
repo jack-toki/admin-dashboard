@@ -46,6 +46,7 @@ export default function JrlScreen({ gate }) {
   const [floor, setFloor] = useState('500');
   const [savingsFirst, setSavingsFirst] = useState('0');
   const [potRecord, setPotRecord] = useState(blankPotRecord);
+  const [potStored, setPotStored] = useState(false);
   const window = useMemo(() => monthWindow(new Date('2026-11-08T12:00:00Z')), []);
 
   useEffect(() => {
@@ -90,6 +91,7 @@ export default function JrlScreen({ gate }) {
       if (!res.ok || cancel) return;
       const body = await res.json();
       if (body.record) setPotRecord({ ...blankPotRecord(), ...body.record });
+      setPotStored(body.stored === true);
     }).catch(() => {});
     return () => { cancel = true; };
   }, [signedIn]);
@@ -146,7 +148,7 @@ export default function JrlScreen({ gate }) {
           </div>
           {auth?.supabaseUser && section === 'overview' && (
             <>
-              <PotCard record={potRecord} ledger={ledger} portfolioAvailable={Boolean(latestPortfolioValue(ledger))} onChange={onPots} />
+              <PotCard record={potRecord} ledger={ledger} portfolioAvailable={Boolean(latestPortfolioValue(ledger))} onChange={onPots} editable={potStored} />
               <Overview ledger={ledger} targets={targets} />
             </>
           )}

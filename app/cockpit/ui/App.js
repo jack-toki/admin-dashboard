@@ -17,6 +17,8 @@ export default function App({ role, areas, client }) {
   const [jrl, setJrl] = useState(null);
   const [theme, setTheme] = useState('light');
   const [plan, setPlan] = useState([]);
+  const [details, setDetails] = useState([]);
+  const [detailStored, setDetailStored] = useState(false);
   const [planNote, setPlanNote] = useState('');
   const [formError, setFormError] = useState('');
   const [storedForecast, setStoredForecast] = useState(null);
@@ -89,6 +91,16 @@ export default function App({ role, areas, client }) {
   }, [areas]);
 
   useEffect(() => {
+    if (!areas.includes('toki')) return;
+    fetch('/api/cockpit/income-detail').then(async (res) => {
+      if (!res.ok) return;
+      const body = await res.json();
+      setDetails(body.records || []);
+      setDetailStored(body.stored === true);
+    }).catch(() => setDetailStored(false));
+  }, [areas]);
+
+  useEffect(() => {
     setCollapsed(readCollapsed(window.localStorage));
     try { setTheme(readTheme(window.localStorage)); } catch { setTheme('light'); }
     function onKey(event) {
@@ -147,6 +159,35 @@ export default function App({ role, areas, client }) {
     setPlanNote(body.shared ? 'Saved in the shared store.' : 'Saved on this server’s local store. Production refuses a file store.');
     setPlan((current) => [...current.filter((entry) => entry.id !== body.entry.id), body.entry]);
     return true;
+  }
+
+  async function onSaveDetail(form) {
+    const res = await fetch('/api/cockpit/income-detail', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(form),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || !body.record) {
+      setFormError(body.error === 'income_detail_schema_required' ? 'Client lines are not saved on this server yet.' : 'That client line was not saved.');
+      return false;
+    }
+    setFormError('');
+    setDetails((current) => [...current.filter((row) => row.id !== body.record.id), body.record]);
+    return true;
+  }
+
+  async function onRemoveDetail(id) {
+    const res = await fetch('/api/cockpit/income-detail', {
+      method: 'DELETE',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    if (!res.ok) {
+      setFormError('That client line was not removed.');
+      return;
+    }
+    setDetails((current) => current.filter((row) => row.id !== id));
   }
 
   async function onRemove(id) {
@@ -234,7 +275,7 @@ export default function App({ role, areas, client }) {
               <button type="button" className="toggle glass signout" onClick={onSignOut}>Sign out</button>
             </div>
           </div>
-          {area === 'toki' && <TokiScreen baseline={baseline} actuals={actuals} evidence={evidence} plan={plan} planNote={planNote} onSave={onSave} onRemove={onRemove} formError={formError} forecastError={forecastError} section={tokiView} onSection={setTokiView} />}
+          {area === 'toki' && <TokiScreen baseline={baseline} actuals={actuals} evidence={evidence} plan={plan} planNote={planNote} onSave={onSave} onRemove={onRemove} formError={formError} forecastError={forecastError} section={tokiView} onSection={setTokiView} details={details} detailStored={detailStored} onSaveDetail={onSaveDetail} onRemoveDetail={onRemoveDetail} />}
           {area === 'automations' && (
             <>
               <AutomationsScreen board={runBoard} error={runError} />
