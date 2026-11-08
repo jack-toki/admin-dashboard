@@ -5,6 +5,7 @@ import { comparePair } from '../../../lib/pnl/variance';
 import { validateEntry, expandTimeline, salesFromCrm } from '../../../lib/planning/entries';
 import { formatMinor } from '../../../lib/money';
 import { readCollapsed, toggleCollapsed, visibleNav, NAV_STORAGE_KEY } from '../../../lib/nav/sidebar';
+import { NavMark } from './marks';
 import '../cockpit.css';
 
 export default function App({ role, areas, client }) {
@@ -116,7 +117,7 @@ export default function App({ role, areas, client }) {
                 title={item.hint}
                 onClick={() => setArea(item.id)}
               >
-                <NavIcon id={item.id} />
+                <NavMark id={item.id} />
                 <span className="nav-label">{item.label}</span>
                 <span className="nav-tip" role="tooltip">{item.label}</span>
               </button>
@@ -251,17 +252,6 @@ export default function App({ role, areas, client }) {
   );
 }
 
-function NavIcon({ id }) {
-  const common = { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, 'aria-hidden': true };
-  if (id === 'automations') {
-    return <svg {...common}><path d="M4 12h4l2-5 4 10 2-5h4" /></svg>;
-  }
-  if (id === 'jrl') {
-    return <svg {...common}><circle cx="12" cy="8" r="3" /><path d="M5 19c1.5-3 4-4.5 7-4.5S17.5 16 19 19" /></svg>;
-  }
-  return <svg {...common}><path d="M5 17V7h6l2 3h6v7H5z" /></svg>;
-}
-
 function RegisterForm() {
   const [title, setTitle] = useState('');
   const [result, setResult] = useState('');
@@ -297,20 +287,20 @@ function sumKind(model, kind, month) {
   return seen ? total : null;
 }
 
-const page = { minHeight: '100vh', background: 'radial-gradient(900px 500px at 12% 90%, rgba(235,70,38,.55), transparent 55%), radial-gradient(700px 420px at 90% 0%, rgba(120,80,180,.35), transparent 50%), linear-gradient(165deg, #24140f, #100e0d 42%, #3a1a10)', color: '#1c1917', fontFamily: 'Inter, sans-serif', padding: 20 };
-const header = { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'end', marginBottom: 20, flexWrap: 'wrap' };
-const kicker = { fontFamily: '"Space Grotesk", Inter, sans-serif', letterSpacing: '0.08em', textTransform: 'uppercase', fontSize: 12 };
-const h2 = { fontFamily: '"Space Grotesk", Inter, sans-serif', fontSize: 28, margin: '18px 0 8px' };
-const banner = { background: '#fffdf8', border: '1.5px solid #1c1917', boxShadow: '4px 4px 0 #1c1917', padding: 12 };
-const warn = { borderLeft: '4px solid #eb4626', paddingLeft: 10 };
+const page = { minHeight: '100vh', background: 'linear-gradient(158deg,#d6e2f1 0%,#e8e7f2 46%,#d9ece1 100%)', color: '#181b24', fontFamily: "'Inter',ui-sans-serif,system-ui,sans-serif", padding: '22px 20px 40px' };
+const header = { display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'end', marginBottom: 18, flexWrap: 'wrap' };
+const kicker = { letterSpacing: '0.08em', textTransform: 'uppercase', fontSize: 12, color: '#6b7280' };
+const h2 = { fontSize: 18, fontWeight: 600, margin: '18px 0 8px' };
+const banner = { background: 'rgba(255,255,255,0.72)', border: '1px solid rgba(20,24,40,0.07)', borderRadius: 16, padding: '14px 16px' };
+const warn = { color: '#6b7280', fontSize: 14 };
 const row = { display: 'flex', gap: 12, alignItems: 'center', margin: '12px 0', flexWrap: 'wrap' };
-const button = { background: '#eb4626', color: '#fffdf8', border: '1.5px solid #1c1917', boxShadow: '3px 3px 0 #1c1917', padding: '8px 12px', font: 'inherit', fontWeight: 700, cursor: 'pointer' };
-const meta = { color: '#44403c', fontSize: 14 };
-const tableWrap = { overflowX: 'auto', background: '#fffdf8', border: '1.5px solid #1c1917', boxShadow: '4px 4px 0 #1c1917' };
+const button = { background: '#fff', color: '#181b24', border: '1px solid rgba(20,24,40,0.07)', borderRadius: 9, boxShadow: '0 1px 2px rgba(0,0,0,.08)', padding: '8px 12px', font: 'inherit', fontWeight: 600, cursor: 'pointer' };
+const meta = { color: '#6b7280', fontSize: 13 };
+const tableWrap = { overflowX: 'auto', background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(20,24,40,0.06)', borderRadius: 16 };
 const table = { borderCollapse: 'collapse', width: '100%', minWidth: 640 };
-const th = { textAlign: 'left', padding: 10, borderBottom: '1.5px solid #1c1917', fontSize: 13 };
-const td = { padding: 10, borderTop: '1px solid #d6d3d1' };
+const th = { textAlign: 'left', padding: '13px 16px', borderBottom: '1px solid rgba(20,24,40,0.06)', fontSize: 12.5, color: '#6b7280' };
+const td = { padding: '14px 16px', borderTop: '1px solid rgba(20,24,40,0.06)', fontSize: 14 };
 const tdNum = { ...td, textAlign: 'right', fontVariantNumeric: 'tabular-nums' };
-const link = { background: 'none', border: 0, padding: 0, font: 'inherit', fontWeight: 700, cursor: 'pointer', color: '#1c1917' };
+const link = { background: 'none', border: 0, padding: 0, font: 'inherit', fontWeight: 600, cursor: 'pointer', color: '#181b24' };
 const formGrid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8, alignItems: 'center' };
-const input = { border: '1.5px solid #1c1917', padding: '8px 10px', font: 'inherit', background: '#fff' };
+const input = { border: '1px solid rgba(20,24,40,0.07)', borderRadius: 9, padding: '8px 10px', font: 'inherit', background: '#fff' };
