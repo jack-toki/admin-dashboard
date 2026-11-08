@@ -241,13 +241,14 @@ test('xero status is read-only oauth and does not echo secrets', () => {
 });
 
 test('sidebar remembers compact or expanded and only lists allowed areas', () => {
-  const { readCollapsed, writeCollapsed, toggleCollapsed, visibleNav, NAV_STORAGE_KEY, COCKPIT_ROUTES } = require('../lib/nav/sidebar');
+  const { readCollapsed, writeCollapsed, toggleCollapsed, visibleNav, NAV_STORAGE_KEY, COCKPIT_ROUTES, TOKI_VIEWS } = require('../lib/nav/sidebar');
   const storage = new Map();
   const memory = { getItem: (key) => storage.get(key) || null, setItem: (key, value) => storage.set(key, value) };
   assert.equal(readCollapsed(memory), false);
   assert.equal(toggleCollapsed(memory), true);
   assert.equal(memory.getItem(NAV_STORAGE_KEY), 'compact');
   assert.equal(toggleCollapsed(memory), false);
+  assert.deepEqual(TOKI_VIEWS.map((item) => item.label), ['Overview', 'Plan', 'Sources']);
   assert.deepEqual(visibleNav(['jrl', 'toki', 'automations']).map((item) => item.label), ['JRL', 'Toki', 'Automations']);
   assert.deepEqual(visibleNav(['toki', 'automations']).map((item) => item.id), ['toki', 'automations']);
   assert.equal(visibleNav(['jrl']).some((item) => item.id === 'toki'), false);

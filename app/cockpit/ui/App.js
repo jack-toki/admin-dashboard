@@ -1,10 +1,10 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { syntheticActuals, syntheticBaseline } from '../../../lib/fixtures/synthetic';
 import { validateEntry } from '../../../lib/planning/entries';
 import { TokiScreen, AutomationsScreen } from './TokiScreen';
 import JrlScreen from './JrlScreen';
-import { readCollapsed, toggleCollapsed, visibleNav, NAV_STORAGE_KEY } from '../../../lib/nav/sidebar';
+import { readCollapsed, toggleCollapsed, visibleNav, NAV_STORAGE_KEY, TOKI_VIEWS } from '../../../lib/nav/sidebar';
 import { readTheme, writeTheme } from '../../../lib/theme';
 import { NavMark } from './marks';
 import '../jrl.css';
@@ -12,6 +12,7 @@ import '../cockpit.css';
 
 export default function App({ role, areas, client }) {
   const [area, setArea] = useState(areas.includes('toki') ? 'toki' : areas[0]);
+  const [tokiView, setTokiView] = useState('overview');
   const [collapsed, setCollapsed] = useState(false);
   const [status, setStatus] = useState(null);
   const [jrl, setJrl] = useState(null);
@@ -159,18 +160,35 @@ export default function App({ role, areas, client }) {
         <aside className="side" data-collapsed={collapsed ? 'true' : 'false'} aria-label="Cockpit sections">
           <nav id="cockpit-nav">
             {items.map((item) => (
-              <a
-                key={item.id}
-                href={`#${item.id}`}
-                className={area === item.id ? 'on' : undefined}
-                aria-current={area === item.id ? 'page' : undefined}
-                onClick={(event) => { event.preventDefault(); setArea(item.id); }}
-              >
-                <span className="ic"><NavMark id={item.id} /></span>
-                <span className="lbl">{item.label}</span>
-                <span className="lbl-short">{item.label}</span>
-                <span className="nav-tip">{item.label}</span>
-              </a>
+              <Fragment key={item.id}>
+                <a
+                  href={`#${item.id}`}
+                  className={area === item.id ? 'on' : undefined}
+                  aria-current={area === item.id ? 'page' : undefined}
+                  aria-expanded={item.id === 'toki' ? area === 'toki' : undefined}
+                  onClick={(event) => { event.preventDefault(); setArea(item.id); }}
+                >
+                  <span className="ic"><NavMark id={item.id} /></span>
+                  <span className="lbl">{item.label}</span>
+                  <span className="lbl-short">{item.label}</span>
+                  <span className="nav-tip">{item.label}</span>
+                </a>
+                {item.id === 'toki' && area === 'toki' && (
+                  <div className="toki-subnav" aria-label="Toki sections">
+                    {TOKI_VIEWS.map((view) => (
+                      <button
+                        key={view.id}
+                        type="button"
+                        className={tokiView === view.id ? 'on' : undefined}
+                        aria-current={tokiView === view.id ? 'page' : undefined}
+                        onClick={() => setTokiView(view.id)}
+                      >
+                        {view.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </Fragment>
             ))}
           </nav>
           <div className="spacer" />
@@ -192,7 +210,7 @@ export default function App({ role, areas, client }) {
               <button type="button" className="toggle glass signout" onClick={onSignOut}>Sign out</button>
             </div>
           </div>
-          {area === 'toki' && <TokiScreen example={example} baseline={baseline} actuals={actuals} evidence={example ? null : evidence} plan={plan} planNote={planNote} onSave={onSave} onRemove={onRemove} formError={formError} forecastError={forecastError} />}
+          {area === 'toki' && <TokiScreen example={example} baseline={baseline} actuals={actuals} evidence={example ? null : evidence} plan={plan} planNote={planNote} onSave={onSave} onRemove={onRemove} formError={formError} forecastError={forecastError} section={tokiView} onSection={setTokiView} />}
           {area === 'automations' && (
             <>
               <AutomationsScreen example={example} />

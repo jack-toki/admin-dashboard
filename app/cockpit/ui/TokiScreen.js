@@ -4,6 +4,7 @@ import { formatPounds } from '../../../lib/money';
 import { overview, drilldown, withScenario, automationBoard } from '../../../lib/finance/screen';
 import { workingPlanMinor } from '../../../lib/planning/entries';
 import { syntheticWorkflows, syntheticEvents, SYNTHETIC_BANNER } from '../../../lib/fixtures/synthetic';
+import { TOKI_VIEWS } from '../../../lib/nav/sidebar';
 import { InteractiveSeriesChart } from './charts';
 
 function showMoney(minor) {
@@ -11,7 +12,7 @@ function showMoney(minor) {
   return formatPounds(minor);
 }
 
-export function TokiScreen({ example, baseline, actuals, evidence, plan, planNote, onSave, onRemove, formError, forecastError }) {
+export function TokiScreen({ example, baseline, actuals, evidence, plan, planNote, onSave, onRemove, formError, forecastError, section = 'overview', onSection }) {
   const [month, setMonth] = useState('2026-01');
   const [mode, setMode] = useState('base');
   const [form, setForm] = useState({ id: '', kind: 'sale', amount: '', party: '', groupId: 'billing', timing: 'one_off', durationMonths: '3' });
@@ -60,89 +61,137 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
     );
   }
 
+  const viewLabel = TOKI_VIEWS.find((item) => item.id === section)?.label || 'Overview';
+  const monthLabel = baseline.months.find((item) => item.key === month)?.header;
+  const coverage = actuals?.months?.[month]?.coverage;
+
   return (
-    <section>
-      {baseline.synthetic && <p className="caveat">{SYNTHETIC_BANNER} Example data. This is not the stored forecast.</p>}
-      {!baseline.synthetic && <p className="caveat">Stored forecast. The workbook is not read at runtime.</p>}
-      <div style={pills}>
-        {baseline.months.map((item) => {
-          const coverage = actuals?.months?.[item.key]?.coverage;
-          const suffix = coverage === 'partial' ? ' · partial' : coverage === 'missing' ? ' · missing' : '';
-          return <button key={item.key} type="button" onClick={() => setMonth(item.key)} style={pill(month === item.key)}>{item.header}{suffix}</button>;
-        })}
-      </div>
-      <div className="tgt-modes">
-        {[['base', 'Base'], ['best', 'Higher'], ['worst', 'Lower']].map(([id, label]) => (
-          <button key={id} type="button" className={mode === id ? 'tgt-mode on' : 'tgt-mode'} onClick={() => setMode(id)}>{label}</button>
+    <section className="toki-view" aria-label={viewLabel}>
+      <div className="toki-section-switch" role="navigation" aria-label="Toki sections">
+        {TOKI_VIEWS.map((item) => (
+          <button key={item.id} type="button" aria-current={section === item.id ? 'page' : undefined} onClick={() => onSection?.(item.id)}>{item.label}</button>
         ))}
       </div>
-      {chartSeries && (
+      {baseline.synthetic && <p className="caveat">{SYNTHETIC_BANNER} Example data. This is not the stored forecast.</p>}
+      <header className="toki-section-head">
+        <h2>{viewLabel}</h2>
+        <p>{section === 'plan' ? 'Add or change a sale or cost for this month. The imported forecast is not changed.' : section === 'sources' ? 'Imported lines and where the figures come from. Nothing here is editable.' : 'Totals for this month. Your entries are included. Imported figures stay read only.'}</p>
+      </header>
+      <div className="toki-controls">
+        <div className="toki-months" role="group" aria-label="Month">
+          {baseline.months.map((item) => {
+            const itemCoverage = actuals?.months?.[item.key]?.coverage;
+            const suffix = itemCoverage === 'partial' ? ' · partial' : itemCoverage === 'missing' ? ' · missing' : '';
+            return <button key={item.key} type="button" aria-pressed={month === item.key} onClick={() => setMonth(item.key)}>{item.header}{suffix}</button>;
+          })}
+        </div>
+        {section === 'overview' && (
+          <div className="tgt-modes">
+            {[['base', 'Base'], ['best', 'Higher'], ['worst', 'Lower']].map(([id, label]) => (
+              <button key={id} type="button" className={mode === id ? 'tgt-mode on' : 'tgt-mode'} onClick={() => setMode(id)}>{label}</button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {section === 'overview' && (
         <>
-          <InteractiveSeriesChart name="billing" points={chartSeries.points} series={chartSeries.series} selectedId={month} onSelect={setMonth} format={formatPounds} caption={baseline.synthetic ? 'Example data. A missing actual stays unknown.' : 'Stored forecast. A missing actual stays unknown. January 2027 group totals are recomputed from inputs.'} />
-          <p id="toki-month-detail" aria-live="polite">{baseline.months.find((item) => item.key === month)?.header} selected. Xero is not connected.</p>
+          {chartSeries && (
+            <div className="toki-block">
+              <InteractiveSeriesChart name="billing" points={chartSeries.points} series={chartSeries.series} selectedId={month} onSelect={setMonth} format={formatPounds} caption={baseline.synthetic ? 'Example data. A missing actual stays unknown.' : 'Stored forecast. A missing actual stays unknown. January 2027 group totals are recomputed from inputs.'} />
+              <p id="toki-month-detail" aria-live="polite">{monthLabel} selected. Xero is not connected.</p>
+            </div>
+          )}
+          <Summary billing={billingShown} costs={costShown} />
+          <GroupTable groups={shownGroups} />
+          <div className="toki-notes">
+            <p>{baseline.grossProfitMeaning}</p>
+            {coverage === 'partial' && <p role="status">This month is a partial accounting export. It is not a complete profit and loss. People actuals are missing information.</p>}
+            {coverage === 'missing' && <p role="status">Accounting actuals for this month are missing information, not zero.</p>}
+            {(baseline.formulaFlags || []).map((flag) => (
+              <p key={flag.month} role="status">January 2027 totals on screen are recomputed from stored input lines. The source total omits {formatPounds(flag.omittedMinor)}. The stored source cell is not replaced.</p>
+            ))}
+          </div>
         </>
       )}
 
-      <div className="stats">
-        <Tile label="Billing" value={showMoney(billingShown)} />
-        <Tile label="Costs" value={showMoney(costShown)} />
-        <Tile label="Result" value={showMoney(billingShown == null || costShown == null ? null : billingShown - costShown)} />
-      </div>
-      <GroupTable groups={shownGroups} />
-      <p style={muted}>Your entries are included in these totals. The imported forecast and the accounting export stay read only.</p>
-      <p style={muted}>{baseline.grossProfitMeaning}</p>
-      {(baseline.formulaFlags || []).map((flag) => (
-        <p key={flag.month} role="status">January 2027 totals on screen are recomputed from stored input lines. The source total omits {formatPounds(flag.omittedMinor)}. The stored source cell is not replaced.</p>
-      ))}
-      {actuals?.months?.[month]?.coverage === 'partial' && <p role="status">This month is a partial accounting export. It is not a complete profit and loss. People actuals are missing information.</p>}
-      {actuals?.months?.[month]?.coverage === 'missing' && <p role="status">Accounting actuals for this month are missing information, not zero.</p>}
-      <p style={muted}>Xero is not connected. {evidence?.invoices ? `Historical invoice copy: ${evidence.invoices.rows.length}, read only.` : 'No live accounting connection.'} {(evidence?.planning?.rows || []).some((row) => row.planKind === 'salary_plan') ? 'Salary plan evidence is not added to costs.' : ''}</p>
-      <h2 style={h2}>Imported lines, read only</h2>
-      <div style={tableWrap}>
-        <table style={table}>
-          <thead><tr><th style={th}>Line</th><th style={th}>Amount</th></tr></thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.label}>
-                <td style={td}>{row.label}{row.suggested && row.kind !== 'revenue' ? ' · group not confirmed' : ''}</td>
-                <td style={tdNum}>{showMoney(row.minor)}</td>
-              </tr>
+      {section === 'plan' && (
+        <>
+          <Summary billing={billingShown} costs={costShown} />
+          <form className="panel glass toki-panel" onSubmit={async (event) => { event.preventDefault(); const ok = await onSave({ ...form, month }); if (ok) setForm({ id: '', kind: 'sale', amount: '', party: '', groupId: 'billing', timing: 'one_off', durationMonths: '3' }); }}>
+            <h3>{form.id ? 'Edit your entry' : 'Add a sale or cost'}</h3>
+            <div className="toki-form">
+              <select aria-label="Kind" value={form.kind} onChange={(event) => setForm({ ...form, kind: event.target.value, groupId: event.target.value === 'cost' ? 'administration' : 'billing' })}>
+                <option value="sale">Sale</option>
+                <option value="cost">Cost</option>
+              </select>
+              <input aria-label="Amount in pounds" placeholder="Amount" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} />
+              <input aria-label="Client or vendor" placeholder="Client or vendor" value={form.party} onChange={(event) => setForm({ ...form, party: event.target.value })} />
+              <select aria-label="Group" value={form.groupId} onChange={(event) => setForm({ ...form, groupId: event.target.value })}>
+                <option value="billing">Billing</option>
+                <option value="administration">Administration</option>
+                <option value="people">People</option>
+                <option value="premises">Premises</option>
+                <option value="finance">Finance</option>
+                <option value="selling">Selling</option>
+              </select>
+              <button type="submit">{form.id ? 'Save change' : 'Add to this month'}</button>
+            </div>
+            {formError && <p role="alert">{formError}</p>}
+            {planNote && <p>{planNote} The imported forecast and Xero are not written.</p>}
+            <ul className="toki-entries">
+              {monthPlans.map((entry) => (
+                <li key={entry.id}>
+                  <span>{entry.kind} {showMoney(entry.amountMinor)} · {entry.party}</span>
+                  <button type="button" onClick={() => setForm({ id: entry.id, kind: entry.kind, amount: String(entry.amountMinor / 100), party: entry.party, groupId: entry.groupId, timing: entry.timing || 'one_off', durationMonths: String(entry.durationMonths || 3) })}>Edit</button>
+                  {onRemove && <button type="button" onClick={() => onRemove(entry.id)}>Remove</button>}
+                </li>
+              ))}
+            </ul>
+          </form>
+        </>
+      )}
+
+      {section === 'sources' && (
+        <>
+          <div className="toki-table">
+            <table>
+              <caption>Imported lines, read only</caption>
+              <thead><tr><th>Line</th><th>Amount</th></tr></thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.label}>
+                    <td>{row.label}{row.suggested && row.kind !== 'revenue' ? ' · group not confirmed' : ''}</td>
+                    <td>{showMoney(row.minor)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="toki-notes">
+            <p>{baseline.synthetic ? 'Example data. The workbook is not read.' : 'Stored forecast. The workbook is not read at runtime.'}</p>
+            <p>{baseline.grossProfitMeaning}</p>
+            {(baseline.formulaFlags || []).map((flag) => (
+              <p key={flag.month} role="status">January 2027 totals on screen are recomputed from stored input lines. The source total omits {formatPounds(flag.omittedMinor)}. The stored source cell is not replaced.</p>
             ))}
-          </tbody>
-        </table>
-      </div>
-      <h2 style={h2}>{form.id ? 'Edit your entry' : 'Add a sale or cost'}</h2>
-      <form onSubmit={async (event) => { event.preventDefault(); const ok = await onSave({ ...form, month }); if (ok) setForm({ id: '', kind: 'sale', amount: '', party: '', groupId: 'billing', timing: 'one_off', durationMonths: '3' }); }}>
-        <div style={formGrid}>
-          <select aria-label="Kind" value={form.kind} onChange={(event) => setForm({ ...form, kind: event.target.value, groupId: event.target.value === 'cost' ? 'administration' : 'billing' })} style={input}>
-            <option value="sale">Sale</option>
-            <option value="cost">Cost</option>
-          </select>
-          <input aria-label="Amount in pounds" placeholder="Amount" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} style={input} />
-          <input aria-label="Client or vendor" placeholder="Client or vendor" value={form.party} onChange={(event) => setForm({ ...form, party: event.target.value })} style={input} />
-          <select aria-label="Group" value={form.groupId} onChange={(event) => setForm({ ...form, groupId: event.target.value })} style={input}>
-            <option value="billing">Billing</option>
-            <option value="administration">Administration</option>
-            <option value="people">People</option>
-            <option value="premises">Premises</option>
-            <option value="finance">Finance</option>
-            <option value="selling">Selling</option>
-          </select>
-          <button style={button} type="submit">{form.id ? 'Save change' : 'Add to this month'}</button>
-        </div>
-        {formError && <p role="alert">{formError}</p>}
-        {planNote && <p style={muted}>{planNote} The imported forecast and Xero are not written.</p>}
-        <ul>
-          {monthPlans.map((entry) => (
-            <li key={entry.id}>{entry.kind} {showMoney(entry.amountMinor)} · {entry.party}
-              <button type="button" onClick={() => setForm({ id: entry.id, kind: entry.kind, amount: String(entry.amountMinor / 100), party: entry.party, groupId: entry.groupId, timing: entry.timing || 'one_off', durationMonths: String(entry.durationMonths || 3) })}>Edit</button>
-              {onRemove && <button type="button" onClick={() => onRemove(entry.id)}>Remove</button>}
-            </li>
-          ))}
-        </ul>
-      </form>
-      {evidence?.alternative?.cells?.length > 0 && <p style={muted}>The V2 scenario is stored separately and is not added to this baseline.</p>}
+            <p>Xero is not connected. {evidence?.invoices ? `Historical invoice copy: ${evidence.invoices.rows.length}, read only.` : 'No live accounting connection.'}</p>
+            {(evidence?.planning?.rows || []).some((row) => row.planKind === 'salary_plan') && <p>Salary plan evidence is not added to costs.</p>}
+            {evidence?.alternative?.cells?.length > 0 && <p>The V2 scenario is stored separately and is not added to this baseline.</p>}
+            <p>A blank stays missing information. A stored zero stays £0.00. A partial month is not a finished result.</p>
+          </div>
+        </>
+      )}
     </section>
+  );
+}
+
+function Summary({ billing, costs }) {
+  return (
+    <div className="stats">
+      <Tile label="Billing" value={showMoney(billing)} />
+      <Tile label="Costs" value={showMoney(costs)} />
+      <Tile label="Result" value={showMoney(billing == null || costs == null ? null : billing - costs)} />
+    </div>
   );
 }
 
@@ -195,17 +244,17 @@ function Tile({ label, value }) {
 
 function GroupTable({ groups }) {
   return (
-    <div style={tableWrap}>
-      <table style={table}>
-        <thead><tr><th style={th}>Group</th><th style={th}>Plan</th><th style={th}>Accounting actual</th><th style={th}>Difference</th><th style={th}>Reading</th></tr></thead>
+    <div className="toki-table">
+      <table>
+        <thead><tr><th>Group</th><th>Plan</th><th>Accounting actual</th><th>Difference</th><th>Reading</th></tr></thead>
         <tbody>
           {groups.map((group) => (
             <tr key={group.groupId}>
-              <td style={td}>{group.label}</td>
-              <td style={tdNum}>{showMoney(group.shownForecast ?? group.forecast.minor)}</td>
-              <td style={tdNum}>{group.actual.known ? showMoney(group.actual.minor) : group.groupId === 'people' ? 'Missing information. People actuals are not on record.' : group.actual.coverage === 'partial' ? 'Missing information. Partial export.' : 'Missing information'}</td>
-              <td style={tdNum}>{group.rawDifference == null ? 'Missing information' : formatPounds(group.rawDifference)}</td>
-              <td style={td}>{group.judgement === 'unknown' ? 'Missing information' : group.judgement === 'incomplete' ? 'Incomplete' : group.direction}</td>
+              <td>{group.label}</td>
+              <td>{showMoney(group.shownForecast ?? group.forecast.minor)}</td>
+              <td>{group.actual.known ? showMoney(group.actual.minor) : group.groupId === 'people' ? 'Missing information. People actuals are not on record.' : group.actual.coverage === 'partial' ? 'Missing information. Partial export.' : 'Missing information'}</td>
+              <td>{group.rawDifference == null ? 'Missing information' : formatPounds(group.rawDifference)}</td>
+              <td>{group.judgement === 'unknown' ? 'Missing information' : group.judgement === 'incomplete' ? 'Incomplete' : group.direction}</td>
             </tr>
           ))}
         </tbody>
