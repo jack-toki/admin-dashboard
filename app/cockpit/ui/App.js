@@ -1,10 +1,10 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { syntheticActuals, syntheticBaseline } from '../../../lib/fixtures/synthetic';
 import { validateEntry } from '../../../lib/planning/entries';
 import { TokiScreen, AutomationsScreen } from './TokiScreen';
 import JrlScreen from './JrlScreen';
-import { readCollapsed, toggleCollapsed, visibleNav, NAV_STORAGE_KEY } from '../../../lib/nav/sidebar';
+import { readCollapsed, toggleCollapsed, visibleNav, NAV_STORAGE_KEY, TOKI_VIEWS } from '../../../lib/nav/sidebar';
 import { readTheme, writeTheme } from '../../../lib/theme';
 import { NavMark } from './marks';
 import '../jrl.css';
@@ -12,6 +12,7 @@ import '../cockpit.css';
 
 export default function App({ role, areas, client }) {
   const [area, setArea] = useState(areas.includes('toki') ? 'toki' : areas[0]);
+  const [tokiView, setTokiView] = useState('toki');
   const [collapsed, setCollapsed] = useState(false);
   const [status, setStatus] = useState(null);
   const [jrl, setJrl] = useState(null);
@@ -23,6 +24,8 @@ export default function App({ role, areas, client }) {
   const [storedForecast, setStoredForecast] = useState(null);
   const [evidence, setEvidence] = useState(null);
   const [forecastError, setForecastError] = useState('');
+  const [runBoard, setRunBoard] = useState(null);
+  const [runError, setRunError] = useState('');
 
   useEffect(() => {
     fetch('/api/cockpit/workspace').then(async (res) => {
@@ -32,8 +35,29 @@ export default function App({ role, areas, client }) {
   }, []);
 
   useEffect(() => {
+    if (window.location.hash === '#jrl' && areas.includes('jrl')) setArea('jrl');
+  }, [areas]);
+
+  useEffect(() => {
     if (area !== 'jrl') return;
     fetch('/api/cockpit/jrl').then(async (res) => setJrl({ status: res.status, body: await res.json() }));
+  }, [area]);
+
+  useEffect(() => {
+    if (area !== 'automations') return;
+    fetch('/api/cockpit/automations').then(async (res) => {
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !body.summary) {
+        setRunBoard(null);
+        setRunError(body.error || 'run_log_unreadable');
+        return;
+      }
+      setRunError('');
+      setRunBoard(body.summary);
+    }).catch(() => {
+      setRunBoard(null);
+      setRunError('run_log_unreadable');
+    });
   }, [area]);
 
   useEffect(() => {
@@ -90,37 +114,54 @@ export default function App({ role, areas, client }) {
 
   async function onSave(form) {
     const result = validateEntry({
+      id: form.id || undefined,
       kind: form.kind,
       amountMinor: Number.isFinite(Number(form.amount)) ? Math.round(Number(form.amount) * 100) : null,
       currency: 'GBP',
       month: form.month,
       party: form.party,
       groupId: form.groupId,
-      timing: form.timing,
+      timing: form.timing || 'one_off',
       durationMonths: form.durationMonths,
       attestation: 'forecast',
+      matchId: form.matchId || null,
+      stage: form.kind === 'sale' ? (form.workType || null) : null,
     });
     if (!result.ok) {
       setFormError(`Check ${result.errors.join(', ')}.`);
-      return;
+      return false;
     }
     const res = await fetch('/api/cockpit/plan', {
-      method: 'POST',
+      method: form.id ? 'PATCH' : 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ...form, amount: Number(form.amount), currency: 'GBP', attestation: 'forecast' }),
+      body: JSON.stringify({ ...form, id: form.id, amount: Number(form.amount), currency: 'GBP', attestation: 'forecast', matchId: form.matchId || null, stage: form.kind === 'sale' ? (form.workType || null) : null }),
     });
     if (res.status === 503) {
       setFormError('Shared saving is not configured. The entry was not stored.');
-      return;
+      return false;
     }
     if (!res.ok) {
       setFormError('The plan did not save.');
-      return;
+      return false;
     }
     const body = await res.json();
     setFormError('');
     setPlanNote(body.shared ? 'Saved in the shared store.' : 'Saved on this server’s local store. Production refuses a file store.');
     setPlan((current) => [...current.filter((entry) => entry.id !== body.entry.id), body.entry]);
+    return true;
+  }
+
+  async function onRemove(id) {
+    const res = await fetch('/api/cockpit/plan', {
+      method: 'DELETE',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    if (!res.ok) {
+      setFormError('The plan row was not removed.');
+      return;
+    }
+    setPlan((current) => current.filter((entry) => entry.id !== id));
   }
 
   const items = visibleNav(areas);
@@ -145,18 +186,35 @@ export default function App({ role, areas, client }) {
         <aside className="side" data-collapsed={collapsed ? 'true' : 'false'} aria-label="Cockpit sections">
           <nav id="cockpit-nav">
             {items.map((item) => (
-              <a
-                key={item.id}
-                href={`#${item.id}`}
-                className={area === item.id ? 'on' : undefined}
-                aria-current={area === item.id ? 'page' : undefined}
-                onClick={(event) => { event.preventDefault(); setArea(item.id); }}
-              >
-                <span className="ic"><NavMark id={item.id} /></span>
-                <span className="lbl">{item.label}</span>
-                <span className="lbl-short">{item.label}</span>
-                <span className="nav-tip">{item.label}</span>
-              </a>
+              <Fragment key={item.id}>
+                <a
+                  href={`#${item.id}`}
+                  className={area === item.id ? 'on' : undefined}
+                  aria-current={item.id === 'toki' ? (area === 'toki' && tokiView === 'toki' ? 'page' : undefined) : (area === item.id ? 'page' : undefined)}
+                  aria-expanded={item.id === 'toki' ? area === 'toki' : undefined}
+                  onClick={(event) => { event.preventDefault(); setArea(item.id); if (item.id === 'toki') setTokiView('toki'); }}
+                >
+                  <span className="ic"><NavMark id={item.id} /></span>
+                  <span className="lbl">{item.label}</span>
+                  <span className="lbl-short">{item.label}</span>
+                  <span className="nav-tip">{item.label}</span>
+                </a>
+                {item.id === 'toki' && area === 'toki' && (
+                  <div className="toki-subnav" aria-label="Toki sections">
+                    {TOKI_VIEWS.map((view) => (
+                      <button
+                        key={view.id}
+                        type="button"
+                        className={tokiView === view.id ? 'on' : undefined}
+                        aria-current={tokiView === view.id ? 'page' : undefined}
+                        onClick={() => setTokiView(view.id)}
+                      >
+                        {view.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </Fragment>
             ))}
           </nav>
           <div className="spacer" />
@@ -178,10 +236,10 @@ export default function App({ role, areas, client }) {
               <button type="button" className="toggle glass signout" onClick={onSignOut}>Sign out</button>
             </div>
           </div>
-          {area === 'toki' && <TokiScreen example={example} baseline={baseline} actuals={actuals} evidence={example ? null : evidence} plan={plan} planNote={planNote} onSave={onSave} formError={formError} forecastError={forecastError} />}
+          {area === 'toki' && <TokiScreen example={example} baseline={baseline} actuals={actuals} evidence={example ? null : evidence} plan={plan} planNote={planNote} onSave={onSave} onRemove={onRemove} formError={formError} forecastError={forecastError} section={tokiView} onSection={setTokiView} />}
           {area === 'automations' && (
             <>
-              <AutomationsScreen example={example} />
+              <AutomationsScreen example={example} board={example ? null : runBoard} error={runError} />
               {status && <p className="caveat">The ingest alias was not called. The last export snapshot recorded {status.coverage.clientOnWithIngest} of {status.coverage.clientOn} client workflows on, and {status.coverage.jackOwnOnWithIngest} of {status.coverage.jackOwnOn} on Jack’s own account. Louise was {status.coverage.louise}.</p>}
             </>
           )}
