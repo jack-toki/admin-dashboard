@@ -195,31 +195,60 @@ function Summary({ billing, costs }) {
   );
 }
 
-export function AutomationsScreen({ example }) {
+export function AutomationsScreen({ example, board, error }) {
+  if (!example && board?.posts != null) {
+    return (
+      <section>
+        <p style={muted}>Logged posts from the run log for this month. A missing or old post is not a failure. The registry export is separate.</p>
+        <div className="stats">
+          <Tile label="Logged posts" value={String(board.posts)} />
+          <Tile label="Accounts" value={String(board.accounts)} />
+          <Tile label="Estimated value" value={`£${Number(board.estimate.value || 0).toLocaleString('en-GB')}`} />
+        </div>
+        <p style={muted}>{board.estimate.label} Last 7 days in this set: {board.postsLast7Days}.</p>
+        <div style={tableWrap}>
+          <table style={table}>
+            <thead><tr><th style={th}>Account</th><th style={th}>Posts</th><th style={th}>Automations</th><th style={th}>Latest</th></tr></thead>
+            <tbody>
+              {board.accountRows.map((row) => (
+                <tr key={row.slug || row.name}>
+                  <td style={td}>{row.name}</td>
+                  <td style={td}>{row.runs}</td>
+                  <td style={td}>{row.automations}</td>
+                  <td style={td}>{row.latest ? row.latest.slice(0, 16).replace('T', ' ') : 'None'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p style={muted}>{board.registry.note}</p>
+      </section>
+    );
+  }
   if (!example) {
     return (
       <section>
         <div className="panel glass">
-          <h2>No run log is connected</h2>
-          <p style={muted}>Health, time, and value appear when events are stored. A workflow with no events is not treated as failed. Legacy posts without a run id are not turned into an exact hours figure.</p>
+          <h2>{error ? 'The run log could not be read' : 'No run log is connected'}</h2>
+          <p style={muted}>Health, time, and value appear when posts are stored. A workflow with no posts is not treated as failed. The time and money figures are estimates, not measured.</p>
         </div>
       </section>
     );
   }
-  const board = automationBoard(syntheticWorkflows(), syntheticEvents());
+  const exampleBoard = automationBoard(syntheticWorkflows(), syntheticEvents());
   return (
     <section>
       <p style={exampleBanner}>{SYNTHETIC_BANNER}</p>
           <div className="stats">
-            <Tile label="Checkpoints" value={String(board.checkpoints)} />
-            <Tile label="Unique runs" value={board.uniqueRuns == null ? 'Not known' : String(board.uniqueRuns)} />
-            <Tile label="Estimated value" value={board.savings.withheld ? 'Not calculated' : formatPounds(board.savings.minor)} />
+            <Tile label="Checkpoints" value={String(exampleBoard.checkpoints)} />
+            <Tile label="Unique runs" value={exampleBoard.uniqueRuns == null ? 'Not known' : String(exampleBoard.uniqueRuns)} />
+            <Tile label="Estimated value" value={exampleBoard.savings.withheld ? 'Not calculated' : formatPounds(exampleBoard.savings.minor)} />
           </div>
       <div style={tableWrap}>
         <table style={table}>
           <thead><tr><th style={th}>Workflow</th><th style={th}>Status</th></tr></thead>
           <tbody>
-            {board.rows.map((row) => (
+            {exampleBoard.rows.map((row) => (
               <tr key={row.zapId}>
                 <td style={td}>{row.title}</td>
                 <td style={td}>{row.health.state === 'no_events' ? 'No events yet' : row.health.state === 'last_event_succeeded' ? 'Last event succeeded' : row.health.state}</td>
@@ -228,7 +257,7 @@ export function AutomationsScreen({ example }) {
           </tbody>
         </table>
       </div>
-      <p style={muted}>{board.savings.label}</p>
+      <p style={muted}>{exampleBoard.savings.label}</p>
     </section>
   );
 }

@@ -67,18 +67,18 @@ export default function JrlScreen({ gate }) {
   }, [period, entries]);
 
   useEffect(() => {
-    if (!example) {
-      setEntries([]);
-      setTargets([]);
-      setPurchases([]);
-      setConversations([]);
+    if (example) {
+      setEntries(exampleEntries());
+      setTargets(exampleTargets());
+      setPurchases(examplePurchases());
+      setConversations(exampleConversations());
       return;
     }
-    setEntries(exampleEntries());
-    setTargets(exampleTargets());
-    setPurchases(examplePurchases());
-    setConversations(exampleConversations());
-  }, [example]);
+    setEntries(Array.isArray(gate?.body?.entries) ? gate.body.entries : []);
+    setTargets([]);
+    setPurchases([]);
+    setConversations([]);
+  }, [example, gate]);
 
   function onTheme() {
     const next = theme === 'dark' ? 'light' : 'dark';
@@ -100,9 +100,11 @@ export default function JrlScreen({ gate }) {
       body: JSON.stringify({ period, ...form }),
     });
     const body = await res.json();
-    setSaveNote(body.error === 'supabase_user_required'
-      ? 'Not saved. This password is not the Supabase user session, so the personal ledger was not written.'
-      : 'Not saved.');
+    setSaveNote(body.saved
+      ? 'Saved with the JRL session. The cockpit password was not used.'
+      : body.error === 'supabase_user_required'
+        ? 'Not saved. Sign in with the JRL account. This cockpit password does not write the ledger.'
+        : 'Not saved. The ledger was left unchanged.');
   }
 
   if (blocked) {
@@ -124,8 +126,8 @@ export default function JrlScreen({ gate }) {
           {example ? <p className="caveat">{JRL_EXAMPLE_BANNER}</p> : (
             <div className="nudge glass">
               <span className="nudge-dot" />
-              <span>{auth?.note || 'Personal balances stay empty until the separate Supabase sign-in exists.'}</span>
-              <a className="nudge-btn" href={auth?.handoff || 'https://jrl-finance.vercel.app/login'}>JRL sign-in</a>
+              <span>{auth?.expired ? 'The JRL session expired. Sign in again. Nothing was filled in.' : auth?.supabaseUser ? `Signed in to JRL. The session expires ${auth.expiresAt ? new Date(auth.expiresAt).toLocaleString('en-GB') : 'on its own'}.` : (auth?.note || 'Sign in with the JRL account. The cockpit password does not open the ledger.')}</span>
+              {auth?.supabaseUser ? <button type="button" className="nudge-btn" onClick={async () => { await fetch('/api/cockpit/jrl/session', { method: 'DELETE' }); window.location.assign('/cockpit#jrl'); }}>Sign out of JRL</button> : <a className="nudge-btn" href={auth?.handoff || '/cockpit/jrl/login?return=/cockpit%23jrl'}>JRL sign-in</a>}
             </div>
           )}
           {section === 'overview' && <Overview ledger={ledger} targets={targets} />}

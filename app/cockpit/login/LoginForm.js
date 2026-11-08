@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { safeCockpitReturn } from '../../../lib/jrl/return';
 import '../jrl.css';
 
 export default function LoginForm() {
@@ -33,7 +34,8 @@ export default function LoginForm() {
         setError('That password was not accepted.');
         return;
       }
-      window.location.assign('/cockpit');
+      const params = new URLSearchParams(window.location.search);
+      window.location.assign(safeCockpitReturn(params.get('return') || '/cockpit'));
     } catch {
       setError('Sign-in could not reach the server.');
     } finally {

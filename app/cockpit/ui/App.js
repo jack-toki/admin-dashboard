@@ -24,6 +24,8 @@ export default function App({ role, areas, client }) {
   const [storedForecast, setStoredForecast] = useState(null);
   const [evidence, setEvidence] = useState(null);
   const [forecastError, setForecastError] = useState('');
+  const [runBoard, setRunBoard] = useState(null);
+  const [runError, setRunError] = useState('');
 
   useEffect(() => {
     fetch('/api/cockpit/workspace').then(async (res) => {
@@ -33,8 +35,29 @@ export default function App({ role, areas, client }) {
   }, []);
 
   useEffect(() => {
+    if (window.location.hash === '#jrl' && areas.includes('jrl')) setArea('jrl');
+  }, [areas]);
+
+  useEffect(() => {
     if (area !== 'jrl') return;
     fetch('/api/cockpit/jrl').then(async (res) => setJrl({ status: res.status, body: await res.json() }));
+  }, [area]);
+
+  useEffect(() => {
+    if (area !== 'automations') return;
+    fetch('/api/cockpit/automations').then(async (res) => {
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !body.summary) {
+        setRunBoard(null);
+        setRunError(body.error || 'run_log_unreadable');
+        return;
+      }
+      setRunError('');
+      setRunBoard(body.summary);
+    }).catch(() => {
+      setRunBoard(null);
+      setRunError('run_log_unreadable');
+    });
   }, [area]);
 
   useEffect(() => {
@@ -213,7 +236,7 @@ export default function App({ role, areas, client }) {
           {area === 'toki' && <TokiScreen example={example} baseline={baseline} actuals={actuals} evidence={example ? null : evidence} plan={plan} planNote={planNote} onSave={onSave} onRemove={onRemove} formError={formError} forecastError={forecastError} section={tokiView} onSection={setTokiView} />}
           {area === 'automations' && (
             <>
-              <AutomationsScreen example={example} />
+              <AutomationsScreen example={example} board={example ? null : runBoard} error={runError} />
               {status && <p className="caveat">The ingest alias was not called. The last export snapshot recorded {status.coverage.clientOnWithIngest} of {status.coverage.clientOn} client workflows on, and {status.coverage.jackOwnOnWithIngest} of {status.coverage.jackOwnOn} on Jack’s own account. Louise was {status.coverage.louise}.</p>}
             </>
           )}
