@@ -287,29 +287,39 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
           </div>
           {(sheetError || formError) && <p role="alert">{sheetError || formError}</p>}
           {planNote && <p className="quiet">{planNote} These edits are a working forecast.</p>}
-          <IncomeBoard month={month} records={details} stored={detailStored} baselineRetainer={incomeBreakdown(lines).retainer} baselineProject={incomeBreakdown(lines).project} onSave={onSaveDetail} onRemove={onRemoveDetail} />
-          <SheetBlock title="Forecast costs" lines={costs} bulk={editAll} rowOpen={rowOpen} draftFor={draftFor} setDrafts={setDrafts} openEdit={openEdit} saveLine={saveLine} onRemove={onRemove} setEditingKey={setEditingKey} />
-          <div className="sheet-add">
-            <button type="button" onClick={() => setAdding({ kind: 'cost', workType: '', party: '', amount: '', groupId: '' })}>Add a cost</button>
-          </div>
-          {adding && (
-            <form className="sheet-new" onSubmit={async (event) => {
-              event.preventDefault();
-              const ok = await onSave({ kind: adding.kind, amount: adding.amount, party: adding.party, groupId: adding.kind === 'sale' ? 'billing' : adding.groupId, workType: adding.workType, month, timing: 'one_off' });
-              if (ok) setAdding(null);
-            }}>
-              <input aria-label="Name or client" placeholder="Name or client" value={adding.party} onChange={(event) => setAdding({ ...adding, party: event.target.value })} />
-              <input aria-label="Amount in pounds" placeholder="Amount" value={adding.amount} onChange={(event) => setAdding({ ...adding, amount: event.target.value })} />
-              {adding.kind === 'cost' && (
-                <select aria-label="Cost group" value={adding.groupId} onChange={(event) => setAdding({ ...adding, groupId: event.target.value })}>
-                  <option value="">Choose a group</option>
-                  {COST_GROUPS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-                </select>
-              )}
-              <button type="submit">Save line</button>
-              <button type="button" onClick={() => setAdding(null)}>Cancel</button>
-            </form>
-          )}
+          <IncomeBoard
+            month={month}
+            records={details}
+            stored={detailStored}
+            baselineRetainer={incomeBreakdown(lines).retainer}
+            baselineProject={incomeBreakdown(lines).project}
+            onSave={onSaveDetail}
+            onRemove={onRemoveDetail}
+            costContent={(
+              <>
+                <SheetBlock title="Forecast costs" lines={costs} bulk={editAll} rowOpen={rowOpen} draftFor={draftFor} setDrafts={setDrafts} openEdit={openEdit} saveLine={saveLine} onRemove={onRemove} setEditingKey={setEditingKey} />
+                <div className="sheet-add">
+                  <button type="button" onClick={() => setAdding({ kind: 'cost', workType: '', party: '', amount: '', groupId: '' })}>Add a cost</button>
+                </div>
+                {adding?.kind === 'cost' && (
+                  <form className="sheet-new" onSubmit={async (event) => {
+                    event.preventDefault();
+                    const ok = await onSave({ kind: 'cost', amount: adding.amount, party: adding.party, groupId: adding.groupId, workType: '', month, timing: 'one_off' });
+                    if (ok) setAdding(null);
+                  }}>
+                    <input aria-label="Name or client" placeholder="Name or client" value={adding.party} onChange={(event) => setAdding({ ...adding, party: event.target.value })} />
+                    <input aria-label="Amount in pounds" placeholder="Amount" value={adding.amount} onChange={(event) => setAdding({ ...adding, amount: event.target.value })} />
+                    <select aria-label="Cost group" value={adding.groupId} onChange={(event) => setAdding({ ...adding, groupId: event.target.value })}>
+                      <option value="">Choose a group</option>
+                      {COST_GROUPS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                    </select>
+                    <button type="submit">Save line</button>
+                    <button type="button" onClick={() => setAdding(null)}>Cancel</button>
+                  </form>
+                )}
+              </>
+            )}
+          />
         </div>
       )}
     </section>

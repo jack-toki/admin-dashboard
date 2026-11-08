@@ -8,8 +8,9 @@
       radial-gradient(60% 19% at 39% 66%, #3F61B8 0%, rgba(63,97,184,.6) 40%, transparent 76%),
       radial-gradient(58% 17% at 42% 85%, #9FC8E8 0%, transparent 76%),
       linear-gradient(180deg,#D2D1CF 0%,#CACACB 100%);
-    --ink:#14171C; --muted:rgba(20,23,28,.6); --knock:#D3D1CE;
-    --glass:rgba(250,249,247,.44); --glass-strong:rgba(250,249,247,.62); --glass-2:rgba(255,255,255,.36);
+    --ink:#14171C; --muted:rgba(20,23,28,.62); --knock:#D3D1CE;
+    --glass:rgba(255,250,246,.82); --glass-strong:rgba(255,250,246,.94); --glass-2:rgba(255,252,248,.6);
+    --surface:rgba(255,250,246,.94); --control:rgba(255,252,248,.8); --control-on:#fff; --line-quiet:rgba(20,23,28,.16);
     --hair:rgba(255,255,255,.75); --hi:rgba(255,255,255,.55);
     --line:rgba(20,23,28,.08); --line-strong:rgba(20,23,28,.16);
     --track:rgba(20,23,28,.07);
@@ -30,8 +31,10 @@
       radial-gradient(58% 20% at 72% 60%, #1E68C9 0%, transparent 76%),
       radial-gradient(70% 24% at 48% 88%, rgba(18,108,160,.85) 0%, transparent 72%),
       linear-gradient(180deg,#0B2C4C 0%,#040A15 26%,#081628 50%,#050B14 78%,#0C0609 100%);
-    --ink:#EEF3F9; --muted:rgba(238,243,249,.62); --knock:#0A1628;
-    --glass:rgba(8,18,36,.44); --glass-strong:rgba(8,18,36,.6); --glass-2:rgba(255,255,255,.045);
+    --ink:#F4F7FB; --muted:rgba(244,247,251,.72); --knock:#0A1628;
+    --glass:rgba(10,18,34,.86); --glass-strong:rgba(14,24,42,.94); --glass-2:rgba(255,255,255,.06);
+    --surface:rgba(16,28,48,.96); --control:rgba(28,44,68,.98); --control-on:rgba(40,58,86,1); --line-quiet:rgba(255,255,255,.22);
+    --surface:rgba(16,28,48,.94); --control:rgba(22,36,58,.96); --control-on:rgba(32,48,74,.98); --line-quiet:rgba(255,255,255,.2);
     --hair:rgba(255,255,255,.16); --hi:rgba(255,255,255,.07);
     --line:rgba(255,255,255,.08); --line-strong:rgba(255,255,255,.16);
     --track:rgba(255,255,255,.08);
@@ -52,8 +55,10 @@
       radial-gradient(58% 20% at 72% 60%, #1E68C9 0%, transparent 76%),
       radial-gradient(70% 24% at 48% 88%, rgba(18,108,160,.85) 0%, transparent 72%),
       linear-gradient(180deg,#0B2C4C 0%,#040A15 26%,#081628 50%,#050B14 78%,#0C0609 100%);
-    --ink:#EEF3F9; --muted:rgba(238,243,249,.62); --knock:#0A1628;
-    --glass:rgba(8,18,36,.44); --glass-strong:rgba(8,18,36,.6); --glass-2:rgba(255,255,255,.045);
+    --ink:#F4F7FB; --muted:rgba(244,247,251,.72); --knock:#0A1628;
+    --glass:rgba(10,18,34,.86); --glass-strong:rgba(14,24,42,.94); --glass-2:rgba(255,255,255,.06);
+    --surface:rgba(16,28,48,.96); --control:rgba(28,44,68,.98); --control-on:rgba(40,58,86,1); --line-quiet:rgba(255,255,255,.22);
+    --surface:rgba(16,28,48,.94); --control:rgba(22,36,58,.96); --control-on:rgba(32,48,74,.98); --line-quiet:rgba(255,255,255,.2);
     --hair:rgba(255,255,255,.16); --hi:rgba(255,255,255,.07);
     --line:rgba(255,255,255,.08); --line-strong:rgba(255,255,255,.16);
     --track:rgba(255,255,255,.08);
@@ -73,8 +78,9 @@
       radial-gradient(60% 19% at 39% 66%, #3F61B8 0%, rgba(63,97,184,.6) 40%, transparent 76%),
       radial-gradient(58% 17% at 42% 85%, #9FC8E8 0%, transparent 76%),
       linear-gradient(180deg,#D2D1CF 0%,#CACACB 100%);
-    --ink:#14171C; --muted:rgba(20,23,28,.6); --knock:#D3D1CE;
-    --glass:rgba(250,249,247,.44); --glass-strong:rgba(250,249,247,.62); --glass-2:rgba(255,255,255,.36);
+    --ink:#14171C; --muted:rgba(20,23,28,.62); --knock:#D3D1CE;
+    --glass:rgba(255,250,246,.82); --glass-strong:rgba(255,250,246,.94); --glass-2:rgba(255,252,248,.6);
+    --surface:rgba(255,250,246,.94); --control:rgba(255,252,248,.8); --control-on:#fff; --line-quiet:rgba(20,23,28,.16);
     --hair:rgba(255,255,255,.75); --hi:rgba(255,255,255,.55);
     --line:rgba(20,23,28,.08); --line-strong:rgba(20,23,28,.16);
     --track:rgba(20,23,28,.07);
@@ -101,7 +107,7 @@
 
   .jrl-root /* glass */
   .glass{background:var(--glass); border:.5px solid var(--hair);
-    -webkit-backdrop-filter:blur(30px) saturate(150%); backdrop-filter:blur(30px) saturate(150%);
+    -webkit-backdrop-filter:blur(14px) saturate(140%); backdrop-filter:blur(14px) saturate(140%);
     box-shadow:inset 0 1px 0 var(--hi), var(--shadow)}
   @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){ .jrl-root .glass{background:var(--glass-strong)} }
 
@@ -471,3 +477,12 @@
 .jrl-root .aura{position:absolute;inset:-12%;z-index:0}
 .jrl-root::after{position:absolute;z-index:1}
 .jrl-root .app{position:relative;z-index:2}
+@media (min-width: 821px) {
+  .jrl-root .side { width: 76px; padding: 16px 8px; background: #16181d; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .jrl-root nav a { justify-content: center; gap: 0; padding: 10px 0; color: rgba(255,255,255,.78); }
+  .jrl-root nav a .lbl, .jrl-root nav a .lbl-short, .jrl-root .help { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+  .jrl-root .toki-subnav { display: none; }
+  .jrl-root .toki-section-switch { display: flex; }
+  .jrl-root nav a.on, .jrl-root nav a:hover { color: #fff; background: rgba(255,255,255,.08); }
+  .jrl-root .toggle { color: #fff; background: transparent; border-color: rgba(255,255,255,.2); }
+}

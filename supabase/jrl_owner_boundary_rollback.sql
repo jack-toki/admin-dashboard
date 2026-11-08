@@ -1,7 +1,9 @@
 -- NOT APPLIED. Rollback for jrl_owner_boundary.sql. Do not run until that script was applied and the owner asks to undo it.
 -- Restores the authenticated commands confirmed by the 2026-11-08 metadata audit: permissive true, no owner predicate.
 -- Does not create an anon policy. Does not grant the service role. Does not read personal rows.
--- GRANT ALL below restores the audited full grants. It is not a captured ACL dump.
+-- The captured table and view ACL is arwdDxtm for anon, authenticated, and the service role.
+-- These statements name those privileges. m is MAINTAIN and is granted only when the server has it.
+-- This does not grant CREATE on schema public. That remains with pg_database_owner.
 -- The pin and the helper are removed. A later session setting cannot keep the owner check.
 
 begin;
@@ -60,12 +62,21 @@ begin
   loop
     execute format('alter table public.%I enable row level security', t);
     execute format('alter table public.%I no force row level security', t);
-    execute format('grant all on table public.%I to anon, authenticated', t);
+    execute format('grant select, insert, update, delete, truncate, references, trigger on table public.%I to anon, authenticated, service_role', t);
   end loop;
+  if current_setting('server_version_num')::int >= 170000 then
+    foreach t in array array[
+      'monthly_entry', 'finance_setting', 'finance_target', 'purchase',
+      'sora_conversation', 'sora_alerts', 'sora_research'
+    ]
+    loop
+      execute format('grant maintain on table public.%I to anon, authenticated, service_role', t);
+    end loop;
+  end if;
 end $$;
 
 alter view public.monthly_finance set (security_invoker = on);
-grant all on table public.monthly_finance to anon, authenticated;
+grant select, insert, update, delete, truncate, references, trigger on table public.monthly_finance to anon, authenticated, service_role;
 
 drop function if exists public.jrl_is_owner();
 drop table if exists public.jrl_owner_pin;

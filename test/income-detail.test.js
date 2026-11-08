@@ -6,7 +6,7 @@ const path = require('path');
 const { signSession, cookieName } = require('../lib/auth');
 const { incomeDetailGet, incomeDetailPost, incomeDetailDelete } = require('../lib/cockpit/http');
 const { workingMonthLines, incomeBreakdown, sumLines } = require('../lib/planning/entries');
-const { scheduleFor, detailSum, reconcileKind, validateIncomeDetail } = require('../lib/planning/incomeDetail');
+const { scheduleFor, detailSum, reconcileKind, validateIncomeDetail, presentDetails } = require('../lib/planning/incomeDetail');
 const { syntheticBaseline } = require('../lib/fixtures/synthetic');
 
 const acme = {
@@ -49,6 +49,18 @@ test('client lines do not change the forecast total and the gap can be negative'
   assert.equal(reconcileKind([acme], split.retainer, '2026-11', 'retainer').difference, 150000 - split.retainer);
   assert.equal(split.total, before);
   assert.equal(validateIncomeDetail({ kind: 'retainer', party: '', amountMinor: 1 }).ok, false);
+});
+
+test('a tombstone stops the same source id from coming back', () => {
+  const source = [{ sourceRowId: 'sheet:3:retainer', id: 'source_sheet_3', layer: 'detail', kind: 'retainer', party: 'Example', amountMinor: 100, deletedAt: null }];
+  const shown = presentDetails([], source);
+  assert.equal(shown.length, 1);
+  const hidden = presentDetails([{ ...source[0], deletedAt: '2026-11-08T00:00:00Z' }], source);
+  assert.equal(hidden.length, 0);
+  const override = presentDetails([{ ...source[0], party: 'Renamed', amountMinor: 200 }], source);
+  assert.equal(override.length, 1);
+  assert.equal(override[0].party, 'Renamed');
+  assert.equal(override[0].amountMinor, 200);
 });
 
 test('the file store saves a client line without adding a forecast row, and a shared store refuses', async () => {

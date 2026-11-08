@@ -40,6 +40,11 @@ const REVIEW_SQL = [
   'supabase/jrl_owner_boundary_rollback.sql',
   'supabase/jrl_owner_boundary_denial.sql',
   'supabase/jrl_owner_link_store.sql',
+  'supabase/jrl_owner_link_store_rollback.sql',
+  'supabase/income_detail.sql',
+  'supabase/income_detail_rollback.sql',
+  'supabase/jrl_pots.sql',
+  'supabase/jrl_pots_rollback.sql',
 ];
 
 function jwt(payload) {
@@ -98,6 +103,15 @@ test('the owner boundary covers every audited command and does not guess an iden
   assert.equal(/for all to authenticated/i.test(sql), false);
   assert.equal(/create policy[\s\S]*to anon/i.test(sql), false);
   assert.match(sql, /does not ALTER ROLE/);
+  const link = fs.readFileSync(rootFile('supabase/jrl_owner_link_store.sql'), 'utf8');
+  assert.equal(/delete from/i.test(link), false);
+  assert.equal(/grant delete/i.test(link), false);
+  assert.match(link, /generation bigint not null default 0/);
+  assert.match(link, /'xero', 'google', 'jrl'/);
+  const income = fs.readFileSync(rootFile('supabase/income_detail.sql'), 'utf8');
+  assert.equal(/plan_entries/i.test(income) && /insert into cockpit.plan_entries/i.test(income), false);
+  assert.match(income, /grant select, insert, update on table cockpit.income_detail_lines to service_role/);
+  assert.equal(/grant delete/i.test(income), false);
   assert.match(sql, /for insert to authenticated with check \(public\.jrl_is_owner\(\)\)/);
   assert.match(sql, /for update to authenticated using \(public\.jrl_is_owner\(\)\) with check \(public\.jrl_is_owner\(\)\)/);
   assert.match(sql, /for delete to authenticated using \(public\.jrl_is_owner\(\)\)/);

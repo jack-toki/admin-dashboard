@@ -12,7 +12,7 @@ function blank(kind) {
   return { kind, party: '', services: '', amount: '', firstPaymentMonth: '', contractEndDate: '', totalPayments: '', comment: '' };
 }
 
-export function IncomeBoard({ month, records, stored, baselineRetainer, baselineProject, onSave, onRemove }) {
+export function IncomeBoard({ month, records, stored, baselineRetainer, baselineProject, onSave, onRemove, costContent }) {
   const [pane, setPane] = useState('income');
   const [kind, setKind] = useState('retainer');
   const [editing, setEditing] = useState('');
@@ -101,6 +101,8 @@ export function IncomeBoard({ month, records, stored, baselineRetainer, baseline
         </>
       )}
       {pane === 'costs' && (
+        <div className="forecast-costs">
+          {costContent}
         <section className="income-col">
           <header>
             <h2>Additional costs</h2>
@@ -117,6 +119,7 @@ export function IncomeBoard({ month, records, stored, baselineRetainer, baseline
             {!costs.length && <li className="income-empty">No additional costs this month.</li>}
           </ul>
         </section>
+        </div>
       )}
       {stored && editing && (
         <form className="income-form" onSubmit={save}>

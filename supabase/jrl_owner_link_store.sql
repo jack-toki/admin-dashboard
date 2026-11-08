@@ -1,10 +1,11 @@
--- NOT APPLIED. Cockpit store only (hcjybjpimqzsueyslxvl, schema cockpit).
+-- NOT APPLIED. Toki project hcjybjpimqzsueyslxvl, schema cockpit, table app_oauth_tokens.
+-- Live columns are id, provider, tenant_key, ciphertext, created_at, updated_at.
+-- The provider check allows only xero and google. There is no generation column.
+-- service_role can select, insert, and update. It cannot delete.
+-- This adds generation and allows provider jrl. It does not delete or rewrite ciphertext.
+-- A new column with a constant default does not rewrite existing token rows.
+-- Unlink clears a link by updating the ciphertext. It does not delete the row.
 -- Do not run this until the owner approves it. It does not touch uxkpqmyzxtjmmixlycio.
--- Approval scope is this table only: allow provider jrl, and add generation for compare-and-swap.
--- The app updates one row with WHERE generation = expected and increments generation.
--- If this column or the provider check is missing, the app refuses the link.
--- A file store is also refused. Two processes cannot share its lock.
--- No personal row, email, or key is written by this file.
 
 begin;
 
