@@ -1,0 +1,40 @@
+.cockpit-shell { display: flex; gap: 18px; align-items: stretch; min-height: calc(100vh - 40px); }
+.cockpit-main { flex: 1; min-width: 0; background: rgba(246,245,241,.94); color: #1c1917; border: 1.5px solid #1c1917; box-shadow: 6px 6px 0 #1c1917; border-radius: 18px; padding: 18px; }
+.glass-nav {
+  width: 232px; flex: none; display: flex; flex-direction: column; gap: 8px; padding: 14px 12px;
+  color: #f6f5f1; border-radius: 28px;
+  background: linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.05));
+  border: 1px solid rgba(255,255,255,.28);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.35), 0 18px 40px rgba(0,0,0,.28), 0 0 32px rgba(235,70,38,.18);
+  backdrop-filter: blur(22px) saturate(1.35);
+  -webkit-backdrop-filter: blur(22px) saturate(1.35);
+}
+.glass-nav[data-collapsed="true"] { width: 84px; }
+.glass-nav ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.nav-toggle, .nav-item {
+  width: 100%; display: flex; align-items: center; gap: 10px; color: inherit; cursor: pointer;
+  background: rgba(255,255,255,.06); border: 1px solid transparent; border-radius: 16px;
+  padding: 10px; font: inherit; text-align: left; position: relative;
+}
+.nav-item.is-current { background: rgba(235,70,38,.28); border-color: rgba(255,255,255,.45); box-shadow: inset 0 0 0 1px rgba(235,70,38,.4), 0 0 18px rgba(235,70,38,.25); }
+.nav-toggle:focus-visible, .nav-item:focus-visible { outline: 2px solid #fffdf8; outline-offset: 3px; }
+.glass-nav[data-collapsed="true"] .nav-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.nav-tip { display: none; }
+.glass-nav[data-collapsed="true"] .nav-item:hover .nav-tip,
+.glass-nav[data-collapsed="true"] .nav-item:focus-visible .nav-tip,
+.glass-nav[data-collapsed="true"] .nav-toggle:hover .nav-tip,
+.glass-nav[data-collapsed="true"] .nav-toggle:focus-visible .nav-tip {
+  display: block; position: absolute; left: calc(100% + 10px); top: 8px; z-index: 3;
+  background: rgba(20,16,14,.88); color: #f6f5f1; border: 1px solid rgba(255,255,255,.3);
+  border-radius: 10px; padding: 6px 8px; white-space: nowrap;
+}
+@media (max-width: 760px) {
+  .cockpit-shell { flex-direction: column; }
+  .glass-nav, .glass-nav[data-collapsed="true"] { width: auto; }
+  .glass-nav ul { flex-direction: row; flex-wrap: wrap; }
+  .glass-nav[data-collapsed="true"] ul { flex-wrap: nowrap; overflow-x: auto; }
+  .nav-tip { display: none !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .glass-nav, .glass-nav * { transition: none !important; scroll-behavior: auto !important; }
+}
