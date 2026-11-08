@@ -320,18 +320,19 @@ export function AutomationsScreen({ example, board, error }) {
         <div className="stats">
           <Tile label="Logged posts" value={String(board.posts)} />
           <Tile label="Accounts" value={String(board.accounts)} />
+          <Tile label="Zap ids that posted" value={String(board.reportingZapIds)} />
           <Tile label="Estimated value" value={`£${Number(board.estimate.value || 0).toLocaleString('en-GB')}`} />
         </div>
-        <p style={muted}>{board.estimate.label} Last 7 days in this set: {board.postsLast7Days}.</p>
+        <p style={muted}>{board.reportingZapIdsMeaning} Posts with no zap id: {board.postsWithoutZapId}. {board.estimate.label} Last 7 days in this set: {board.postsLast7Days}.</p>
         <div style={tableWrap}>
           <table style={table}>
-            <thead><tr><th style={th}>Account</th><th style={th}>Posts</th><th style={th}>Automations</th><th style={th}>Latest</th></tr></thead>
+            <thead><tr><th style={th}>Account</th><th style={th}>Posts</th><th style={th}>Zap ids that posted</th><th style={th}>Latest</th></tr></thead>
             <tbody>
               {board.accountRows.map((row) => (
-                <tr key={row.slug || row.name}>
+                <tr key={row.logAccount || row.name}>
                   <td style={td}>{row.name}</td>
                   <td style={td}>{row.runs}</td>
-                  <td style={td}>{row.automations}</td>
+                  <td style={td}>{row.reportingZapIds}</td>
                   <td style={td}>{row.latest ? row.latest.slice(0, 16).replace('T', ' ') : 'None'}</td>
                 </tr>
               ))}

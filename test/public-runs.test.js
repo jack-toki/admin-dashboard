@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { summariseRuns, loadRunSummary } = require('../lib/automations/publicRuns');
+const { summariseRuns, loadRunSummary, identifyRunAccount } = require('../lib/automations/publicRuns');
 const { signSession, cookieName } = require('../lib/auth');
 const { GET } = require('../app/api/cockpit/automations/route');
 
@@ -12,9 +12,11 @@ test('run posts are counted without dedupe and the estimate stays labelled', asy
   ]);
   assert.equal(summary.deduped, false);
   assert.equal(summary.posts, 3);
-  assert.equal(summary.accountRows.find((row) => row.slug === 'aa-surveys').runs, 2);
-  assert.equal(summary.accountRows.find((row) => row.slug === 'aa-surveys').automations, 1);
-  assert.equal(summary.accountRows.find((row) => row.slug === 'jack').name, 'Jack');
+  assert.equal(summary.accountRows.find((row) => row.logAccount === 'aa-surveys').runs, 2);
+  assert.equal(summary.accountRows.find((row) => row.logAccount === 'aa-surveys').reportingZapIds, 1);
+  assert.equal(summary.accountRows.find((row) => row.logAccount === 'aa-surveys').ingestSlug, null);
+  assert.equal(summary.accountRows.find((row) => row.logAccount === 'jack').name, 'jack');
+  assert.equal(summary.reportingZapIds, 2);
   assert.equal(summary.estimate.measured, false);
   assert.match(summary.estimate.label, /Estimated/);
   assert.equal(summary.registry.jackReportingInExport, 0);
@@ -24,8 +26,21 @@ test('run posts are counted without dedupe and the estimate stays labelled', asy
 
   const loaded = await loadRunSummary(async () => ({ data: [{ account: 'house-to-home', zap_id: '1', ts: '2026-11-02T00:00:00Z' }], error: null }));
   assert.equal(loaded.ok, true);
-  assert.equal(loaded.summary.accountRows[0].name, 'House To Home');
+  assert.equal(loaded.summary.accountRows[0].name, 'house-to-home');
+  assert.equal(loaded.summary.accountRows[0].ingestSlug, null);
   assert.equal(loaded.summary.posts, 1);
+  const named = summariseRuns([
+    { account: 'House to Home Surveys', zap_id: '1', ts: '2026-11-08T12:00:00Z' },
+    { account: 'House to Home Surveys', zap_id: '', ts: '2026-11-08T12:05:00Z' },
+    { account: 'house-to-home', zap_id: '2', ts: '2026-11-08T12:06:00Z' },
+  ], undefined, { ACCOUNTS: '{"house-to-home":"House to Home Surveys"}' });
+  assert.equal(named.accountRows.find((row) => row.logAccount === 'House to Home Surveys').ingestSlug, 'house-to-home');
+  assert.equal(named.accountRows.find((row) => row.logAccount === 'House to Home Surveys').reportingZapIds, 1);
+  assert.equal(named.accountRows.find((row) => row.logAccount === 'House to Home Surveys').postsWithoutZapId, 1);
+  assert.equal(named.accountRows.find((row) => row.logAccount === 'house-to-home').name, 'House to Home Surveys');
+  assert.equal(named.reportingZapIds, 2);
+  assert.equal(named.postsWithoutZapId, 1);
+  assert.equal(identifyRunAccount('Interim Digital', { ACCOUNTS: '{}' }).ingestSlug, null);
 
   const previous = process.env.DASHBOARD_SESSION_SECRET;
   process.env.DASHBOARD_SESSION_SECRET = 'session-secret-for-test';
