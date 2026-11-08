@@ -51,9 +51,8 @@ export function TokiScreen({ example, baseline, actuals, plan, planNote, onSave,
     return (
       <section>
         <div className="panel glass">
-          <h2>Forecast sheet is not connected</h2>
-          <p style={muted}>The plan, variance, and what-if views stay empty until a read-only sheet connection is configured. Example figures are off.</p>
-          <p style={muted}>Use “Show example figures” only to preview the layout. Those figures are not the company.</p>
+          <h2>No forecast is stored yet</h2>
+          <p style={muted}>The Google Sheet is not read while the app is running. A one-time import can store the first Forecast Profit &amp; Loss tab. Those figures are forecasts, not actuals. Example data stays off until you ask for it.</p>
         </div>
       </section>
     );

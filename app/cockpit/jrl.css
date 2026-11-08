@@ -21,7 +21,7 @@
     --tip:#F4F3F1; --glass-nav:rgba(255,255,255,.42); --nav-edge:rgba(255,255,255,.7); --page-edge:#CFCFCE; --shadow:0 10px 30px -20px rgba(40,20,10,.35);
     --grain:.2; color-scheme:light;
  }
-  @media (prefers-color-scheme:dark){ .jrl-root:not([data-theme="light"]){ 
+  @media (prefers-color-scheme:dark){ .jrl-root[data-theme="follow-system"]{ 
     --aura:
       radial-gradient(62% 34% at 50% -2%, #1C73B8 0%, rgba(28,115,184,.45) 40%, transparent 72%),
       radial-gradient(44% 17% at 76% 41%, #E23A1B 0%, rgba(226,58,27,.55) 38%, transparent 76%),

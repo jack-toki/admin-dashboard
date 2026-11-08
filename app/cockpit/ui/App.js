@@ -5,6 +5,7 @@ import { validateEntry } from '../../../lib/planning/entries';
 import { TokiScreen, AutomationsScreen } from './TokiScreen';
 import JrlScreen from './JrlScreen';
 import { readCollapsed, toggleCollapsed, visibleNav, NAV_STORAGE_KEY } from '../../../lib/nav/sidebar';
+import { readTheme, writeTheme } from '../../../lib/theme';
 import { NavMark } from './marks';
 import '../jrl.css';
 import '../cockpit.css';
@@ -15,7 +16,7 @@ export default function App({ role, areas, client }) {
   const [status, setStatus] = useState(null);
   const [jrl, setJrl] = useState(null);
   const [example, setExample] = useState(false);
-  const [theme, setTheme] = useState('');
+  const [theme, setTheme] = useState('light');
   const [plan, setPlan] = useState([]);
   const [planNote, setPlanNote] = useState('');
   const [formError, setFormError] = useState('');
@@ -44,7 +45,7 @@ export default function App({ role, areas, client }) {
 
   useEffect(() => {
     setCollapsed(readCollapsed(window.localStorage));
-    try { setTheme(window.localStorage.getItem('jrl-theme') || ''); } catch { setTheme(''); }
+    try { setTheme(readTheme(window.localStorage)); } catch { setTheme('light'); }
     function onKey(event) {
       const tag = event.target?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || event.target?.isContentEditable) return;
@@ -106,17 +107,16 @@ export default function App({ role, areas, client }) {
     window.location.href = '/cockpit/login';
   }
 
-  function onTheme() {
-    const next = theme === 'dark' ? 'light' : 'dark';
+  function onTheme(event) {
+    const next = writeTheme(window.localStorage, event.target.checked ? 'dark' : 'light');
     setTheme(next);
-    try { window.localStorage.setItem('jrl-theme', next); } catch { /* keep the choice for this view */ }
     window.dispatchEvent(new Event('jrl-theme'));
   }
 
   const title = area === 'jrl' ? 'JRL' : area === 'automations' ? 'Automations' : 'Toki';
 
   return (
-    <div className="jrl-root" data-theme={theme || undefined}>
+    <div className="jrl-root" data-theme={theme === 'dark' ? 'dark' : 'light'}>
       <div className="aura" aria-hidden="true" />
       <div className="app">
         <aside className="side" data-collapsed={collapsed ? 'true' : 'false'} aria-label="Cockpit sections">
@@ -148,7 +148,10 @@ export default function App({ role, areas, client }) {
             </div>
             <div className="head-actions">
               {area !== 'jrl' && <button type="button" className="toggle glass" onClick={() => setExample((value) => !value)}>{example ? 'Hide example data' : 'Show example data'}</button>}
-              <button type="button" className="toggle glass" aria-label="Theme" onClick={onTheme}>{theme === 'dark' ? 'Light' : 'Dark'}</button>
+              <label className="theme-switch">
+                <span>Dark</span>
+                <input type="checkbox" role="switch" aria-checked={theme === 'dark'} checked={theme === 'dark'} onChange={onTheme} />
+              </label>
               <button type="button" className="toggle glass signout" onClick={onSignOut}>Sign out</button>
             </div>
           </div>

@@ -1,18 +1,24 @@
 const fs = require('fs');
 const path = require('path');
 
-const sqlPath = path.join(__dirname, '..', 'supabase', 'app_store.sql');
+const pointerPath = path.join(__dirname, '..', 'supabase', 'app_store.sql');
+const sqlPath = path.join(__dirname, '..', 'supabase', 'cockpit_forecast.sql');
+const pointer = fs.readFileSync(pointerPath, 'utf8');
 const sql = fs.readFileSync(sqlPath, 'utf8');
-const required = ['app_oauth_tokens', 'automation_registry', 'automation_events', 'plan_entries', 'login_attempts', 'enable row level security'];
+const required = ['app_oauth_tokens', 'automation_registry', 'automation_events', 'plan_entries', 'login_attempts', 'forecast_baseline_cells', 'enable row level security', 'force row level security', 'revoke all on schema cockpit from anon', 'revoke all on schema cockpit from authenticated'];
 
 function check() {
   const missing = required.filter((name) => !sql.toLowerCase().includes(name));
   if (missing.length) {
-    console.error(`app store SQL is missing: ${missing.join(', ')}`);
+    console.error(`cockpit SQL is missing: ${missing.join(', ')}`);
     process.exit(1);
   }
-  if (!/not run by the app/i.test(sql)) {
-    console.error('app store SQL must say it is not run by the app');
+  if (!/not run by the app/i.test(pointer) || !/do not apply/i.test(pointer)) {
+    console.error('app store pointer must say it is not run by the app and must not be applied');
+    process.exit(1);
+  }
+  if (/grant [^;]+ to anon/i.test(sql) || /create table (?!if not exists cockpit\.)/i.test(sql)) {
+    console.error('cockpit SQL must not grant anon or create a public table');
     process.exit(1);
   }
   console.log('app store SQL check ok');
@@ -33,7 +39,7 @@ async function apply() {
   await client.connect();
   try {
     await client.query(sql);
-    const tables = await client.query("select tablename from pg_tables where schemaname = 'public' and tablename = any($1)", [required.filter((name) => !name.includes(' '))]);
+    const tables = await client.query("select tablename from pg_tables where schemaname = 'cockpit' and tablename = any($1)", [required.filter((name) => !name.includes(' '))]);
     if (tables.rowCount < 5) throw new Error('tables_missing');
     console.log('ephemeral app store SQL applied');
   } finally {
