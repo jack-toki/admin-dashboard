@@ -4,7 +4,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { validateAdditionalPacket, evidenceView, ACCOUNTING_PERIODS, PRIMARY_BASELINE, ARCHIVE_STAYS_PARENT_SIDE } = require('../lib/forecast/additional');
+const { validateAdditionalPacket, evidenceView, ACCOUNTING_PERIODS, PRIMARY_BASELINE, ARCHIVE_STAYS_PARENT_SIDE, SUPPLEMENTAL_COUNTS } = require('../lib/forecast/additional');
+const { evidenceToRows, evidenceFromRows } = require('../lib/forecast/evidenceRows');
 const { EXPECTED_SNAPSHOT_HASH } = require('../lib/store/target');
 const { openAppStore } = require('../lib/store/index');
 const { overview } = require('../lib/finance/screen');
@@ -127,6 +128,72 @@ test('additional evidence stays separate from the baseline and does not read a s
     assert.equal(/alter table public\.runs/i.test(sql), false);
     assert.equal(/chase tracker/i.test(sql), false);
     assert.equal(/create table[^;]*forecast_baseline_cells/i.test(sql), false);
+    assert.match(sql, /salary_plan/);
+    assert.match(sql, /adds_to_cost boolean not null default false/);
+    assert.deepEqual(SUPPLEMENTAL_COUNTS, {
+      accountingPeriods: 12,
+      accountingLines: 300,
+      alternativeCells: 504,
+      reconciliation: 531,
+      invoices: 21,
+      planning: 524,
+    });
+    assert.equal(validateAdditionalPacket(packet(), { full: true }).error, 'supplemental_count');
+    assert.equal(validateAdditionalPacket({ ...packet(), archiveCells: [] }).error, 'archive_refused');
+    assert.equal(validateAdditionalPacket({ ...packet(), records: [] }).error, 'archive_refused');
+    assert.equal(validateAdditionalPacket({ ...packet(), personalArchive: { note: 'hidden' } }).error, 'personal_tracker_refused');
+    const salary = validateAdditionalPacket(packet({
+      counts: { accountingLines: 2, alternativeCells: 1, reconciliation: 1, invoices: 1, planning: 2 },
+      invoices: [{
+        ...packet().invoices[0],
+        invoiceDate: '2026-01-15',
+        dueDate: '2026-02-15',
+        sourceStatus: 'copy',
+      }],
+      alternativeCells: [{
+        ...packet().alternativeCells[0],
+        exactNumeric: '999.50',
+        cellState: 'value',
+      }],
+      planning: [
+        { ...packet().planning[0], exactNumeric: '200.00' },
+        {
+          planKind: 'salary_plan',
+          sourceWorkbookId: 'example-workbook',
+          sourceSheetId: 1455407915,
+          sourceCell: 'B51',
+          sourceRow: 51,
+          sourceLabel: 'Example salary line',
+          period: null,
+          amountMinor: 100,
+          exactNumeric: '100.00',
+          isActual: false,
+          addsToCost: false,
+          sourceHash: 'example',
+        },
+      ],
+    }));
+    assert.equal(salary.ok, true);
+    assert.equal(salary.stored.planning[1].period, null);
+    assert.equal(salary.stored.planning[1].sourceLabel, 'Example salary line');
+    const round = evidenceFromRows(evidenceToRows(salary.stored));
+    assert.equal(round.invoices[0].invoiceDate, '2026-01-15');
+    assert.equal(round.invoices[0].dueDate, '2026-02-15');
+    assert.equal(round.invoices[0].party, 'Example client');
+    assert.equal(round.invoices[0].sourceStatus, 'copy');
+    assert.equal(round.alternativeCells[0].period, '2026-01-01');
+    assert.equal(round.alternativeCells[0].exactNumeric, '999.50');
+    assert.equal(round.alternativeCells[0].cellState, 'value');
+    assert.equal(round.planning[0].exactNumeric, '200.00');
+    assert.equal(round.planning[1].period, null);
+    assert.equal(round.planning[1].planKind, 'salary_plan');
+    assert.equal(round.planning[1].addsToCost, false);
+    assert.equal(round.planning[1].sourceSheetId, 1455407915);
+    assert.equal(round.accountingLines[0].sourceCellState, 'value');
+    assert.equal(round.accountingLines[0].sourceWorkbookId, 'example-workbook');
+    const viewed = evidenceView(salary.stored);
+    assert.equal(viewed.actuals.months['2026-01'].people, null);
+    assert.equal(viewed.planning.createsSale, false);
   } finally {
     global.fetch = originalFetch;
     if (previous == null) delete process.env.SHEET_CSV_URL;

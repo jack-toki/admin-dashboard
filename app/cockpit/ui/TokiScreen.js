@@ -122,6 +122,7 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
           </div>
           <p style={muted}>Gross profit in the stored forecast is the billing total, not profit after costs. People actuals are missing, not zero. A partial month is not a finished result. September to December are missing, not zero.</p>
           {evidence?.invoices && <p style={muted}>Historical invoice copy: {evidence.invoices.rows.length}. This is not live Xero.</p>}
+          {(evidence?.planning?.rows || []).some((row) => row.planKind === 'salary_plan') && <p style={muted}>Salary plan lines stay separate and are not added to people costs. A blank period stays unassigned.</p>}
         </>
       )}
 

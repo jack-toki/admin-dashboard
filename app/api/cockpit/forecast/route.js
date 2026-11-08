@@ -75,7 +75,7 @@ export async function POST(req) {
   let body = {};
   try { body = await req.json(); } catch { body = {}; }
   if (body.confirm === 'import-forecast-evidence') {
-    const validated = validateAdditionalPacket(body.packet);
+    const validated = validateAdditionalPacket(body.packet, { full: true });
     if (!validated.ok) return Response.json({ ok: false, connected: false, error: validated.error, counts: validated.counts }, { status: 422 });
     const opened = openAppStore();
     const closed = storeClosed(opened);
