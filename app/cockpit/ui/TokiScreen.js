@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { formatPounds } from '../../../lib/money';
 import { automationBoard } from '../../../lib/finance/screen';
 import { workingMonthLines, sumLines } from '../../../lib/planning/entries';
@@ -27,8 +27,18 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
   const [drafts, setDrafts] = useState({});
   const [adding, setAdding] = useState(null);
   const [sheetError, setSheetError] = useState('');
+  const monthStripRef = useRef(null);
 
   const page = section === 'sources' || section === 'plan' ? 'sources' : 'toki';
+
+  useLayoutEffect(() => {
+    const strip = monthStripRef.current;
+    if (!strip) return;
+    const selected = strip.querySelector('[aria-pressed="true"]');
+    if (!selected) return;
+    const left = selected.offsetLeft - (strip.clientWidth - selected.offsetWidth) / 2;
+    strip.scrollTo({ left: Math.max(0, left) });
+  }, [month, page]);
   const year = month.slice(0, 4);
   const lines = useMemo(() => (baseline ? workingMonthLines(baseline.rows, plan, month) : []), [baseline, plan, month]);
   const billingShown = sumLines(lines, 'sale');
@@ -186,7 +196,7 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
               {years.map((item) => <option key={item} value={item}>{item}</option>)}
             </select>
           </label>
-          <div className="toki-months" role="group" aria-label="Month">
+          <div className="toki-months" role="group" aria-label="Month" ref={monthStripRef}>
             {MONTHS.map(([id, short, long]) => {
               const key = `${year}-${id}`;
               const itemCoverage = actuals?.months?.[key]?.coverage;

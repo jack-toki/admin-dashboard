@@ -242,6 +242,11 @@
   .toki-panels { display: block; }
   .toki-dash [data-panel] { display: none; }
   .toki-dash [data-panel][data-on="true"] { display: block; }
+  .toki-dash .stats[data-panel][data-on="true"] {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
   .sheet-rows li { grid-template-columns: 1fr auto; }
 }
 @media (max-width: 820px) {
@@ -254,7 +259,11 @@
 }
 @media (max-width: 420px) {
   .jrl-root .toki-view { gap: 12px; }
-  .jrl-root .toki-dash .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .jrl-root .toki-dash .stats[data-panel][data-on="true"] {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
   .jrl-root .toki-table th,
   .jrl-root .toki-table td { padding: 14px 16px; }
   .jrl-root .toki-controls,
