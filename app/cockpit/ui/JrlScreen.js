@@ -126,19 +126,19 @@ export default function JrlScreen({ gate }) {
           {example ? <p className="caveat">{JRL_EXAMPLE_BANNER}</p> : (
             <div className="nudge glass">
               <span className="nudge-dot" />
-              <span>{auth?.expired ? 'The JRL session expired. Sign in again. Nothing was filled in.' : auth?.supabaseUser ? `Signed in to JRL. The session expires ${auth.expiresAt ? new Date(auth.expiresAt).toLocaleString('en-GB') : 'on its own'}.` : (auth?.note || 'Sign in with the JRL account. The cockpit password does not open the ledger.')}</span>
-              {auth?.supabaseUser ? <button type="button" className="nudge-btn" onClick={async () => { await fetch('/api/cockpit/jrl/session', { method: 'DELETE' }); window.location.assign('/cockpit#jrl'); }}>Sign out of JRL</button> : <a className="nudge-btn" href={auth?.handoff || '/cockpit/jrl/login?return=/cockpit%23jrl'}>JRL sign-in</a>}
+              <span>{auth?.expired ? 'The JRL session expired. Sign in again. The ledger was not filled in.' : auth?.supabaseUser ? `Signed in to JRL. The session expires ${auth.expiresAt ? new Date(auth.expiresAt).toLocaleString('en-GB') : 'on its own'}.` : (!auth?.configured ? `JRL sign-in needs ${(auth?.missing || ['JRL_SUPABASE_URL', 'JRL_SUPABASE_ANON_KEY']).join(' and ')} on this server. The legacy anon key is accepted. No service role is used.` : 'Sign in with the JRL account. The cockpit password does not open the ledger.')}</span>
+              {auth?.supabaseUser ? <button type="button" className="nudge-btn" onClick={async () => { await fetch('/api/cockpit/jrl/session', { method: 'DELETE' }); window.location.assign('/cockpit#jrl'); }}>Sign out of JRL</button> : auth?.configured ? <a className="nudge-btn" href={auth?.handoff || '/cockpit/jrl/login?return=/cockpit%23jrl'}>JRL sign-in</a> : null}
             </div>
           )}
-          {section === 'overview' && <Overview ledger={ledger} targets={targets} />}
-          {section === 'month' && (
+          {(example || auth?.supabaseUser) && section === 'overview' && <Overview ledger={ledger} targets={targets} />}
+          {(example || auth?.supabaseUser) && section === 'month' && (
             <MonthForm form={form} setForm={setForm} period={period} setPeriod={setPeriod} options={window.options} ledger={ledger} onSave={onSave} note={saveNote} />
           )}
-          {section === 'targets' && <Targets ledger={ledger} targets={targets} />}
-          {section === 'spending' && (
+          {(example || auth?.supabaseUser) && section === 'targets' && <Targets ledger={ledger} targets={targets} />}
+          {(example || auth?.supabaseUser) && section === 'spending' && (
             <Spending purchases={purchases} targets={targets} savings={latest?.savings_total || 0} price={price} setPrice={setPrice} budget={budget} setBudget={setBudget} floor={floor} setFloor={setFloor} savingsFirst={savingsFirst} setSavingsFirst={setSavingsFirst} />
           )}
-          {section === 'sora' && (
+          {(example || auth?.supabaseUser) && section === 'sora' && (
             <Sora rows={paged.page} filter={filter} setFilter={(value) => { setFilter(value); setCursor(null); }} next={paged.next} onMore={() => setCursor(paged.next)} openId={openId} setOpenId={setOpenId} confirmId={confirmId} setConfirmId={setConfirmId} onDelete={(id) => { if (confirmDelete(true).ok) setConversations((rows) => rows.filter((row) => row.id !== id)); }} />
           )}
     </>

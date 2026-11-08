@@ -8,7 +8,7 @@ const { spawnSync } = require('child_process');
 const { GROUPS } = require('../lib/groups');
 const { syntheticActuals, syntheticBaseline, syntheticPipeline } = require('../lib/fixtures/synthetic');
 const { compareGroup, overview, withScenario, recurringCostMonths, pipelineRow, reviewActivity, weeklyCommentary } = require('../lib/finance/screen');
-const { validateEntry } = require('../lib/planning/entries');
+const { validateEntry, lineMatchId, incomeWorkType, workingMonthLines, sumLines } = require('../lib/planning/entries');
 const { openAppStore } = require('../lib/store/index');
 const { encryptToken, decryptToken } = require('../lib/xero/oauth');
 const { signSession, cookieName } = require('../lib/auth');
@@ -55,6 +55,35 @@ test('a repeating cost covers the stated months only', () => {
     durationMonths: 3,
   }).entry;
   assert.deepEqual(recurringCostMonths(entry), ['2026-11', '2026-12', '2027-01']);
+});
+
+test('a forecast edit replaces the stored line and does not add it twice', () => {
+  const model = syntheticBaseline();
+  const month = '2026-01';
+  const retained = model.rows.find((row) => row.label === 'Retained Clients');
+  const before = JSON.stringify(model.rows);
+  const lines = workingMonthLines(model.rows, [], month);
+  assert.equal(incomeWorkType('Retained Clients'), 'retainer');
+  assert.equal(incomeWorkType('Project Work'), 'project');
+  assert.equal(incomeWorkType('Example Tool'), null);
+  assert.equal(lines.find((line) => line.rowLabel === 'Cursor').groupKnown, false);
+  const base = sumLines(lines, 'sale');
+  const override = validateEntry({
+    kind: 'sale',
+    amountMinor: 100,
+    currency: 'GBP',
+    month,
+    party: 'Retained Clients',
+    groupId: 'billing',
+    timing: 'one_off',
+    stage: 'retainer',
+    matchId: lineMatchId(retained, month),
+    attestation: 'forecast',
+  }).entry;
+  const next = sumLines(workingMonthLines(model.rows, [override], month), 'sale');
+  assert.equal(next, base - 10000 + 100);
+  assert.notEqual(next, base + 100);
+  assert.equal(JSON.stringify(model.rows), before);
 });
 
 test('a what-if recomputes a copy and leaves the baseline rows unchanged', () => {

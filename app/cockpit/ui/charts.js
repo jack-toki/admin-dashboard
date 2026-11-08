@@ -138,6 +138,95 @@ export function InteractiveSeriesChart({
   );
 }
 
+export function CompactColumns({ name, points, series, selectedId, onSelect, format }) {
+  const [hidden, setHidden] = useState({});
+  const [tip, setTip] = useState(null);
+  const tipId = useId();
+  const visible = series.filter((item) => !hidden[item.id]);
+  const nums = visible.flatMap((item) => item.values.map((value) => value.value)).filter((value) => value != null && Number.isFinite(value));
+  const max = Math.max(1, ...nums.map((value) => Math.abs(value)));
+  const width = 320;
+  const height = 132;
+  const left = 36;
+  const right = 6;
+  const top = 8;
+  const bottom = 18;
+  const innerW = width - left - right;
+  const innerH = height - top - bottom;
+  const slot = innerW / Math.max(points.length, 1);
+
+  function money(value) {
+    if (value == null || !Number.isFinite(value)) return 'Missing information';
+    return format(value);
+  }
+
+  function axis(minor) {
+    const pounds = minor / 100;
+    const rounded = Math.abs(pounds) >= 100 ? Math.round(pounds) : Math.round(pounds * 10) / 10;
+    return `${pounds < 0 ? '-' : ''}£${rounded.toLocaleString('en-GB')}`;
+  }
+
+  return (
+    <figure className="year-chart" data-chart={name}>
+      <figcaption>
+        <strong>{name}</strong>
+        <span className="year-legend" role="group" aria-label={`${name} series`}>
+          {series.map((item) => (
+            <button key={item.id} type="button" className="chart-key" aria-pressed={!hidden[item.id]} onClick={() => setHidden((current) => ({ ...current, [item.id]: !current[item.id] }))}>
+              <i style={{ background: item.color }} />
+              {item.label}
+            </button>
+          ))}
+        </span>
+      </figcaption>
+      <svg viewBox={`0 0 ${width} ${height}`} role="group" aria-label={name}>
+        {[0, 0.5, 1].map((step) => {
+          const y = top + innerH - step * innerH;
+          return <g key={step}><line x1={left} x2={width - right} y1={y} y2={y} className="chart-grid" /><text x={left - 4} y={y + 3} textAnchor="end">{axis(max * step)}</text></g>;
+        })}
+        {points.map((point, index) => {
+          const x = left + index * slot;
+          const selected = point.id === selectedId;
+          return (
+            <g key={point.id}>
+              {selected && <rect className="chart-select" x={x + 2} y={top} width={Math.max(slot - 4, 1)} height={innerH} rx="4" />}
+              {visible.map((item, seriesIndex) => {
+                const value = item.values.find((entry) => entry.id === point.id);
+                if (value?.value == null || !Number.isFinite(value.value)) return null;
+                const barW = Math.min(8, Math.max(3, (slot - 8) / visible.length));
+                const h = value.value === 0 ? 2 : Math.max(2, (Math.abs(value.value) / max) * (innerH - 2));
+                const bx = x + (slot - visible.length * barW) / 2 + seriesIndex * barW;
+                return <rect key={item.id} data-bar={item.id} data-state={value.value === 0 ? 'zero' : 'value'} x={bx} y={top + innerH - h} width={barW - 1} height={h} rx="2" fill={selected && item.id === 'plan' ? 'var(--orange)' : item.color} opacity={selected || item.id !== 'plan' ? 0.95 : 0.45} />;
+              })}
+              <text x={x + slot / 2} y={height - 4} textAnchor="middle">{point.label}</text>
+              <rect
+                className="chart-hit"
+                data-chart-point={point.id}
+                x={x}
+                y={top}
+                width={slot}
+                height={innerH}
+                fill="transparent"
+                tabIndex="0"
+                role="button"
+                aria-label={`${point.label}. ${visible.map((item) => `${item.label} ${money(item.values.find((entry) => entry.id === point.id)?.value)}`).join('. ')}.`}
+                aria-describedby={tip?.id === point.id ? tipId : undefined}
+                onMouseEnter={() => setTip({ id: point.id, text: `${point.label} · ${visible.map((item) => `${item.label} ${money(item.values.find((entry) => entry.id === point.id)?.value)}`).join(' · ')}` })}
+                onFocus={() => setTip({ id: point.id, text: `${point.label} · ${visible.map((item) => `${item.label} ${money(item.values.find((entry) => entry.id === point.id)?.value)}`).join(' · ')}` })}
+                onPointerDown={() => setTip({ id: point.id, text: `${point.label} · ${visible.map((item) => `${item.label} ${money(item.values.find((entry) => entry.id === point.id)?.value)}`).join(' · ')}` })}
+                onClick={() => onSelect?.(point.id)}
+                onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect?.(point.id); } }}
+                onBlur={() => setTip(null)}
+              />
+            </g>
+          );
+        })}
+      </svg>
+      {tip && <div id={tipId} role="status" className="chart-tip">{tip.text}</div>}
+    </figure>
+  );
+}
+
 export function ComparisonBars({ name, items, format, caption }) {
   const [hidden, setHidden] = useState({});
   const [tip, setTip] = useState(null);

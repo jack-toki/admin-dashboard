@@ -52,7 +52,7 @@ export default function JrlLoginForm({ returnTo }) {
     <div className="jrl-root">
       <div className="aura" aria-hidden="true" />
       <main className="login-wrap">
-        <form className="panel glass login-card" onSubmit={onSubmit}>
+        <form className="panel glass login-card" method="post" action="/cockpit/jrl/login" onSubmit={onSubmit}>
           <h1>JRL sign-in</h1>
           <p className="sub">This is the personal ledger account. The cockpit password does not open these figures, and the service role is not used.</p>
           <label className="entry-row" htmlFor="jrl-email"><span>Email</span></label>

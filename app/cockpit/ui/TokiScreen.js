@@ -1,56 +1,88 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { formatPounds } from '../../../lib/money';
-import { overview, drilldown, withScenario, automationBoard } from '../../../lib/finance/screen';
-import { workingPlanMinor } from '../../../lib/planning/entries';
+import { automationBoard } from '../../../lib/finance/screen';
+import { workingMonthLines, sumLines } from '../../../lib/planning/entries';
 import { syntheticWorkflows, syntheticEvents, SYNTHETIC_BANNER } from '../../../lib/fixtures/synthetic';
 import { TOKI_VIEWS } from '../../../lib/nav/sidebar';
-import { InteractiveSeriesChart } from './charts';
+import { CompactColumns } from './charts';
+
+const MONTHS = [
+  ['01', 'Jan', 'January'], ['02', 'Feb', 'February'], ['03', 'Mar', 'March'], ['04', 'Apr', 'April'],
+  ['05', 'May', 'May'], ['06', 'Jun', 'June'], ['07', 'Jul', 'July'], ['08', 'Aug', 'August'],
+  ['09', 'Sep', 'September'], ['10', 'Oct', 'October'], ['11', 'Nov', 'November'], ['12', 'Dec', 'December'],
+];
+const COST_GROUPS = [['administration', 'Administration'], ['people', 'People'], ['premises', 'Premises'], ['finance', 'Finance'], ['selling', 'Selling']];
 
 function showMoney(minor) {
   if (minor == null || !Number.isFinite(minor)) return 'Missing information';
   return formatPounds(minor);
 }
 
-export function TokiScreen({ example, baseline, actuals, evidence, plan, planNote, onSave, onRemove, formError, forecastError, section = 'overview', onSection }) {
+export function TokiScreen({ example, baseline, actuals, evidence, plan, planNote, onSave, onRemove, formError, forecastError, section = 'toki', onSection }) {
   const [month, setMonth] = useState('2026-01');
-  const [mode, setMode] = useState('base');
-  const [form, setForm] = useState({ id: '', kind: 'sale', amount: '', party: '', groupId: 'billing', timing: 'one_off', durationMonths: '3' });
+  const [board, setBoard] = useState('summary');
+  const [editAll, setEditAll] = useState(false);
+  const [editingKey, setEditingKey] = useState('');
+  const [drafts, setDrafts] = useState({});
+  const [adding, setAdding] = useState(null);
 
-  const view = useMemo(() => {
-    if (!baseline) return null;
-    const rows = mode === 'base' ? baseline.rows : withScenario(baseline.rows, mode);
-    return overview({ rows }, actuals, month);
-  }, [baseline, actuals, month, mode]);
+  const page = section === 'sources' || section === 'plan' ? 'sources' : 'toki';
+  const year = month.slice(0, 4);
+  const lines = useMemo(() => (baseline ? workingMonthLines(baseline.rows, plan, month) : []), [baseline, plan, month]);
+  const billingShown = sumLines(lines, 'sale');
+  const costShown = sumLines(lines, 'cost');
+  const years = useMemo(() => {
+    const found = new Set((baseline?.months || []).map((item) => item.key.slice(0, 4)));
+    found.add(year);
+    return [...found].sort();
+  }, [baseline, year]);
+  const yearPoints = useMemo(() => MONTHS.map(([id, label]) => ({ id: `${year}-${id}`, label })), [year]);
+  const monthLines = (key) => workingMonthLines(baseline?.rows || [], plan, key);
   const chartSeries = useMemo(() => {
     if (!baseline) return null;
-    const rows = mode === 'base' ? baseline.rows : withScenario(baseline.rows, mode);
-    const points = baseline.months.map((item) => ({ id: item.key, label: item.header }));
-    const billingAt = (id) => {
-      const group = overview({ rows }, actuals, id).groups.find((item) => item.groupId === 'billing');
-      return { ...group, shown: workingPlanMinor(group?.forecast.minor ?? null, plan, id, 'billing') };
+    const billingOf = (key) => sumLines(monthLines(key), 'sale');
+    const costOf = (key) => sumLines(monthLines(key), 'cost');
+    const actualOf = (key) => {
+      const coverage = actuals?.months?.[key]?.coverage;
+      const known = actuals?.months?.[key]?.billing != null;
+      return { value: known ? actuals.months[key].billing : null, status: coverage === 'partial' ? 'Partial accounting export. Not a complete profit and loss.' : known ? 'Historical accounting export. Not live Xero.' : 'Missing information' };
     };
     return {
-      points,
-      series: [
-        { id: 'plan', label: 'Plan', color: 'var(--ink)', values: points.map((point) => ({ id: point.id, value: billingAt(point.id)?.shown ?? null, status: baseline.synthetic ? 'Example forecast. The workbook is not read.' : 'Stored forecast plus your entries. The imported forecast is not changed.' })) },
-        { id: 'actual', label: 'Accounting actual', color: 'var(--c1)', values: points.map((point) => {
-          const group = billingAt(point.id);
-          const coverage = actuals?.months?.[point.id]?.coverage;
-          const partial = coverage === 'partial';
-          return { id: point.id, value: group?.actual.known ? group.actual.minor : null, status: partial ? 'Partial accounting export. Not a complete profit and loss.' : group?.actual.known ? 'Historical accounting export. Not live Xero.' : 'Missing information' };
-        }) },
-      ],
+      year: {
+        points: yearPoints,
+        series: [
+          { id: 'plan', label: 'Plan', color: 'var(--ink)', values: yearPoints.map((point) => ({ id: point.id, value: billingOf(point.id), status: 'Working forecast. Accounting actuals are not changed.' })) },
+          { id: 'actual', label: 'Actual', color: 'var(--c1)', values: yearPoints.map((point) => ({ id: point.id, ...actualOf(point.id) })) },
+        ],
+      },
+      compare: {
+        points: [{ id: 'sale', label: 'Income' }, { id: 'cost', label: 'Costs' }],
+        series: [
+          { id: 'plan', label: 'Plan', color: 'var(--ink)', values: [{ id: 'sale', value: billingShown, status: 'Working forecast' }, { id: 'cost', value: costShown, status: 'Working forecast' }] },
+          { id: 'actual', label: 'Actual', color: 'var(--c1)', values: [
+            { id: 'sale', value: actualOf(month).value, status: actualOf(month).status },
+            { id: 'cost', value: null, status: 'Missing information unless every cost actual is on record' },
+          ] },
+        ],
+      },
+      groups: {
+        points: COST_GROUPS.map(([id, label]) => ({ id, label })),
+        series: [{
+          id: 'plan',
+          label: 'Plan',
+          color: 'var(--orange)',
+          values: COST_GROUPS.map(([id]) => {
+            const groupLines = lines.filter((line) => line.kind === 'cost' && line.groupId === id);
+            const seen = groupLines.some((line) => line.minor != null);
+            return { id, value: seen ? groupLines.reduce((sum, line) => sum + (line.minor || 0), 0) : null, status: seen ? 'Working forecast' : 'Missing information' };
+          }),
+        }],
+      },
     };
-  }, [baseline, actuals, mode, plan]);
-  const rows = useMemo(() => (baseline ? drilldown(mode === 'base' ? baseline : { rows: withScenario(baseline.rows, mode) }, month) : []), [baseline, month, mode]);
-  const shownGroups = (view?.groups || []).map((group) => ({ ...group, shownForecast: workingPlanMinor(group.forecast.minor, plan, month, group.groupId) }));
-  const billingShown = shownGroups.find((group) => group.groupId === 'billing')?.shownForecast ?? null;
-  const costGroups = shownGroups.filter((group) => group.kind === 'cost' && group.shownForecast != null);
-  const costShown = costGroups.length ? costGroups.reduce((sum, group) => sum + group.shownForecast, 0) : null;
-  const monthPlans = (plan || []).filter((entry) => entry.month === month);
+  }, [baseline, actuals, plan, month, yearPoints, lines, billingShown, costShown]);
 
-  if (!view) {
+  if (!baseline) {
     return (
       <section>
         <div className="panel glass">
@@ -61,126 +93,211 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
     );
   }
 
-  const viewLabel = TOKI_VIEWS.find((item) => item.id === section)?.label || 'Overview';
-  const monthLabel = baseline.months.find((item) => item.key === month)?.header;
+  const monthName = MONTHS.find((item) => item[0] === month.slice(5))?.[2] || month;
   const coverage = actuals?.months?.[month]?.coverage;
+  const income = lines.filter((line) => line.kind === 'sale');
+  const costs = lines.filter((line) => line.kind === 'cost');
+
+  function chooseYear(nextYear) {
+    setMonth(`${nextYear}-${month.slice(5)}`);
+  }
+
+  function draftFor(line) {
+    return drafts[line.key] || {
+      amount: line.minor == null ? '' : String(line.minor / 100),
+      party: line.party,
+      workType: line.workType || '',
+      groupId: line.groupKnown ? line.groupId : '',
+    };
+  }
+
+  function openEdit(line) {
+    setDrafts((current) => ({ ...current, [line.key]: draftFor(line) }));
+    setEditingKey(line.key);
+  }
+
+  async function saveLine(line) {
+    const draft = draftFor(line);
+    const groupId = line.kind === 'sale' ? 'billing' : draft.groupId;
+    if (!groupId) return false;
+    if (line.kind === 'sale' && line.added && draft.workType !== 'retainer' && draft.workType !== 'project') return false;
+    const ok = await onSave({
+      id: line.planId || undefined,
+      matchId: line.matchId,
+      kind: line.kind,
+      amount: draft.amount,
+      party: draft.party,
+      groupId,
+      workType: line.kind === 'sale' ? (draft.workType || null) : null,
+      month,
+      timing: 'one_off',
+    });
+    if (ok) {
+      setDrafts((current) => { const next = { ...current }; delete next[line.key]; return next; });
+      setEditingKey('');
+    }
+    return ok;
+  }
+
+  async function saveAll() {
+    for (const line of lines) {
+      if (!drafts[line.key]) continue;
+      const ok = await saveLine(line);
+      if (!ok) return;
+    }
+    setEditAll(false);
+  }
+
+  function rowOpen(line) {
+    return editAll || editingKey === line.key;
+  }
 
   return (
-    <section className="toki-view" aria-label={viewLabel}>
-      <div className="toki-section-switch" role="navigation" aria-label="Toki sections">
-        {TOKI_VIEWS.map((item) => (
-          <button key={item.id} type="button" aria-current={section === item.id ? 'page' : undefined} onClick={() => onSection?.(item.id)}>{item.label}</button>
-        ))}
-      </div>
-      {baseline.synthetic && <p className="caveat">{SYNTHETIC_BANNER} Example data. This is not the stored forecast.</p>}
-      <header className="toki-section-head">
-        <h2>{viewLabel}</h2>
-        <p>{section === 'plan' ? 'Add or change a sale or cost for this month. The imported forecast is not changed.' : section === 'sources' ? 'Imported lines and where the figures come from. Nothing here is editable.' : 'Totals for this month. Your entries are included. Imported figures stay read only.'}</p>
-      </header>
-      <div className="toki-controls">
-        <div className="toki-months" role="group" aria-label="Month">
-          {baseline.months.map((item) => {
-            const itemCoverage = actuals?.months?.[item.key]?.coverage;
-            const suffix = itemCoverage === 'partial' ? ' · partial' : itemCoverage === 'missing' ? ' · missing' : '';
-            return <button key={item.key} type="button" aria-pressed={month === item.key} onClick={() => setMonth(item.key)}>{item.header}{suffix}</button>;
-          })}
+    <section className={page === 'toki' ? 'toki-view toki-dash' : 'toki-view'} aria-label={page === 'sources' ? 'Income and costs' : 'Toki'}>
+      <div className="toki-sticky">
+        <div className="toki-section-switch" role="navigation" aria-label="Toki sections">
+          <button type="button" aria-current={page === 'toki' ? 'page' : undefined} onClick={() => onSection?.('toki')}>Toki</button>
+          {TOKI_VIEWS.map((item) => (
+            <button key={item.id} type="button" aria-current={page === 'sources' ? 'page' : undefined} onClick={() => onSection?.(item.id)}>{item.label}</button>
+          ))}
         </div>
-        {section === 'overview' && (
-          <div className="tgt-modes">
-            {[['base', 'Base'], ['best', 'Higher'], ['worst', 'Lower']].map(([id, label]) => (
-              <button key={id} type="button" className={mode === id ? 'tgt-mode on' : 'tgt-mode'} onClick={() => setMode(id)}>{label}</button>
-            ))}
+        <div className="toki-period">
+          <label className="year-select">Year
+            <select aria-label="Year" value={year} onChange={(event) => chooseYear(event.target.value)}>
+              {years.map((item) => <option key={item} value={item}>{item}</option>)}
+            </select>
+          </label>
+          <div className="toki-months" role="group" aria-label="Month">
+            {MONTHS.map(([id, short, long]) => {
+              const key = `${year}-${id}`;
+              const itemCoverage = actuals?.months?.[key]?.coverage;
+              const mark = itemCoverage === 'partial' ? 'partial' : itemCoverage === 'missing' ? 'missing' : '';
+              const detail = mark === 'partial' ? ', partial accounting export' : mark === 'missing' ? ', accounting actuals missing' : '';
+              return (
+                <button key={key} type="button" aria-pressed={month === key} aria-label={`${long} ${year}${detail}`} onClick={() => setMonth(key)}>
+                  {short}
+                  {mark ? <i className={`month-dot ${mark}`} aria-hidden="true" /> : null}
+                </button>
+              );
+            })}
           </div>
-        )}
+        </div>
+        <p id="toki-month-detail" className="toki-month-title" aria-live="polite">{monthName} {year}</p>
+        <div className="toki-alerts">
+          <p className="alert-pill">Xero is not connected.</p>
+          {coverage === 'partial' && <p className="alert-pill" role="status">Partial accounting export. Not a complete profit and loss.</p>}
+          {coverage === 'missing' && <p className="alert-pill" role="status">Accounting actuals are missing information, not zero.</p>}
+          {(baseline.formulaFlags || []).map((flag) => (
+            <p key={flag.month} className="alert-pill" role="status">January 2027 source total omits {formatPounds(flag.omittedMinor)}. The stored cell is not replaced.</p>
+          ))}
+        </div>
       </div>
+      {baseline.synthetic && <p className="caveat">{SYNTHETIC_BANNER}</p>}
 
-      {section === 'overview' && (
+      {page === 'toki' && chartSeries && (
         <>
-          {chartSeries && (
-            <div className="toki-block">
-              <InteractiveSeriesChart name="billing" points={chartSeries.points} series={chartSeries.series} selectedId={month} onSelect={setMonth} format={formatPounds} caption={baseline.synthetic ? 'Example data. A missing actual stays unknown.' : 'Stored forecast. A missing actual stays unknown. January 2027 group totals are recomputed from inputs.'} />
-              <p id="toki-month-detail" aria-live="polite">{monthLabel} selected. Xero is not connected.</p>
+          <div className="toki-panel-tabs" role="tablist" aria-label="Toki panels">
+            {[['summary', 'Summary'], ['year', 'Year'], ['groups', 'Groups']].map(([id, label]) => (
+              <button key={id} type="button" aria-selected={board === id} onClick={() => setBoard(id)}>{label}</button>
+            ))}
+          </div>
+          <div className="stats" data-panel="summary" data-on={board === 'summary' ? 'true' : 'false'}>
+            <Tile label="Income" value={showMoney(billingShown)} />
+            <Tile label="Costs" value={showMoney(costShown)} />
+            <Tile label="Result" value={showMoney(billingShown == null || costShown == null ? null : billingShown - costShown)} />
+          </div>
+          <div className="toki-panels">
+            <div data-panel="year" data-on={board === 'year' ? 'true' : 'false'}>
+              <CompactColumns name="Income through the year" points={chartSeries.year.points} series={chartSeries.year.series} selectedId={month} onSelect={setMonth} format={formatPounds} />
             </div>
+            <div data-panel="summary" data-on={board === 'summary' ? 'true' : 'false'}>
+              <CompactColumns name="Income and costs" points={chartSeries.compare.points} series={chartSeries.compare.series} selectedId="" onSelect={() => {}} format={formatPounds} />
+            </div>
+            <div data-panel="groups" data-on={board === 'groups' ? 'true' : 'false'}>
+              <CompactColumns name="Cost groups" points={chartSeries.groups.points} series={chartSeries.groups.series} selectedId="" onSelect={() => {}} format={formatPounds} />
+            </div>
+          </div>
+          <p className="quiet">{baseline.grossProfitMeaning} A gap on a chart is missing information, not zero.</p>
+        </>
+      )}
+
+      {page === 'sources' && (
+        <div className="month-sheet">
+          <div className="sheet-tools">
+            <button type="button" onClick={() => { if (editAll) { setEditAll(false); setDrafts({}); } else { const next = {}; lines.forEach((line) => { next[line.key] = draftFor(line); }); setDrafts(next); setEditAll(true); } }}>{editAll ? 'Cancel' : 'Edit all'}</button>
+            {editAll && <button type="button" onClick={saveAll}>Save</button>}
+          </div>
+          {formError && <p role="alert">{formError}</p>}
+          {planNote && <p className="quiet">{planNote} These edits are a working forecast. Xero is not written.</p>}
+          <SheetBlock title="Income" lines={income} rowOpen={rowOpen} draftFor={draftFor} setDrafts={setDrafts} openEdit={openEdit} saveLine={saveLine} onRemove={onRemove} setEditingKey={setEditingKey} />
+          <div className="sheet-add">
+            <button type="button" onClick={() => setAdding({ kind: 'sale', workType: 'retainer', party: '', amount: '', groupId: 'billing' })}>Add a retainer</button>
+            <button type="button" onClick={() => setAdding({ kind: 'sale', workType: 'project', party: '', amount: '', groupId: 'billing' })}>Add project work</button>
+          </div>
+          <SheetBlock title="Costs" lines={costs} rowOpen={rowOpen} draftFor={draftFor} setDrafts={setDrafts} openEdit={openEdit} saveLine={saveLine} onRemove={onRemove} setEditingKey={setEditingKey} />
+          <div className="sheet-add">
+            <button type="button" onClick={() => setAdding({ kind: 'cost', workType: '', party: '', amount: '', groupId: '' })}>Add a cost</button>
+          </div>
+          {adding && (
+            <form className="sheet-new" onSubmit={async (event) => {
+              event.preventDefault();
+              const ok = await onSave({ kind: adding.kind, amount: adding.amount, party: adding.party, groupId: adding.kind === 'sale' ? 'billing' : adding.groupId, workType: adding.workType, month, timing: 'one_off' });
+              if (ok) setAdding(null);
+            }}>
+              <input aria-label="Name or client" placeholder="Name or client" value={adding.party} onChange={(event) => setAdding({ ...adding, party: event.target.value })} />
+              <input aria-label="Amount in pounds" placeholder="Amount" value={adding.amount} onChange={(event) => setAdding({ ...adding, amount: event.target.value })} />
+              {adding.kind === 'cost' && (
+                <select aria-label="Cost group" value={adding.groupId} onChange={(event) => setAdding({ ...adding, groupId: event.target.value })}>
+                  <option value="">Choose a group</option>
+                  {COST_GROUPS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                </select>
+              )}
+              <button type="submit">Save line</button>
+              <button type="button" onClick={() => setAdding(null)}>Cancel</button>
+            </form>
           )}
-          <Summary billing={billingShown} costs={costShown} />
-          <GroupTable groups={shownGroups} />
-          <div className="toki-notes">
-            <p>{baseline.grossProfitMeaning}</p>
-            {coverage === 'partial' && <p role="status">This month is a partial accounting export. It is not a complete profit and loss. People actuals are missing information.</p>}
-            {coverage === 'missing' && <p role="status">Accounting actuals for this month are missing information, not zero.</p>}
-            {(baseline.formulaFlags || []).map((flag) => (
-              <p key={flag.month} role="status">January 2027 totals on screen are recomputed from stored input lines. The source total omits {formatPounds(flag.omittedMinor)}. The stored source cell is not replaced.</p>
-            ))}
-          </div>
-        </>
+        </div>
       )}
+    </section>
+  );
+}
 
-      {section === 'plan' && (
-        <>
-          <Summary billing={billingShown} costs={costShown} />
-          <form className="panel glass toki-panel" onSubmit={async (event) => { event.preventDefault(); const ok = await onSave({ ...form, month }); if (ok) setForm({ id: '', kind: 'sale', amount: '', party: '', groupId: 'billing', timing: 'one_off', durationMonths: '3' }); }}>
-            <h3>{form.id ? 'Edit your entry' : 'Add a sale or cost'}</h3>
-            <div className="toki-form">
-              <select aria-label="Kind" value={form.kind} onChange={(event) => setForm({ ...form, kind: event.target.value, groupId: event.target.value === 'cost' ? 'administration' : 'billing' })}>
-                <option value="sale">Sale</option>
-                <option value="cost">Cost</option>
-              </select>
-              <input aria-label="Amount in pounds" placeholder="Amount" value={form.amount} onChange={(event) => setForm({ ...form, amount: event.target.value })} />
-              <input aria-label="Client or vendor" placeholder="Client or vendor" value={form.party} onChange={(event) => setForm({ ...form, party: event.target.value })} />
-              <select aria-label="Group" value={form.groupId} onChange={(event) => setForm({ ...form, groupId: event.target.value })}>
-                <option value="billing">Billing</option>
-                <option value="administration">Administration</option>
-                <option value="people">People</option>
-                <option value="premises">Premises</option>
-                <option value="finance">Finance</option>
-                <option value="selling">Selling</option>
-              </select>
-              <button type="submit">{form.id ? 'Save change' : 'Add to this month'}</button>
-            </div>
-            {formError && <p role="alert">{formError}</p>}
-            {planNote && <p>{planNote} The imported forecast and Xero are not written.</p>}
-            <ul className="toki-entries">
-              {monthPlans.map((entry) => (
-                <li key={entry.id}>
-                  <span>{entry.kind} {showMoney(entry.amountMinor)} · {entry.party}</span>
-                  <button type="button" onClick={() => setForm({ id: entry.id, kind: entry.kind, amount: String(entry.amountMinor / 100), party: entry.party, groupId: entry.groupId, timing: entry.timing || 'one_off', durationMonths: String(entry.durationMonths || 3) })}>Edit</button>
-                  {onRemove && <button type="button" onClick={() => onRemove(entry.id)}>Remove</button>}
-                </li>
-              ))}
-            </ul>
-          </form>
-        </>
-      )}
-
-      {section === 'sources' && (
-        <>
-          <div className="toki-table">
-            <table>
-              <caption>Imported lines, read only</caption>
-              <thead><tr><th>Line</th><th>Amount</th></tr></thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.label}>
-                    <td>{row.label}{row.suggested && row.kind !== 'revenue' ? ' · group not confirmed' : ''}</td>
-                    <td>{showMoney(row.minor)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="toki-notes">
-            <p>{baseline.synthetic ? 'Example data. The workbook is not read.' : 'Stored forecast. The workbook is not read at runtime.'}</p>
-            <p>{baseline.grossProfitMeaning}</p>
-            {(baseline.formulaFlags || []).map((flag) => (
-              <p key={flag.month} role="status">January 2027 totals on screen are recomputed from stored input lines. The source total omits {formatPounds(flag.omittedMinor)}. The stored source cell is not replaced.</p>
-            ))}
-            <p>Xero is not connected. {evidence?.invoices ? `Historical invoice copy: ${evidence.invoices.rows.length}, read only.` : 'No live accounting connection.'}</p>
-            {(evidence?.planning?.rows || []).some((row) => row.planKind === 'salary_plan') && <p>Salary plan evidence is not added to costs.</p>}
-            {evidence?.alternative?.cells?.length > 0 && <p>The V2 scenario is stored separately and is not added to this baseline.</p>}
-            <p>A blank stays missing information. A stored zero stays £0.00. A partial month is not a finished result.</p>
-          </div>
-        </>
-      )}
+function SheetBlock({ title, lines, rowOpen, draftFor, setDrafts, openEdit, saveLine, onRemove, setEditingKey }) {
+  return (
+    <section className="sheet-block">
+      <h2>{title}</h2>
+      <ul className="sheet-rows">
+        {lines.map((line) => {
+          const open = rowOpen(line);
+          const draft = draftFor(line);
+          return (
+            <li key={line.key}>
+              {open ? <input aria-label={`${title} name`} value={draft.party} onChange={(event) => setDrafts((current) => ({ ...current, [line.key]: { ...draft, party: event.target.value } }))} /> : <span>{line.party}</span>}
+              {line.kind === 'sale' ? (
+                open ? (
+                  <select aria-label="Income type" value={draft.workType} onChange={(event) => setDrafts((current) => ({ ...current, [line.key]: { ...draft, workType: event.target.value } }))}>
+                    <option value="">Not set</option>
+                    <option value="retainer">Retainer</option>
+                    <option value="project">Project</option>
+                  </select>
+                ) : <span>{line.workType === 'retainer' ? 'Retainer' : line.workType === 'project' ? 'Project' : 'Not set'}</span>
+              ) : (
+                open ? (
+                  <select aria-label="Cost group" value={draft.groupId} onChange={(event) => setDrafts((current) => ({ ...current, [line.key]: { ...draft, groupId: event.target.value } }))}>
+                    <option value="">Not set</option>
+                    {COST_GROUPS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+                  </select>
+                ) : <span>{line.groupKnown ? (COST_GROUPS.find(([id]) => id === line.groupId)?.[1] || line.groupId) : 'Not set'}</span>
+              )}
+              {open ? <input aria-label="Amount in pounds" value={draft.amount} onChange={(event) => setDrafts((current) => ({ ...current, [line.key]: { ...draft, amount: event.target.value } }))} /> : <span className="num">{showMoney(line.minor)}</span>}
+              {open ? <button type="button" onClick={() => saveLine(line)}>Save</button> : <button type="button" onClick={() => openEdit(line)}>Edit</button>}
+              {open && <button type="button" onClick={() => { setEditingKey(''); setDrafts((current) => { const next = { ...current }; delete next[line.key]; return next; }); }}>Cancel</button>}
+              {line.planId && onRemove ? <button type="button" onClick={() => onRemove(line.planId)}>Remove</button> : null}
+              {line.overridden && line.baseMinor != null ? <span className="quiet">Was {showMoney(line.baseMinor)}</span> : null}
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }
@@ -229,8 +346,8 @@ export function AutomationsScreen({ example, board, error }) {
     return (
       <section>
         <div className="panel glass">
-          <h2>{error ? 'The run log could not be read' : 'No run log is connected'}</h2>
-          <p style={muted}>Health, time, and value appear when posts are stored. A workflow with no posts is not treated as failed. The time and money figures are estimates, not measured.</p>
+          <h2>{error === 'run_log_not_configured' ? 'The run log is not configured on this server' : error ? 'The run log could not be read' : 'Reading the run log'}</h2>
+          <p style={muted}>{error === 'run_log_not_configured' ? 'Signed-in Automations needs SUPABASE_URL and SUPABASE_SERVICE_KEY for the Toki project. No posts were marked failed.' : 'A workflow with no posts is not treated as failed. Time and money stay estimates until a post is measured.'}</p>
         </div>
       </section>
     );

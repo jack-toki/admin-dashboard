@@ -12,7 +12,7 @@ import '../cockpit.css';
 
 export default function App({ role, areas, client }) {
   const [area, setArea] = useState(areas.includes('toki') ? 'toki' : areas[0]);
-  const [tokiView, setTokiView] = useState('overview');
+  const [tokiView, setTokiView] = useState('toki');
   const [collapsed, setCollapsed] = useState(false);
   const [status, setStatus] = useState(null);
   const [jrl, setJrl] = useState(null);
@@ -114,15 +114,18 @@ export default function App({ role, areas, client }) {
 
   async function onSave(form) {
     const result = validateEntry({
+      id: form.id || undefined,
       kind: form.kind,
       amountMinor: Number.isFinite(Number(form.amount)) ? Math.round(Number(form.amount) * 100) : null,
       currency: 'GBP',
       month: form.month,
       party: form.party,
       groupId: form.groupId,
-      timing: form.timing,
+      timing: form.timing || 'one_off',
       durationMonths: form.durationMonths,
       attestation: 'forecast',
+      matchId: form.matchId || null,
+      stage: form.kind === 'sale' ? (form.workType || null) : null,
     });
     if (!result.ok) {
       setFormError(`Check ${result.errors.join(', ')}.`);
@@ -131,7 +134,7 @@ export default function App({ role, areas, client }) {
     const res = await fetch('/api/cockpit/plan', {
       method: form.id ? 'PATCH' : 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ...form, id: form.id, amount: Number(form.amount), currency: 'GBP', attestation: 'forecast' }),
+      body: JSON.stringify({ ...form, id: form.id, amount: Number(form.amount), currency: 'GBP', attestation: 'forecast', matchId: form.matchId || null, stage: form.kind === 'sale' ? (form.workType || null) : null }),
     });
     if (res.status === 503) {
       setFormError('Shared saving is not configured. The entry was not stored.');
@@ -187,9 +190,9 @@ export default function App({ role, areas, client }) {
                 <a
                   href={`#${item.id}`}
                   className={area === item.id ? 'on' : undefined}
-                  aria-current={area === item.id ? 'page' : undefined}
+                  aria-current={item.id === 'toki' ? (area === 'toki' && tokiView === 'toki' ? 'page' : undefined) : (area === item.id ? 'page' : undefined)}
                   aria-expanded={item.id === 'toki' ? area === 'toki' : undefined}
-                  onClick={(event) => { event.preventDefault(); setArea(item.id); }}
+                  onClick={(event) => { event.preventDefault(); setArea(item.id); if (item.id === 'toki') setTokiView('toki'); }}
                 >
                   <span className="ic"><NavMark id={item.id} /></span>
                   <span className="lbl">{item.label}</span>

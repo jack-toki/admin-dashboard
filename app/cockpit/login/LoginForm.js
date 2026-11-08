@@ -47,7 +47,7 @@ export default function LoginForm() {
     <div className="jrl-root">
       <div className="aura" aria-hidden="true" />
       <main className="login-wrap">
-        <form className="panel glass login-card" onSubmit={onSubmit}>
+        <form className="panel glass login-card" method="post" action="/cockpit/login" onSubmit={onSubmit}>
           <h1>Cockpit sign-in</h1>
           <p className="sub">This password is not the personal Supabase sign-in. The public site is unchanged.</p>
           <label className="entry-row" htmlFor="password"><span>Password</span></label>
