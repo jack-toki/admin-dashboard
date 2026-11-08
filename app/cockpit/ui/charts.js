@@ -25,7 +25,7 @@ export function InteractiveSeriesChart({
     setTip({
       id: point.id,
       seriesId: item.id,
-      text: `${point.label} · ${item.label} · ${value?.value == null ? 'Unknown' : format(value.value)} · ${value?.status || 'Unknown'}`,
+      text: `${point.label} · ${item.label} · ${value?.value == null ? 'Missing information' : format(value.value)} · ${value?.status || 'Unknown'}`,
     });
     if (event?.currentTarget && typeof event.currentTarget.focus === 'function' && event.type === 'pointerdown') {
       event.currentTarget.focus();
@@ -91,7 +91,7 @@ export function InteractiveSeriesChart({
                   fill="transparent"
                   tabIndex="0"
                   role="button"
-                  aria-label={`${point.label}, ${item.label}, ${value?.value == null ? 'unknown' : format(value.value)}, ${value?.status || 'unknown'}`}
+                  aria-label={`${point.label}, ${item.label}, ${value?.value == null ? 'Missing information' : format(value.value)}, ${value?.status || 'unknown'}`}
                   aria-describedby={tip?.id === point.id && tip?.seriesId === item.id ? tipId : undefined}
                   onMouseEnter={(event) => show(point, item, event)}
                   onFocus={(event) => show(point, item, event)}
@@ -127,7 +127,7 @@ export function InteractiveSeriesChart({
                 <td>{point.label}</td>
                 {series.map((item) => {
                   const value = item.values.find((entry) => entry.id === point.id);
-                  return <td key={item.id}>{value?.value == null ? 'Unknown' : format(value.value)}</td>;
+                  return <td key={item.id}>{value?.value == null ? 'Missing information' : format(value.value)}</td>;
                 })}
               </tr>
             ))}
@@ -185,7 +185,7 @@ export function ComparisonBars({ name, items, format, caption }) {
         <caption className="sub">{name} values</caption>
         <tbody>
           {items.map((item) => (
-            <tr key={item.id}><td>{item.label}</td><td>{item.value == null ? 'Unknown' : format(item.value)}</td><td>{item.status}</td></tr>
+            <tr key={item.id}><td>{item.label}</td><td>{item.value == null ? 'Missing information' : format(item.value)}</td><td>{item.status}</td></tr>
           ))}
         </tbody>
       </table>

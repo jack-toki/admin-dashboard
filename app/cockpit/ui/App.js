@@ -102,25 +102,26 @@ export default function App({ role, areas, client }) {
     });
     if (!result.ok) {
       setFormError(`Check ${result.errors.join(', ')}.`);
-      return;
+      return false;
     }
     const res = await fetch('/api/cockpit/plan', {
-      method: 'POST',
+      method: form.id ? 'PATCH' : 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ...form, amount: Number(form.amount), currency: 'GBP', attestation: 'forecast' }),
+      body: JSON.stringify({ ...form, id: form.id, amount: Number(form.amount), currency: 'GBP', attestation: 'forecast' }),
     });
     if (res.status === 503) {
       setFormError('Shared saving is not configured. The entry was not stored.');
-      return;
+      return false;
     }
     if (!res.ok) {
       setFormError('The plan did not save.');
-      return;
+      return false;
     }
     const body = await res.json();
     setFormError('');
     setPlanNote(body.shared ? 'Saved in the shared store.' : 'Saved on this server’s local store. Production refuses a file store.');
     setPlan((current) => [...current.filter((entry) => entry.id !== body.entry.id), body.entry]);
+    return true;
   }
 
   async function onRemove(id) {
