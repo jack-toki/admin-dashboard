@@ -4,7 +4,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const { validateAdditionalPacket, evidenceView, ACCOUNTING_PERIODS, PRIMARY_BASELINE, ARCHIVE_STAYS_PARENT_SIDE, SUPPLEMENTAL_COUNTS } = require('../lib/forecast/additional');
+const { validateAdditionalPacket, evidenceView, ACCOUNTING_PERIODS, PRIMARY_BASELINE, ARCHIVE_STAYS_PARENT_SIDE, SUPPLEMENTAL_COUNTS, SUPPLEMENTAL_PACKET_HASH } = require('../lib/forecast/additional');
 const { evidenceToRows, evidenceFromRows } = require('../lib/forecast/evidenceRows');
 const { EXPECTED_SNAPSHOT_HASH } = require('../lib/store/target');
 const { openAppStore } = require('../lib/store/index');
@@ -136,8 +136,9 @@ test('additional evidence stays separate from the baseline and does not read a s
       alternativeCells: 504,
       reconciliation: 531,
       invoices: 21,
-      planning: 524,
+      planning: 548,
     });
+    assert.equal(SUPPLEMENTAL_PACKET_HASH, 'b3d3098ecbe787f9c4e8c50b2f9b7e5e0dae690cb7c45b154fd8e8806eab17fc');
     assert.equal(validateAdditionalPacket(packet(), { full: true }).error, 'supplemental_count');
     assert.equal(validateAdditionalPacket({ ...packet(), archiveCells: [] }).error, 'archive_refused');
     assert.equal(validateAdditionalPacket({ ...packet(), records: [] }).error, 'archive_refused');
