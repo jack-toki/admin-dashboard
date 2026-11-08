@@ -8,6 +8,7 @@ import { performance, projection, BENCHMARK_RATE } from '../../../vendor/jrl-fin
 import { afford } from '../../../vendor/jrl-finance/code/lib/afford.ts';
 import { monthsToTarget, projectPath } from '../../../vendor/jrl-finance/code/lib/targets.ts';
 import { confirmDelete, dayGroup, filterConversations, pageConversations } from '../../../lib/jrl/sora';
+import { ComparisonBars, InteractiveSeriesChart } from './charts';
 import '../jrl.css';
 
 const LINKS = [
@@ -111,42 +112,14 @@ export default function JrlScreen({ gate }) {
   const paged = pageConversations(filterConversations(conversations, filter), cursor);
 
   return (
-    <div className="jrl-root" data-theme={theme || undefined}>
-      <div className="aura" aria-hidden="true" />
-      <div className="app">
-        <aside className="side">
-          <div className="logo" aria-label="JRL">
-            <svg viewBox="0 0 100 100" role="img">
-              <path d="M18 0H100V82L82 100H0V18Z" fill="var(--ink)" />
-              <g fill="var(--knock)">
-                <path d="M26 28H36V62Q36 72 26 72H18V63H24Q26 63 26 61Z" />
-                <path fillRule="evenodd" d="M40 28H51A11 11 0 0 1 51 50H50V72H40ZM50 35V43H51A4 4 0 0 0 51 35Z" />
-                <path d="M49 50H59L63 72H53Z" />
-                <path d="M66 28H76V62H82V72H66Z" />
-              </g>
-            </svg>
+    <>
+          <div className="head-actions">
+            <button type="button" className="toggle glass" onClick={() => setExample((value) => !value)}>{example ? 'Hide example data' : 'Show example data'}</button>
           </div>
-          <nav>
-            {LINKS.map(([id, label, short]) => (
-              <a key={id} href={`#jrl-${id}`} className={section === id ? 'on' : undefined} onClick={(event) => { event.preventDefault(); setSection(id); }}>
-                <span className="lbl">{label}</span>
-                <span className="lbl-short">{short}</span>
-              </a>
+          <div className="tgt-modes" role="tablist" aria-label="JRL pages">
+            {LINKS.map(([id, label]) => (
+              <button key={id} type="button" className={section === id ? 'tgt-mode on' : 'tgt-mode'} onClick={() => setSection(id)}>{label}</button>
             ))}
-          </nav>
-          <div className="spacer" />
-          <div className="help"><b>One form a month</b><span>Add what went in and out — everything else works itself out.</span></div>
-        </aside>
-        <main className="main">
-          <div className="head">
-            <div>
-              <h1>{LINKS.find((item) => item[0] === section)?.[1]}</h1>
-              {latest && section === 'overview' ? <div className="period">{latest.period}</div> : null}
-            </div>
-            <div className="head-actions">
-              <button type="button" className="toggle glass" onClick={() => setExample((value) => !value)}>{example ? 'Hide example' : 'Show example'}</button>
-              <button type="button" className="toggle glass" aria-label="Theme" onClick={onTheme}>{theme === 'dark' ? 'Light' : 'Dark'}</button>
-            </div>
           </div>
           {example ? <p className="caveat">{JRL_EXAMPLE_BANNER}</p> : (
             <div className="nudge glass">
@@ -166,9 +139,7 @@ export default function JrlScreen({ gate }) {
           {section === 'sora' && (
             <Sora rows={paged.page} filter={filter} setFilter={(value) => { setFilter(value); setCursor(null); }} next={paged.next} onMore={() => setCursor(paged.next)} openId={openId} setOpenId={setOpenId} confirmId={confirmId} setConfirmId={setConfirmId} onDelete={(id) => { if (confirmDelete(true).ok) setConversations((rows) => rows.filter((row) => row.id !== id)); }} />
           )}
-        </main>
-      </div>
-    </div>
+    </>
   );
 }
 
@@ -179,6 +150,7 @@ function money(value) {
 }
 
 function Overview({ ledger, targets }) {
+  const [focus, setFocus] = useState(null);
   const latest = ledger.at(-1);
   if (!latest) return <div className="panel glass"><h2>{EMPTY.overview}</h2><p className="sub">Five totals, targets, and the ledger appear when a Supabase user session can read them. Nothing here is filled with a made-up balance.</p></div>;
   const previous = ledger.at(-2);
@@ -231,7 +203,8 @@ function Overview({ ledger, targets }) {
         </section>
         <section className="panel glass">
           <h2>Growth</h2>
-          <Growth ledger={ledger} />
+          <Growth ledger={ledger} selectedId={focus || latest.period} onSelect={setFocus} />
+          <p id="jrl-month-detail" aria-live="polite">Selected month {focus || latest.period}. Earnings stay unknown when that month has no fresh reading.</p>
         </section>
       </div>
       <section className="panel glass gap">
@@ -272,29 +245,36 @@ function Overview({ ledger, targets }) {
 }
 
 function Allocation({ row }) {
-  const parts = [
-    ['Savings', row.savings_total, 'var(--pos)'],
-    ['Tax', row.tax_total, 'var(--c1)'],
-    ['HargLans ISA', row.hl_contributed, 'var(--orange)'],
-  ];
-  const total = parts.reduce((sum, part) => sum + Math.max(part[1], 0), 0) || 1;
   return (
-    <div className="legend">
-      {parts.map(([label, value, color]) => (
-        <div key={label} className="row"><span className="dot" style={{ background: color }} /><span>{label}</span><span className="amt">{money(value)}</span><span className="pct">{Math.round((Math.max(value, 0) / total) * 100)}%</span></div>
-      ))}
-    </div>
+    <ComparisonBars
+      name="allocation"
+      format={money}
+      caption="Savings, tax, and contributions. Portfolio value is not in this comparison."
+      items={[
+        { id: 'savings', label: 'Savings pot', value: row.savings_total, color: 'var(--pos)', status: 'Pot from flows. Not market value.' },
+        { id: 'tax', label: 'Tax pot', value: row.tax_total, color: 'var(--c1)', status: 'Pot from flows. Not market value.' },
+        { id: 'hl', label: 'HargLans contributions', value: row.hl_contributed, color: 'var(--ink)', status: 'Contributions, not portfolio value.' },
+      ]}
+    />
   );
 }
 
-function Growth({ ledger }) {
-  const max = Math.max(...ledger.map((row) => Math.max(row.chase_total, row.hl_contributed, row.hl_chart_value || 0)), 1);
+function Growth({ ledger, selectedId, onSelect }) {
+  const points = ledger.map((row) => ({ id: row.period, label: row.period }));
   return (
-    <svg viewBox="0 0 300 120" role="img" aria-label="Chase, contributions, and portfolio value">
-      <polyline fill="none" stroke="currentColor" strokeWidth="2" points={ledger.map((row, index) => `${20 + index * 80},${110 - (row.chase_total / max) * 90}`).join(' ')} />
-      <polyline fill="none" stroke="var(--orange)" strokeWidth="2" points={ledger.map((row, index) => `${20 + index * 80},${110 - (row.hl_contributed / max) * 90}`).join(' ')} />
-      <polyline fill="none" stroke="var(--orange)" strokeDasharray="4 3" strokeWidth="2" points={ledger.filter((row) => row.hl_chart_value != null).map((row) => `${20 + ledger.indexOf(row) * 80},${110 - (row.hl_chart_value / max) * 90}`).join(' ')} />
-    </svg>
+    <InteractiveSeriesChart
+      name="growth"
+      points={points}
+      selectedId={selectedId}
+      onSelect={onSelect}
+      format={money}
+      caption="Example data. Chase and contributions come from the flows. A carried portfolio value is not a new gain."
+      series={[
+        { id: 'chase', label: 'Chase', color: 'var(--ink)', values: ledger.map((row) => ({ id: row.period, value: row.chase_total, status: 'Derived from savings plus tax.' })) },
+        { id: 'contrib', label: 'Contributions', color: 'var(--c1)', values: ledger.map((row) => ({ id: row.period, value: row.hl_contributed, status: 'Contributions, not market value.' })) },
+        { id: 'value', label: 'Portfolio value', color: 'var(--pos)', values: ledger.map((row) => ({ id: row.period, value: row.hl_chart_value, status: row.hl_value == null ? 'Carried or not supplied. Gain unknown.' : 'Supplied reading.' })) },
+      ]}
+    />
   );
 }
 

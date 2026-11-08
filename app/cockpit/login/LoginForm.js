@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import '../jrl.css';
 
 export default function LoginForm() {
   const [password, setPassword] = useState('');
@@ -14,7 +15,10 @@ export default function LoginForm() {
       body: JSON.stringify({ password }),
     });
     if (res.status === 503) {
-      setError('Sign-in is not configured. The server needs DASHBOARD_PASSWORD and DASHBOARD_SESSION_SECRET.');
+      const body = await res.json().catch(() => ({}));
+      setError(body.error === 'password_verifier_malformed'
+        ? 'The password verifier is set but unreadable. The plaintext password was not used.'
+        : 'Sign-in is not configured. The server needs DASHBOARD_SESSION_SECRET and either DASHBOARD_PASSWORD_HASH or DASHBOARD_PASSWORD.');
       return;
     }
     if (!res.ok) {
@@ -25,17 +29,19 @@ export default function LoginForm() {
   }
 
   return (
-    <main style={shell}>
-      <form onSubmit={onSubmit} style={card}>
-        <p style={kicker}>Toki</p>
-        <h1 style={title}>Cockpit sign-in</h1>
-        <p style={copy}>Personal, business, and automation areas are behind this sign-in. The public site is unchanged.</p>
-        <label htmlFor="password" style={label}>Password</label>
-        <input id="password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" style={input} />
-        {error && <p role="alert" style={alert}>{error}</p>}
-        <button type="submit" style={button}>Continue</button>
-      </form>
-    </main>
+    <div className="jrl-root">
+      <div className="aura" aria-hidden="true" />
+      <main className="login-wrap">
+        <form className="panel glass login-card" onSubmit={onSubmit}>
+          <h1>Cockpit sign-in</h1>
+          <p className="sub">This password is not the personal Supabase sign-in. The public site is unchanged.</p>
+          <label className="entry-row" htmlFor="password"><span>Password</span></label>
+          <span className="entry-input login-input"><input id="password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" /></span>
+          {error && <p role="alert" className="entry-err">{error}</p>}
+          <button className="btn" type="submit">Continue</button>
+        </form>
+      </main>
+    </div>
   );
 }
 

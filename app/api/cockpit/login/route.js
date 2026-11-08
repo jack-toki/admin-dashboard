@@ -1,6 +1,6 @@
-import { authConfigStatus, authenticatePassword, clearCookie, readSession, sessionCookie, signSession } from '../../../../lib/auth';
-import { loginGate, noteLoginFailure, resetProcessThrottle } from '../../../../lib/auth/throttle';
-import { openAppStore } from '../../../../lib/store/index';
+import { authConfigStatus, authenticatePassword, clearCookie, readSession, sessionCookie, signSession } from '../../../../lib/auth.js';
+import { loginGate, noteLoginFailure, resetProcessThrottle } from '../../../../lib/auth/throttle.js';
+import { openAppStore } from '../../../../lib/store/index.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,7 +13,7 @@ function subjectFor(req) {
 export async function POST(req) {
   const status = authConfigStatus();
   if (status.state !== 'configured') {
-    return Response.json({ ok: false, error: 'auth_not_configured', missing: status.missing }, { status: 503 });
+    return Response.json({ ok: false, error: status.error || 'auth_not_configured', missing: status.missing }, { status: 503 });
   }
   const opened = openAppStore();
   const store = opened.ok ? opened.store : null;
@@ -26,6 +26,9 @@ export async function POST(req) {
   try { body = await req.json(); } catch { body = {}; }
   const auth = authenticatePassword(body.password || '');
   if (!auth.ok) {
+    if (auth.error === 'password_verifier_malformed' || auth.error === 'auth_not_configured') {
+      return Response.json({ ok: false, error: auth.error, missing: auth.missing }, { status: 503 });
+    }
     await noteLoginFailure({ subject, store, now: Date.now() });
     return Response.json({ ok: false, error: 'invalid' }, { status: 401 });
   }

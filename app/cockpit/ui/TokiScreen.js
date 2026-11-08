@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { formatPounds } from '../../../lib/money';
 import { overview, drilldown, withScenario, pipelineRow, reviewActivity, weeklyCommentary, automationBoard } from '../../../lib/finance/screen';
 import { syntheticPipeline, syntheticContacts, syntheticFacts, syntheticWorkflows, syntheticEvents, SYNTHETIC_BANNER } from '../../../lib/fixtures/synthetic';
+import { InteractiveSeriesChart } from './charts';
 
 const SECTIONS = [
   ['overview', 'Overview'],
@@ -20,7 +21,27 @@ export function TokiScreen({ example, baseline, actuals, plan, planNote, onSave,
   const [mode, setMode] = useState('base');
   const [form, setForm] = useState({ kind: 'sale', amount: '', party: '', groupId: 'billing', month: '2026-01', timing: 'one_off', durationMonths: '3' });
 
-  const view = useMemo(() => (baseline ? overview(baseline, actuals, month) : null), [baseline, actuals, month]);
+  const view = useMemo(() => {
+    if (!baseline) return null;
+    const rows = mode === 'base' ? baseline.rows : withScenario(baseline.rows, mode);
+    return overview({ rows }, actuals, month);
+  }, [baseline, actuals, month, mode]);
+  const chartSeries = useMemo(() => {
+    if (!baseline) return null;
+    const rows = mode === 'base' ? baseline.rows : withScenario(baseline.rows, mode);
+    const points = baseline.months.map((item) => ({ id: item.key, label: item.header }));
+    const billingAt = (id) => overview({ rows }, actuals, id).groups.find((group) => group.groupId === 'billing');
+    return {
+      points,
+      series: [
+        { id: 'plan', label: 'Plan', color: 'var(--ink)', values: points.map((point) => ({ id: point.id, value: billingAt(point.id)?.forecast.minor ?? null, status: 'Example forecast. The sheet is not connected.' })) },
+        { id: 'actual', label: 'Accounting actual', color: 'var(--c1)', values: points.map((point) => {
+          const group = billingAt(point.id);
+          return { id: point.id, value: group?.actual.known ? group.actual.minor : null, status: group?.actual.known ? 'Example actual. Not from Xero.' : 'Not on record' };
+        }) },
+      ],
+    };
+  }, [baseline, actuals, mode]);
   const rows = useMemo(() => (baseline ? drilldown(mode === 'base' ? baseline : { rows: withScenario(baseline.rows, mode) }, month) : []), [baseline, month, mode]);
   const pipeline = example ? syntheticPipeline().map(pipelineRow) : [];
   const activity = example ? reviewActivity(syntheticContacts()) : [];
@@ -29,8 +50,8 @@ export function TokiScreen({ example, baseline, actuals, plan, planNote, onSave,
   if (!example || !view) {
     return (
       <section>
-        <div style={empty}>
-          <div style={emptyTitle}>Forecast sheet is not connected</div>
+        <div className="panel glass">
+          <h2>Forecast sheet is not connected</h2>
           <p style={muted}>The plan, variance, and what-if views stay empty until a read-only sheet connection is configured. Example figures are off.</p>
           <p style={muted}>Use “Show example figures” only to preview the layout. Those figures are not the company.</p>
         </div>
@@ -40,7 +61,7 @@ export function TokiScreen({ example, baseline, actuals, plan, planNote, onSave,
 
   return (
     <section>
-      <p style={exampleBanner}>{SYNTHETIC_BANNER}</p>
+      <p className="caveat">{SYNTHETIC_BANNER} Example data.</p>
       <div style={pills}>
         {SECTIONS.map(([id, label]) => (
           <button key={id} type="button" onClick={() => setSection(id)} style={pill(section === id)}>{label}</button>
@@ -51,11 +72,22 @@ export function TokiScreen({ example, baseline, actuals, plan, planNote, onSave,
           <button key={item.key} type="button" onClick={() => setMonth(item.key)} style={pill(month === item.key)}>{item.header}</button>
         ))}
       </div>
+      <div className="tgt-modes">
+        {[['base', 'Base'], ['best', 'Higher'], ['worst', 'Lower']].map(([id, label]) => (
+          <button key={id} type="button" className={mode === id ? 'tgt-mode on' : 'tgt-mode'} onClick={() => setMode(id)}>{label}</button>
+        ))}
+      </div>
+      {chartSeries && (
+        <>
+          <InteractiveSeriesChart name="billing" points={chartSeries.points} series={chartSeries.series} selectedId={month} onSelect={setMonth} format={formatPounds} caption="Example data. A missing actual stays unknown. Higher and lower recompute the plan line only." />
+          <p id="toki-month-detail" aria-live="polite">{baseline.months.find((item) => item.key === month)?.header} selected. Sheet and Xero are not connected.</p>
+        </>
+      )}
 
       {section === 'overview' && (
         <>
-          <div style={tiles}>
-            <Tile label="Billing" value={formatPounds(view.revenueMinor)} accent />
+          <div className="stats">
+            <Tile label="Billing" value={formatPounds(view.revenueMinor)} />
             <Tile label="Costs" value={formatPounds(view.costMinor)} />
             <Tile label="Result" value={formatPounds(view.resultMinor)} />
           </div>
@@ -172,8 +204,8 @@ export function AutomationsScreen({ example }) {
   if (!example) {
     return (
       <section>
-        <div style={empty}>
-          <div style={emptyTitle}>No run log is connected</div>
+        <div className="panel glass">
+          <h2>No run log is connected</h2>
           <p style={muted}>Health, time, and value appear when events are stored. A workflow with no events is not treated as failed. Legacy posts without a run id are not turned into an exact hours figure.</p>
         </div>
       </section>
@@ -183,11 +215,11 @@ export function AutomationsScreen({ example }) {
   return (
     <section>
       <p style={exampleBanner}>{SYNTHETIC_BANNER}</p>
-      <div style={tiles}>
-        <Tile label="Checkpoints" value={String(board.checkpoints)} />
-        <Tile label="Unique runs" value={board.uniqueRuns == null ? 'Not known' : String(board.uniqueRuns)} accent />
-        <Tile label="Estimated value" value={board.savings.withheld ? 'Not calculated' : formatPounds(board.savings.minor)} />
-      </div>
+          <div className="stats">
+            <Tile label="Checkpoints" value={String(board.checkpoints)} />
+            <Tile label="Unique runs" value={board.uniqueRuns == null ? 'Not known' : String(board.uniqueRuns)} />
+            <Tile label="Estimated value" value={board.savings.withheld ? 'Not calculated' : formatPounds(board.savings.minor)} />
+          </div>
       <div style={tableWrap}>
         <table style={table}>
           <thead><tr><th style={th}>Workflow</th><th style={th}>Status</th></tr></thead>
@@ -206,12 +238,12 @@ export function AutomationsScreen({ example }) {
   );
 }
 
-function Tile({ label, value, accent }) {
+function Tile({ label, value }) {
   return (
-    <div style={tile}>
-      <div style={tileLabel}>{label}</div>
-      <div style={{ ...tileValue, color: accent ? '#ec5a29' : '#181b24' }}>{value}</div>
-    </div>
+    <article className="card glass">
+      <div className="k">{label}</div>
+      <div className="v num">{value}</div>
+    </article>
   );
 }
 

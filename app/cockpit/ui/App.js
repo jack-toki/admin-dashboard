@@ -6,6 +6,7 @@ import { TokiScreen, AutomationsScreen } from './TokiScreen';
 import JrlScreen from './JrlScreen';
 import { readCollapsed, toggleCollapsed, visibleNav, NAV_STORAGE_KEY } from '../../../lib/nav/sidebar';
 import { NavMark } from './marks';
+import '../jrl.css';
 import '../cockpit.css';
 
 export default function App({ role, areas, client }) {
@@ -14,6 +15,7 @@ export default function App({ role, areas, client }) {
   const [status, setStatus] = useState(null);
   const [jrl, setJrl] = useState(null);
   const [example, setExample] = useState(false);
+  const [theme, setTheme] = useState('');
   const [plan, setPlan] = useState([]);
   const [planNote, setPlanNote] = useState('');
   const [formError, setFormError] = useState('');
@@ -42,6 +44,7 @@ export default function App({ role, areas, client }) {
 
   useEffect(() => {
     setCollapsed(readCollapsed(window.localStorage));
+    try { setTheme(window.localStorage.getItem('jrl-theme') || ''); } catch { setTheme(''); }
     function onKey(event) {
       const tag = event.target?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || event.target?.isContentEditable) return;
@@ -98,74 +101,66 @@ export default function App({ role, areas, client }) {
 
   const items = visibleNav(areas);
 
+  async function onSignOut() {
+    await fetch('/api/cockpit/login', { method: 'DELETE' });
+    window.location.href = '/cockpit/login';
+  }
+
+  function onTheme() {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    try { window.localStorage.setItem('jrl-theme', next); } catch { /* keep the choice for this view */ }
+    window.dispatchEvent(new Event('jrl-theme'));
+  }
+
+  const title = area === 'jrl' ? 'JRL' : area === 'automations' ? 'Automations' : 'Toki';
+
   return (
-    <div style={page}>
-      <div className="cockpit-shell">
-      <nav className="glass-nav" data-collapsed={collapsed ? 'true' : 'false'} aria-label="Cockpit sections">
-        <button
-          type="button"
-          className="nav-toggle"
-          aria-expanded={!collapsed}
-          aria-controls="cockpit-nav"
-          aria-label={collapsed ? 'Expand menu' : 'Collapse menu'}
-          onClick={onToggleNav}
-        >
-          <span aria-hidden="true">{collapsed ? '»' : '«'}</span>
-          <span className="nav-label">{collapsed ? 'Expand menu' : 'Collapse menu'}</span>
-          <span className="nav-tip" role="tooltip">{collapsed ? 'Expand menu' : 'Collapse menu'}</span>
-        </button>
-        <ul id="cockpit-nav">
-          {items.map((item) => (
-            <li key={item.id}>
-              <button
-                type="button"
-                className={area === item.id ? 'nav-item is-current' : 'nav-item'}
+    <div className="jrl-root" data-theme={theme || undefined}>
+      <div className="aura" aria-hidden="true" />
+      <div className="app">
+        <aside className="side" data-collapsed={collapsed ? 'true' : 'false'} aria-label="Cockpit sections">
+          <nav id="cockpit-nav">
+            {items.map((item) => (
+              <a
+                key={item.id}
+                href={`#${item.id}`}
+                className={area === item.id ? 'on' : undefined}
                 aria-current={area === item.id ? 'page' : undefined}
-                aria-label={item.label}
-                title={item.hint}
-                onClick={() => setArea(item.id)}
+                onClick={(event) => { event.preventDefault(); setArea(item.id); }}
               >
-                <NavMark id={item.id} />
-                <span className="nav-label">{item.label}</span>
-                <span className="nav-tip" role="tooltip">{item.label}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </nav>
-      <div className="cockpit-main">
-      <header style={header}>
-        <div>
-          <div style={kicker}>Toki cockpit</div>
-          <strong>{role}{client ? ` · ${client}` : ''}</strong>
-        </div>
-        <span style={meta}>Menu preference is saved on this device ({NAV_STORAGE_KEY}). Press [ to toggle it.</span>
-      </header>
-
-      {area === 'toki' && (
-        <>
-          <div style={row}>
-            <button type="button" style={button} onClick={() => setExample((value) => !value)}>{example ? 'Hide example figures' : 'Show example figures'}</button>
+                <span className="ic"><NavMark id={item.id} /></span>
+                <span className="lbl">{item.label}</span>
+                <span className="lbl-short">{item.label}</span>
+                <span className="nav-tip">{item.label}</span>
+              </a>
+            ))}
+          </nav>
+          <div className="spacer" />
+          <button type="button" className="toggle glass" aria-label={collapsed ? 'Expand menu' : 'Collapse menu'} onClick={onToggleNav}>{collapsed ? '»' : '«'}</button>
+          <div className="help"><b>Example data stays off</b><span>Turn it on only to preview the layout. Press [ to collapse the menu ({NAV_STORAGE_KEY}).</span></div>
+        </aside>
+        <main className="main">
+          <div className="head">
+            <div>
+              <h1>{title}</h1>
+              <div className="period">{role}{client ? ` · ${client}` : ''}</div>
+            </div>
+            <div className="head-actions">
+              {area !== 'jrl' && <button type="button" className="toggle glass" onClick={() => setExample((value) => !value)}>{example ? 'Hide example data' : 'Show example data'}</button>}
+              <button type="button" className="toggle glass" aria-label="Theme" onClick={onTheme}>{theme === 'dark' ? 'Light' : 'Dark'}</button>
+              <button type="button" className="toggle glass signout" onClick={onSignOut}>Sign out</button>
+            </div>
           </div>
-          <TokiScreen example={example} baseline={baseline} actuals={actuals} plan={plan} planNote={planNote} onSave={onSave} formError={formError} />
-        </>
-      )}
-
-      {area === 'automations' && (
-        <>
-          <div style={row}>
-            <button type="button" style={button} onClick={() => setExample((value) => !value)}>{example ? 'Hide example figures' : 'Show example figures'}</button>
-          </div>
-          <AutomationsScreen example={example} />
-          <details style={meta}>
-            <summary>Coverage notes</summary>
-            {status && <p>The ingest alias was not called. The last export snapshot recorded {status.coverage.clientOnWithIngest} of {status.coverage.clientOn} client workflows on, and {status.coverage.jackOwnOnWithIngest} of {status.coverage.jackOwnOn} on Jack’s own account. Louise was {status.coverage.louise}.</p>}
-          </details>
-        </>
-      )}
-
-      {area === 'jrl' && <JrlScreen gate={jrl} />}
-      </div>
+          {area === 'toki' && <TokiScreen example={example} baseline={baseline} actuals={actuals} plan={plan} planNote={planNote} onSave={onSave} formError={formError} />}
+          {area === 'automations' && (
+            <>
+              <AutomationsScreen example={example} />
+              {status && <p className="caveat">The ingest alias was not called. The last export snapshot recorded {status.coverage.clientOnWithIngest} of {status.coverage.clientOn} client workflows on, and {status.coverage.jackOwnOnWithIngest} of {status.coverage.jackOwnOn} on Jack’s own account. Louise was {status.coverage.louise}.</p>}
+            </>
+          )}
+          {area === 'jrl' && <JrlScreen gate={jrl} />}
+        </main>
       </div>
     </div>
   );
