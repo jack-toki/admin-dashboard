@@ -7,7 +7,7 @@ const path = require('path');
 const { importBaseline, importNormalized, upsertBaseline, summarizeSnapshot, snapshotMatchesExpected, EXPECTED_SNAPSHOT_SHAPE } = require('../lib/forecast/import');
 const { readTheme, writeTheme } = require('../lib/theme');
 const { openAppStore } = require('../lib/store/index');
-const { targetCheck, EXPECTED_PROJECT_REF, EXPECTED_SNAPSHOT_HASH, COCKPIT_ACCESS } = require('../lib/store/target');
+const { targetCheck, EXPECTED_PROJECT_REF, EXPECTED_SNAPSHOT_HASH, COCKPIT_ACCESS, classifySchemaProbe, probeCockpitSchema } = require('../lib/store/target');
 const { POST, GET } = require('../app/api/cockpit/forecast/route');
 const { GET: targetGET } = require('../app/api/cockpit/target/route');
 const { signSession, cookieName } = require('../lib/auth');
@@ -73,6 +73,39 @@ test('supabase forecast reads stay closed until the project ref and schema flag 
   assert.equal(flagged.match, false);
   assert.equal(COCKPIT_ACCESS.reachable, false);
   assert.equal(COCKPIT_ACCESS.doNot.includes('ALTER ROLE'), true);
+});
+
+test('the cockpit schema probe reports live PostgREST codes and does not leak the key', async () => {
+  assert.deepEqual(classifySchemaProbe(406, 'PGRST106'), { schemaExposed: false, reachable: false, code: 'PGRST106' });
+  assert.deepEqual(classifySchemaProbe(404, 'PGRST205'), { schemaExposed: true, reachable: false, code: 'PGRST205' });
+  assert.deepEqual(classifySchemaProbe(200, null), { schemaExposed: true, reachable: true, code: null });
+  const key = serviceJwt(EXPECTED_PROJECT_REF);
+  const env = {
+    SUPABASE_URL: `https://${EXPECTED_PROJECT_REF}.supabase.co`,
+    SUPABASE_SERVICE_KEY: key,
+  };
+  let calls = 0;
+  const opened = await probeCockpitSchema(env, async (url, init) => {
+    calls += 1;
+    assert.equal(init.headers['Accept-Profile'], 'cockpit');
+    assert.equal(url.startsWith(`https://${EXPECTED_PROJECT_REF}.supabase.co/rest/v1/forecast_baseline_cells`), true);
+    return { ok: true, status: 200, async json() { return []; } };
+  });
+  assert.equal(calls, 1);
+  assert.equal(opened.reachable, true);
+  assert.equal(JSON.stringify(opened).includes(key), false);
+  const failed = await probeCockpitSchema(env, async () => { throw new Error(key); });
+  assert.equal(failed.code, 'probe_failed');
+  assert.equal(failed.reachable, false);
+  assert.equal(JSON.stringify(failed).includes(key), false);
+  const closed = await probeCockpitSchema(env, async () => ({
+    ok: false,
+    status: 406,
+    async json() { return { code: 'PGRST106', message: key }; },
+  }));
+  assert.equal(closed.code, 'PGRST106');
+  assert.equal(closed.schemaExposed, false);
+  assert.equal(JSON.stringify(closed).includes(key), false);
 });
 
 test('light is the default until an explicit dark choice is saved', () => {
@@ -238,6 +271,8 @@ test('forecast import requires a signed-in Toki session and does not read a shee
     assert.equal(statusBody.connected, false);
     assert.equal(statusBody.target.expectedRef, EXPECTED_PROJECT_REF);
     assert.equal(statusBody.access.reachable, false);
+    assert.equal(statusBody.access.probed, false);
+    assert.equal(statusBody.access.probeCode, null);
     assert.equal(JSON.stringify(statusBody).includes(otherKey), false);
     const anonymous = await targetGET(new Request('http://localhost/api/cockpit/target'));
     assert.equal(anonymous.status, 401);

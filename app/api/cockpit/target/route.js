@@ -1,5 +1,5 @@
 import { canAccess, readSession } from '../../../../lib/auth.js';
-import { COCKPIT_ACCESS } from '../../../../lib/store/target.js';
+import { COCKPIT_ACCESS, probeCockpitSchema } from '../../../../lib/store/target.js';
 import { supabaseGuard } from '../../../../lib/store/index.js';
 
 export const runtime = 'nodejs';
@@ -10,6 +10,7 @@ export async function GET(req) {
   if (!session) return Response.json({ error: 'unauthenticated' }, { status: 401 });
   if (!canAccess(session, 'toki')) return Response.json({ error: 'forbidden' }, { status: 403 });
   const guard = supabaseGuard();
+  const probe = await probeCockpitSchema(process.env);
   return Response.json({
     ok: true,
     connected: false,
@@ -17,9 +18,11 @@ export async function GET(req) {
     access: {
       schema: COCKPIT_ACCESS.schema,
       schemaRoute: COCKPIT_ACCESS.schemaRoute,
-      reachable: false,
-      parentSetting: COCKPIT_ACCESS.parentSetting,
-      exposureError: COCKPIT_ACCESS.exposureError,
+      header: 'Accept-Profile',
+      probed: probe.probed,
+      schemaExposed: probe.schemaExposed,
+      reachable: probe.reachable,
+      probeCode: probe.code,
     },
   }, { headers: { 'cache-control': 'private, no-store' } });
 }
