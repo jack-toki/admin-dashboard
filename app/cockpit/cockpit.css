@@ -954,3 +954,13 @@ button.quick-card { padding: 18px 18px 16px; }
 @media (max-width: 820px) {
   .quick-row { grid-template-columns: minmax(0, 1fr); }
 }
+#outstanding { scroll-margin-top: 16px; }
+.forecast-plan { display: flex; flex-direction: column; gap: 12px; }
+.forecast-tiles { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.forecast-tiles .ov-tile { height: auto; min-height: 72px; max-height: none; cursor: default; }
+.forecast-table { width: 100%; border-collapse: collapse; }
+.forecast-table th, .forecast-table td { text-align: left; padding: 6px 8px; white-space: nowrap; }
+.forecast-table input { width: 76px; font: inherit; color: var(--ink); background: var(--control); border: 0; border-radius: 8px; min-height: 32px; padding: 0 6px; }
+.chart-card[data-chart="forecast-plan"] .chart-tip { position: absolute; margin: 0; white-space: pre-line; z-index: 2; pointer-events: none; max-width: 280px; }
+.chart-axis { fill: var(--ink); }
+.chart-grid { stroke: var(--hair); stroke-width: .5; }

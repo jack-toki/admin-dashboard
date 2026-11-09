@@ -12,6 +12,7 @@ export function InteractiveSeriesChart({
   caption,
   xTitle,
   yTitle,
+  showTable = true,
 }) {
   const [hidden, setHidden] = useState({});
   const [tip, setTip] = useState(null);
@@ -131,7 +132,7 @@ export function InteractiveSeriesChart({
         {tip && <div id={tipId} role="tooltip" className="chart-tip" style={{ left: tip.x, top: tip.y }}>{tip.text}</div>}
       </div>
       {caption && <p className="caveat">{caption}</p>}
-      <div className="ledger-scroll">
+      {showTable && <div className="ledger-scroll">
         <table className="chart-fallback">
           <caption className="sub">{name} values</caption>
           <thead>
@@ -152,7 +153,7 @@ export function InteractiveSeriesChart({
             ))}
           </tbody>
         </table>
-      </div>
+      </div>}
     </figure>
   );
 }

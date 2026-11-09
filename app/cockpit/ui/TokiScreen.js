@@ -6,7 +6,7 @@ import { TOKI_VIEWS } from '../../../lib/nav/sidebar';
 import { HorizontalBars, YearColumns } from './charts';
 import { IncomeBoard } from './IncomeBoard';
 import { DetailDrawer, DetailFields } from './DetailDrawer';
-import { deriveAutoTasks } from '../../../lib/planning/autoTasks';
+import { INITIAL_TOKI_MONTH, deriveAutoTasks, forecastCellsFromRows, openOutstandingItems } from '../../../lib/planning/autoTasks';
 import { priceZaps, savingsFromZaps } from '../../../lib/automations/savings';
 
 const MONTHS = [
@@ -33,7 +33,7 @@ function showMoney(minor) {
 }
 
 export function TokiScreen({ example, baseline, actuals, evidence, plan, planNote, onSave, onRemove, formError, forecastError, section = 'toki', onSection, details = [], detailStored = false, onSaveDetail, onRemoveDetail, outstanding = [], outstandingStored = false, onAddOutstanding, onCompleteOutstanding, jrlEntries = [], automationPosts = null, dismissals = [], potsUpdated = true, onDismissAuto, focus = null, onFocusApplied }) {
-  const [month, setMonth] = useState('2026-01');
+  const [month, setMonth] = useState(INITIAL_TOKI_MONTH);
   const [board, setBoard] = useState('year');
   const [editAll, setEditAll] = useState(false);
   const [editingKey, setEditingKey] = useState('');
@@ -56,6 +56,14 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
   }, [focus]);
 
   const page = section === 'sources' || section === 'plan' ? 'sources' : 'toki';
+
+  useLayoutEffect(() => {
+    if (!focus || focus.area !== 'toki' || focus.scroll !== 'outstanding' || page !== 'toki') return;
+    const node = document.getElementById('outstanding');
+    if (!node) return;
+    node.scrollIntoView({ block: 'start' });
+    if (typeof window !== 'undefined' && window.location.hash !== '#outstanding') window.location.hash = 'outstanding';
+  }, [focus, page]);
 
   useLayoutEffect(() => {
     const strip = monthStripRef.current;
@@ -134,15 +142,14 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
 
   const autoTasks = deriveAutoTasks({
     period: month,
-    cells: (baseline?.rows || []).flatMap((row) => Object.entries(row.cells || {}).map(([key, cell]) => ({
-      label: row.label, kind: row.kind, rowNumber: row.rowNumber, month: key, enteredMinor: cell.blank ? null : cell.minor, amountMinor: cell.blank ? null : cell.minor, nullState: cell.blank ? 'blank' : 'amount',
-    }))),
+    cells: forecastCellsFromRows(baseline?.rows),
     details,
     entries: jrlEntries,
     posts: automationPosts,
     potsUpdated,
     dismissals,
   });
+  const openItems = openOutstandingItems(outstanding, autoTasks);
 
   if (!baseline) {
     return (
@@ -233,7 +240,7 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
   }
 
   return (
-    <section className={page === 'toki' ? 'toki-view toki-dash' : 'toki-view'} aria-label={page === 'sources' ? 'Income and costs' : 'Toki'}>
+    <section className={page === 'toki' ? 'toki-view toki-dash' : 'toki-view'} aria-label={page === 'sources' ? 'Revenue Split' : 'Toki'}>
       <div className="toki-sticky">
         <div className="toki-section-switch" role="navigation" aria-label="Toki sections">
           <button type="button" aria-current={page === 'toki' ? 'page' : undefined} onClick={() => onSection?.('toki')}>Toki</button>
@@ -335,28 +342,29 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
               <p className="sub">A retainer needs a contract end. It is not added to the forecast.</p>
               <span className="btn quick-foot">Add a retainer</span>
             </button>
-            <article className="card glass quick-card">
+            <article className="card glass quick-card" id="outstanding" tabIndex={-1}>
               <QuickMark name="todo" />
               <h3>Outstanding</h3>
               <p className="sub">{outstandingStored ? 'Tick an item when it is done.' : 'Outstanding items are not saved on this server yet.'}</p>
               <ul className="todo-list">
-                {outstanding.map((item) => (
+                {openItems.map((item) => (
+                  item.source === 'auto' ? (
+                  <li key={item.id}>
+                    <label>
+                      <input type="checkbox" aria-label={`Dismiss: ${item.title}`} onChange={() => onDismissAuto?.(item)} />
+                      <a href={item.href}>{item.title}</a>
+                    </label>
+                  </li>
+                  ) : (
                   <li key={item.id}>
                     <label>
                       <input type="checkbox" aria-label={`Mark done: ${item.title}`} onChange={() => onCompleteOutstanding?.(item.id)} />
                       <span>{item.title}</span>
                     </label>
                   </li>
+                  )
                 ))}
-                {!outstanding.length && !autoTasks.length && <li className="sub">Nothing outstanding.</li>}
-                {autoTasks.map((task) => (
-                  <li key={task.id}>
-                    <label>
-                      <input type="checkbox" aria-label={`Dismiss: ${task.title}`} onChange={() => onDismissAuto?.(task)} />
-                      <a href={task.href}>{task.title}</a>
-                    </label>
-                  </li>
-                ))}
+                {!openItems.length && <li className="sub">Nothing outstanding.</li>}
               </ul>
               <form className="quick-add quick-foot" onSubmit={(event) => { event.preventDefault(); if (!todoTitle.trim() || !outstandingStored) return; onAddOutstanding?.(todoTitle.trim()); setTodoTitle(''); }}>
                 <input aria-label="New outstanding item" placeholder="Add an item" value={todoTitle} onChange={(event) => setTodoTitle(event.target.value)} />

@@ -3,7 +3,8 @@ import { Fragment, useEffect, useState } from 'react';
 import { validateEntry } from '../../../lib/planning/entries';
 import { TokiScreen, AutomationsScreen } from './TokiScreen';
 import { OverviewScreen } from './OverviewScreen';
-import { deriveAutoTasks } from '../../../lib/planning/autoTasks';
+import { ForecastScreen } from './ForecastScreen';
+import { INITIAL_TOKI_MONTH, deriveAutoTasks, forecastCellsFromRows } from '../../../lib/planning/autoTasks';
 import JrlScreen from './JrlScreen';
 import { readCollapsed, toggleCollapsed, visibleNav, NAV_STORAGE_KEY, TOKI_VIEWS } from '../../../lib/nav/sidebar';
 import { readTheme, writeTheme } from '../../../lib/theme';
@@ -82,7 +83,18 @@ export default function App({ role, areas, client, fixture = false }) {
   }, [fixture]);
 
   useEffect(() => {
-    if (window.location.hash === '#jrl' && areas.includes('jrl')) setArea('jrl');
+    const hash = window.location.hash;
+    if (hash === '#jrl' && areas.includes('jrl')) setArea('jrl');
+    if (hash === '#money' || hash === '#sources') {
+      setArea('toki');
+      setTokiView('sources');
+    }
+    if (hash === '#forecast' && areas.includes('toki')) setArea('forecast');
+    if (hash === '#outstanding' && areas.includes('toki')) {
+      setArea('toki');
+      setTokiView('toki');
+      setFocus({ area: 'toki', section: 'toki', scroll: 'outstanding' });
+    }
   }, [areas]);
 
   useEffect(() => {
@@ -394,8 +406,11 @@ export default function App({ role, areas, client, fixture = false }) {
                 </button>
               ))}
               {areas.includes('toki') && TOKI_VIEWS.map((view) => (
-                <button key={view.id} type="button" role="tab" aria-label={view.label} aria-selected={area === 'toki' && tokiView === view.id} onClick={() => { setArea('toki'); setTokiView(view.id); }}>Money</button>
+                <button key={view.id} type="button" role="tab" aria-label={view.label} aria-selected={area === 'toki' && tokiView === view.id} onClick={() => { setArea('toki'); setTokiView(view.id); }}>{view.label}</button>
               ))}
+              {areas.includes('toki') && (
+                <button type="button" role="tab" aria-selected={area === 'forecast'} onClick={() => setArea('forecast')}>Forecast</button>
+              )}
             </div>
             <details className="fx-user">
               <summary>
@@ -418,7 +433,8 @@ export default function App({ role, areas, client, fixture = false }) {
             <p>{subtitle}</p>
           </div>
           <main className="main">
-            {area === 'overview' && <OverviewScreen forecast={storedForecast} plan={plan} actuals={actuals} details={details} jrl={jrl} jrlLoading={jrlLoading} runs={runBoard} runsLoading={runsLoading} outstanding={outstanding} auto={deriveAutoTasks({ period: new Date().toISOString().slice(0, 7), cells: (storedForecast?.rows || []).flatMap((row) => Object.entries(row.cells || {}).map(([key, cell]) => ({ label: row.label, kind: row.kind, rowNumber: row.rowNumber, month: key, enteredMinor: cell.blank ? null : cell.minor, nullState: cell.blank ? 'blank' : 'amount' }))), details, entries: jrlLoading ? null : (jrl?.body?.entries || []), posts: runsLoading ? null : (runBoard?.posts ?? null), dismissals })} onOpen={openSpace} />}
+            {area === 'overview' && <OverviewScreen forecast={storedForecast} plan={plan} actuals={actuals} details={details} jrl={jrl} jrlLoading={jrlLoading} runs={runBoard} runsLoading={runsLoading} outstanding={outstanding} auto={deriveAutoTasks({ period: INITIAL_TOKI_MONTH, cells: forecastCellsFromRows(storedForecast?.rows), details, entries: jrlLoading ? null : (jrl?.body?.entries || []), posts: runsLoading ? null : (runBoard?.posts ?? null), dismissals })} onOpen={openSpace} />}
+            {area === 'forecast' && <ForecastScreen />}
             {area === 'toki' && <TokiScreen baseline={baseline} actuals={actuals} evidence={evidence} plan={plan} planNote={planNote} onSave={onSave} onRemove={onRemove} formError={formError} forecastError={forecastError} section={tokiView} onSection={setTokiView} details={details} detailStored={detailStored} onSaveDetail={onSaveDetail} onRemoveDetail={onRemoveDetail} outstanding={outstanding} outstandingStored={outstandingStored} onAddOutstanding={onAddOutstanding} onCompleteOutstanding={onCompleteOutstanding} jrlEntries={jrl?.body?.entries || []} automationPosts={runBoard?.posts ?? null} dismissals={dismissals} onDismissAuto={onDismissAuto} focus={focus} onFocusApplied={() => setFocus(null)} />}
             {area === 'automations' && (
               <>
