@@ -317,9 +317,9 @@ function Allocation({ row, onOpen }) {
       format={money}
       caption="Savings, tax, and contributions. Portfolio value is not in this comparison."
       items={[
-        { id: 'savings', label: 'Savings pot', value: row.savings_total, color: 'var(--chart-burgundy-100)', status: 'Pot from flows. Not market value.' },
-        { id: 'tax', label: 'Tax pot', value: row.tax_total, color: 'var(--chart-red-100)', status: 'Pot from flows. Not market value.' },
-        { id: 'hl', label: 'HargLans contributions', value: row.hl_contributed, color: 'var(--chart-sand-100)', status: 'Contributions, not portfolio value.' },
+        { id: 'savings', label: 'Savings pot', value: row.savings_total, color: 'var(--chart-orange)', status: 'Pot from flows. Not market value.' },
+        { id: 'tax', label: 'Tax pot', value: row.tax_total, color: 'var(--chart-electric)', status: 'Pot from flows. Not market value.' },
+        { id: 'hl', label: 'HargLans contributions', value: row.hl_contributed, color: 'var(--chart-ciel)', status: 'Contributions, not portfolio value.' },
       ]}
     />
   );
@@ -347,11 +347,12 @@ function ChartRange({ range, years, overlay, onRange, onOverlay }) {
 function Growth({ ledger, overlay, selectedId, onSelect }) {
   const overlaid = overlay ? yearOverlay(ledger, (row) => row.chase_total) : null;
   const points = overlaid ? overlaid.points : ledger.map((row) => ({ id: row.period, label: row.period.slice(0, 7) }));
-  const series = overlaid ? overlaid.series.map((item, index) => ({ ...item, opacity: Math.max(0.35, 1 - index * 0.18) })) : [
+  const palette = ['var(--chart-orange)', 'var(--chart-electric)', 'var(--chart-ciel)', 'var(--chart-charcoal)'];
+  const series = (overlaid ? overlaid.series : [
     { id: 'chase', label: 'Chase', kind: 'history', values: ledger.map((row) => ({ id: row.period, value: row.chase_total, status: 'Derived from savings plus tax.' })) },
-    { id: 'contrib', label: 'Contributions', kind: 'history', opacity: 0.55, values: ledger.map((row) => ({ id: row.period, value: row.hl_contributed, status: 'Contributions, not market value.' })) },
-    { id: 'value', label: 'Portfolio value', kind: 'history', opacity: 0.35, values: ledger.map((row) => ({ id: row.period, value: row.hl_chart_value, status: row.hl_value == null ? 'Carried or not supplied. Gain unknown.' : 'Supplied reading.' })) },
-  ];
+    { id: 'contrib', label: 'Contributions', kind: 'history', values: ledger.map((row) => ({ id: row.period, value: row.hl_contributed, status: 'Contributions, not market value.' })) },
+    { id: 'value', label: 'Portfolio value', kind: 'history', values: ledger.map((row) => ({ id: row.period, value: row.hl_chart_value, status: row.hl_value == null ? 'Carried or not supplied. Gain unknown.' : 'Supplied reading.' })) },
+  ]).map((item, index) => ({ ...item, color: palette[index % palette.length], opacity: 1 }));
   return (
     <InteractiveSeriesChart
       name="growth"
@@ -398,11 +399,11 @@ function Forecast({ ledger, layers, setLayers, customMonthly, setCustomMonthly }
         <button type="button" aria-pressed={layers.custom} onClick={() => toggle('custom')}>Custom</button>
         <label>Monthly <input aria-label="Custom monthly amount" inputMode="decimal" value={customMonthly} onChange={(event) => setCustomMonthly(event.target.value)} /></label>
       </div>
-      {chosen.benchmark ? <p className="caveat">Under 12 months, the money-weighted figure swings. Forecasts use 7% until there is a year of readings.</p> : <p className="caveat">Forecasts use the tracked state rate ({((rate || 0) * 100).toFixed(1)}% a year). Red and sand lines are forecasts.</p>}
+      {chosen.benchmark ? <p className="caveat">Under 12 months, the money-weighted figure swings. Forecasts use 7% until there is a year of readings.</p> : <p className="caveat">Forecasts use the tracked state rate ({((rate || 0) * 100).toFixed(1)}% a year). Blue lines are forecasts.</p>}
       <InteractiveSeriesChart
         name="forecast"
         points={chart.points}
-        series={chart.series.map((item, index) => ({ ...item, color: item.kind === 'forecast' ? ['var(--chart-red-100)', 'var(--chart-red-60)', 'var(--chart-sand-100)', 'var(--chart-sand-50)'][index % 4] : 'var(--chart-burgundy-100)' }))}
+        series={chart.series.map((item, index) => ({ ...item, color: item.kind === 'forecast' ? ['var(--chart-electric)', 'var(--chart-ciel)', 'var(--chart-ciel-45)', 'var(--chart-charcoal)'][index % 4] : 'var(--chart-orange)' }))}
         format={money}
         xTitle="Years"
         yTitle="£"

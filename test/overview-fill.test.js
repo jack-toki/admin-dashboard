@@ -93,9 +93,14 @@ test('overview loads JRL and Automations on mount and paints client bars', () =>
   assert.match(screen, /Loading client time/);
   assert.match(screen, /spark empty ov-spark/);
   assert.match(css, /\.overview-card \.ov-client i\[data-state="value"\] \{ background: var\(--series-retainer\); \}/);
-  assert.match(css, /--chart-burgundy:\s*#3C0016/);
-  assert.match(css, /--chart-red:\s*#F92424/);
-  assert.match(css, /--chart-sand:\s*#D1C0A5/);
+  assert.match(css, /--chart-orange:\s*#FF5A00/);
+  assert.match(css, /--chart-electric:\s*#2038E2/);
+  assert.match(css, /--chart-ciel:\s*#007BFF/);
+  assert.match(css, /--chart-beige:\s*#FFE6D0/);
+  assert.match(css, /--chart-charcoal:\s*#1A1A1A/);
+  assert.match(css, /--series-retainer:\s*var\(--chart-orange\)/);
+  assert.equal(css.includes('--chart-burgundy'), false);
+  assert.equal(css.includes('--chart-sand'), false);
   assert.match(css, /\.overview-card \.ov-spark \{ flex: 0 0 120px; height: 120px;/);
   assert.match(css, /\.ov-tile b \{[^}]*font-size: 17px/);
   assert.match(css, /\.overview-card \.ov-income \.ov-x \{[^}]*font-size: 12px/);

@@ -87,9 +87,9 @@ export function InteractiveSeriesChart({
             const line = coords.map((spot) => `${spot.x},${spot.y}`).join(' ');
             return (
               <g key={item.id}>
-                {coords.length > 1 && <polyline data-kind={item.kind || 'history'} fill="none" stroke={item.color || 'var(--series-retainer)'} strokeWidth="1.6" points={line} opacity={item.opacity ?? 1} />}
+                {coords.length > 1 && <polyline data-kind={item.kind || 'history'} fill="none" stroke={item.color || 'var(--chart-orange)'} strokeWidth="1.6" points={line} opacity={item.opacity ?? 1} />}
                 {coords.map((spot) => (
-                  <circle key={spot.point.id} data-kind={item.kind || 'history'} cx={spot.x} cy={spot.y} r="2.4" fill={item.color || 'var(--series-retainer)'} />
+                  <circle key={spot.point.id} data-kind={item.kind || 'history'} cx={spot.x} cy={spot.y} r="2.4" fill={item.color || 'var(--chart-orange)'} />
                 ))}
               </g>
             );
@@ -216,7 +216,7 @@ export function CompactColumns({ name, points, series, selectedId, onSelect, for
                 const barW = Math.min(8, Math.max(3, (slot - 8) / visible.length));
                 const h = value.value === 0 ? 2 : Math.max(2, (Math.abs(value.value) / max) * (innerH - 2));
                 const bx = x + (slot - visible.length * barW) / 2 + seriesIndex * barW;
-                return <rect key={item.id} data-bar={item.id} data-state={value.value === 0 ? 'zero' : 'value'} x={bx} y={top + innerH - h} width={barW - 1} height={h} rx="2" fill={item.color || 'var(--series-retainer)'} opacity={selected || item.id !== 'plan' ? 1 : 0.45} />;
+                return <rect key={item.id} data-bar={item.id} data-state={value.value === 0 ? 'zero' : 'value'} x={bx} y={top + innerH - h} width={barW - 1} height={h} rx="2" fill={item.color || 'var(--chart-orange)'} opacity={selected || item.id !== 'plan' ? 1 : 0.45} />;
               })}
               <text x={x + slot / 2} y={height - 4} textAnchor="middle">{point.label}</text>
               <rect
