@@ -526,6 +526,59 @@
   .jrl-root .fx-signout, .jrl-root .fx-theme { display: flex; }
   .jrl-root .fx-signout { display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 50%; background: var(--glass); color: var(--ink); cursor: pointer; }
   .jrl-root .toki-section-switch { display: none !important; }
-  .jrl-root .fx-canvas .main, .jrl-root .main:has(.toki-dash), .jrl-root .main:has(.toki-view) { padding-bottom: 8px; }
+  .jrl-root .fx-canvas { height: calc(100dvh - 92px); overflow: auto; margin-bottom: 78px; padding-bottom: 20px; }
+  .jrl-root .fx-tabs { flex-wrap: nowrap; }
+  .jrl-root .fx-tabs button { white-space: nowrap; flex: none; }
+  .col-slot:not([data-index="0"]):not([data-index="2"]):not([data-index="4"]):not([data-index="6"]):not([data-index="8"]):not([data-index="10"]) .col-label { visibility: hidden; }
+  .chart-readout { grid-template-columns: 1fr; }
+  .jrl-root .fx-canvas .main, .jrl-root .main:has(.toki-dash), .jrl-root .main:has(.toki-view) { padding-bottom: 12px; }
 }
 .jrl-root .toki-section-switch { display: none !important; }
+.jrl-root .card .v, .jrl-root .v { font-weight: 500; letter-spacing: -.045em; }
+.jrl-root .card::after { display: none; }
+.stat-ico { position: absolute; top: 14px; right: 14px; width: 32px; height: 32px; border-radius: 50%; background: var(--control); color: var(--ink); display: grid; place-items: center; }
+.stat-ico svg { width: 16px; height: 16px; }
+.card.hero .stat-ico { background: rgba(255,255,255,.22); color: #fff; }
+.chip.down { background: var(--neg-bg); color: var(--neg); }
+.bento { display: grid; grid-template-columns: minmax(220px, .9fr) minmax(280px, 1.05fr) minmax(360px, 1.35fr); gap: 14px; align-items: start; }
+.bento-summary { grid-column: 1; }
+.bento-stats { grid-column: 2; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.bento-chart { grid-column: 3; grid-row: 1 / span 2; min-width: 0; }
+.bento-table { grid-column: 1 / span 2; }
+.bento-progress { grid-column: 3; }
+.bento-span { grid-column: 1 / -1; }
+.bento-contents { display: contents; }
+.bento .pot-card { grid-column: 1; grid-row: 1 / span 2; margin: 0; }
+.bento-actions { display: flex; gap: 8px; margin-top: 14px; }
+.btn-ghost { background: var(--control) !important; color: var(--ink) !important; }
+.chart-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; }
+.finance-plot figcaption { flex-direction: column; align-items: stretch; }
+.chart-segments { width: auto; display: inline-flex; padding: 3px; }
+.year-legend { align-self: flex-end; }
+.chart-readout { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+.chart-readout > div, .chart-readout li { display: flex; justify-content: space-between; gap: 8px; align-items: center; background: var(--control); border-radius: 12px; padding: 8px 10px; }
+.chart-readout ul { grid-column: 1 / -1; list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.chart-readout span { color: var(--muted); font-size: .78rem; }
+.chart-readout b { font-weight: 500; letter-spacing: -.03em; }
+.miss-pill { font-style: normal; font-size: .72rem; font-weight: 600; color: var(--muted); background: var(--track); border-radius: 999px; padding: 2px 8px; }
+.status-dot::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--pos); display: inline-block; margin-right: 6px; }
+.table-tools { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.table-tools h2 { margin: 0 auto 0 0; font-size: 1rem; }
+.table-tools input, .table-tools select { border: 0; background: var(--control); color: var(--ink); border-radius: 999px; min-height: 36px; padding: 0 12px; font: inherit; }
+.fx-user { position: relative; }
+.fx-user summary { list-style: none; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.fx-user summary::-webkit-details-marker { display: none; }
+.fx-menu { position: absolute; right: 0; top: calc(100% + 8px); z-index: 6; min-width: 148px; background: var(--surface); border-radius: 16px; padding: 6px; display: flex; flex-direction: column; box-shadow: 0 10px 30px rgba(0,0,0,.08); }
+.fx-menu button { border: 0; background: transparent; color: var(--ink); font: inherit; text-align: left; border-radius: 10px; padding: 8px 10px; cursor: pointer; }
+.col-chart { height: 240px; }
+.col-stack { width: 26px; gap: 4px; }
+.col-stack i { border-radius: 7px; }
+.col-stack i[data-state="missing"] { height: 16%; background: repeating-linear-gradient(135deg, transparent 0 3px, rgba(23,23,23,.28) 3px 4px) !important; }
+.col-average::after { content: "Avg"; background: var(--surface); color: var(--muted); font-size: 11px; padding: 0 4px; top: -14px; }
+.income-col table { width: 100%; border-collapse: collapse; }
+.income-col th, .income-col td { text-align: left; padding: 10px 8px; }
+.jrl-root .toki-months button { min-width: 44px; }
+@media (max-width: 1100px) {
+  .bento { grid-template-columns: 1fr; }
+  .bento-summary, .bento-stats, .bento-chart, .bento-table, .bento-progress, .bento .pot-card { grid-column: 1; grid-row: auto; }
+}

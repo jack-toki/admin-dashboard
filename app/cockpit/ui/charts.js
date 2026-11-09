@@ -251,17 +251,15 @@ function niceMax(minor) {
 }
 
 function ChartLegend({ name, series, hidden, setHidden, ready = {} }) {
+  const shown = series.filter((item) => ready[item.id] !== false && item.id !== 'actual' && item.id !== 'unallocated');
   return (
     <span className="year-legend" role="group" aria-label={`${name} series`}>
-      {series.map((item) => {
-        const available = ready[item.id] !== false;
-        return (
-          <button key={item.id} type="button" className="chart-key" aria-pressed={available && !hidden[item.id]} disabled={!available} onClick={() => { if (available) setHidden((current) => ({ ...current, [item.id]: !current[item.id] })); }}>
-            <i style={{ background: item.color }} />
-            {item.label}{available ? '' : ' unavailable'}
-          </button>
-        );
-      })}
+      {shown.map((item) => (
+        <button key={item.id} type="button" className="chart-key" aria-pressed={!hidden[item.id]} onClick={() => setHidden((current) => ({ ...current, [item.id]: !current[item.id] }))}>
+          <i style={{ background: item.color }} />
+          {item.label}
+        </button>
+      ))}
     </span>
   );
 }
@@ -277,7 +275,7 @@ function linePhrase(line, format) {
   return `${kind} · ${line.name} · ${moneyText(line.minor, format)}`;
 }
 
-export function YearColumns({ name, months, selectedId, onOpen, format }) {
+export function YearColumns({ name, months, selectedId, onOpen, format, tabs = null }) {
   const [hidden, setHidden] = useState({});
   const [showAverage, setShowAverage] = useState(true);
   const [focusId, setFocusId] = useState('');
@@ -308,10 +306,13 @@ export function YearColumns({ name, months, selectedId, onOpen, format }) {
     <div className="chart-block">
     <figure className="finance-plot" data-chart={name}>
       <figcaption>
-        <strong>{name}</strong>
+        <div className="chart-card-head">
+          <strong>{name}</strong>
+          {tabs}
+        </div>
         <span className="year-legend">
           <ChartLegend name={name} series={legend} hidden={hidden} setHidden={setHidden} ready={ready} />
-          <button type="button" className="chart-key" aria-pressed={showAverage} onClick={() => setShowAverage((current) => !current)}>
+          <button type="button" className="chart-key" aria-pressed={showAverage} title="Average of known months. Missing months are left out. A stored zero is included." onClick={() => setShowAverage((current) => !current)}>
             <i className="avg-swatch" />
             Average
           </button>
@@ -326,11 +327,12 @@ export function YearColumns({ name, months, selectedId, onOpen, format }) {
         <div className="col-plot" role="group" aria-label={name}>
           <div className="col-grid" aria-hidden="true" />
           {showAverage && average != null && <span className="col-average" style={{ bottom: `calc(22px + ${(Math.min(average, max) / max)} * (100% - 22px))` }} />}
-          {months.map((month) => (
+          {months.map((month, index) => (
             <button
               key={month.id}
               type="button"
               className="col-slot"
+              data-index={index}
               data-chart-point={month.id}
               aria-pressed={month.id === selectedId}
               aria-label={`${month.label}. Income ${moneyText(month.total, format)}. ${month.lines.map((line) => linePhrase(line, format)).join('. ')}. Opens income and costs.`}
@@ -349,26 +351,33 @@ export function YearColumns({ name, months, selectedId, onOpen, format }) {
             >
               <span className="col-bars">
                 <span className="col-stack">
-                  {month.segments.filter((item) => visible.has(item.id) && item.value != null && Number.isFinite(item.value)).map((item) => (
-                    <i key={item.id} data-bar={item.id} data-state={item.value === 0 ? 'zero' : 'value'} style={{ height: item.value === 0 ? undefined : `${(Math.abs(item.value) / max) * 100}%`, background: item.color }} />
-                  ))}
+                  {month.segments.filter((item) => visible.has(item.id) && item.id !== 'unallocated').map((item) => {
+                    const known = item.value != null && Number.isFinite(item.value);
+                    if (!known) return <i key={item.id} data-bar={item.id} data-state="missing" title="Missing information, not zero." />;
+                    return <i key={item.id} data-bar={item.id} data-state={item.value === 0 ? 'zero' : 'value'} style={{ height: item.value === 0 ? undefined : `${(Math.abs(item.value) / max) * 100}%`, background: item.color }} />;
+                  })}
                 </span>
                 {visible.has('actual') && month.actual != null && Number.isFinite(month.actual) ? (
                   <i data-bar="actual" data-state={month.actual === 0 ? 'zero' : 'value'} style={{ height: month.actual === 0 ? undefined : `${(Math.abs(month.actual) / max) * 100}%`, background: 'var(--series-actual)' }} />
                 ) : null}
               </span>
-              <span className="col-label">{month.label}</span>
+              <span className="col-label" data-letter={month.label.slice(0, 1)}>{month.label}</span>
             </button>
           ))}
         </div>
       </div>
     </figure>
-    <div className="chart-breakdown" role="status" aria-live="polite">
-      <p>{active ? `${active.label} · Income ${moneyText(active.total, format)} · Actual ${moneyText(active.actual, format)}` : 'Select a month'}{average != null ? ` · Average ${moneyText(average, format)} of ${knownTotals.length} known months. Missing months are left out. A stored zero is included.` : ''}</p>
+    <div className="chart-readout" role="status" aria-live="polite">
+      <div><span>{active?.label || 'Month'}</span><b>{moneyText(active?.total, format)}</b></div>
+      <div><span>Actual</span>{active?.actual == null ? <em className="miss-pill" title="Missing information, not zero.">Missing</em> : <b>{moneyText(active.actual, format)}</b>}</div>
+      <div><span>Average</span><b>{average == null ? '—' : moneyText(average, format)}</b></div>
       {shownLines.length > 0 && (
         <ul>
           {shownLines.map((line) => (
-            <li key={`${line.type}-${line.name}`} data-income-line={line.name}>{linePhrase(line, format)}</li>
+            <li key={`${line.type}-${line.name}`} data-income-line={line.name}>
+              <span>{line.name}</span>
+              {line.minor == null ? <em className="miss-pill">Missing</em> : <b>{moneyText(line.minor, format)}</b>}
+            </li>
           ))}
         </ul>
       )}
@@ -377,7 +386,7 @@ export function YearColumns({ name, months, selectedId, onOpen, format }) {
   );
 }
 
-export function HorizontalBars({ name, points, series, format }) {
+export function HorizontalBars({ name, points, series, format, tabs = null }) {
   const [hidden, setHidden] = useState({});
   const [focusId, setFocusId] = useState('');
   const visible = series.filter((item) => !hidden[item.id]);
@@ -391,7 +400,10 @@ export function HorizontalBars({ name, points, series, format }) {
     <div className="chart-block">
     <figure className="finance-plot" data-chart={name}>
       <figcaption>
-        <strong>{name}</strong>
+        <div className="chart-card-head">
+          <strong>{name}</strong>
+          {tabs}
+        </div>
         <ChartLegend name={name} series={series} hidden={hidden} setHidden={setHidden} />
       </figcaption>
       <div className="hbar-list" role="group" aria-label={name}>

@@ -17,6 +17,8 @@ export function IncomeBoard({ month, records, stored, baselineRetainer, baseline
   const [kind, setKind] = useState('retainer');
   const [editing, setEditing] = useState('');
   const [draft, setDraft] = useState(blank('retainer'));
+  const [query, setQuery] = useState('');
+  const [scheduleFilter, setScheduleFilter] = useState('all');
 
   const retainers = (records || []).filter((row) => row.kind === 'retainer');
   const projects = (records || []).filter((row) => row.kind === 'project');
@@ -47,34 +49,41 @@ export function IncomeBoard({ month, records, stored, baselineRetainer, baseline
   }
 
   function column(title, rows, nextKind) {
-    const visible = rows.filter((row) => shownInMonth(row, month));
+    const visible = rows.filter((row) => shownInMonth(row, month)).filter((row) => {
+      const schedule = scheduleFor(row, month);
+      if (query && !`${row.party} ${row.services || ''}`.toLowerCase().includes(query.toLowerCase())) return false;
+      if (scheduleFilter === 'missing') return schedule.state === 'unknown' || row.amountMinor == null;
+      if (scheduleFilter === 'scheduled') return schedule.state === 'scheduled';
+      return true;
+    });
     return (
-      <section className="income-col" data-pane={nextKind} data-on={kind === nextKind || pane === 'income' ? 'true' : 'false'}>
-        <header>
+      <section className="income-col card glass" data-pane={nextKind} data-on={kind === nextKind || pane === 'income' ? 'true' : 'false'}>
+        <header className="table-tools">
           <h2>{title}</h2>
-          {stored && <button type="button" onClick={() => start(nextKind)}>Add</button>}
+          {stored && <button type="button" className="btn" onClick={() => start(nextKind)}>Add</button>}
         </header>
-        <ul>
-          {visible.map((row) => {
-            const schedule = scheduleFor(row, month);
-            return (
-              <li key={row.id}>
-                <div>
-                  <strong>{row.party}</strong>
-                  <span>{row.amountMinor == null ? 'Missing information' : formatPounds(row.amountMinor)}</span>
-                </div>
-                <p>{schedule.label}{row.contractEndDate ? ` · ends ${row.contractEndDate}` : ''}</p>
-                {stored && (
-                  <div className="income-row-actions">
-                    <button type="button" onClick={() => start(nextKind, row)}>Edit</button>
-                    <button type="button" onClick={() => onRemove(row.id)}>Delete</button>
-                  </div>
-                )}
-              </li>
-            );
-          })}
-          {!visible.length && <li className="income-empty">No {title.toLowerCase()} this month.</li>}
-        </ul>
+        <table>
+          <thead><tr><th>Company</th><th>Amount</th><th>Schedule</th><th></th></tr></thead>
+          <tbody>
+            {visible.map((row) => {
+              const schedule = scheduleFor(row, month);
+              return (
+                <tr key={row.id}>
+                  <td><strong>{row.party}</strong></td>
+                  <td>{row.amountMinor == null ? <em className="miss-pill">Missing</em> : formatPounds(row.amountMinor)}</td>
+                  <td>{schedule.state === 'unknown' ? <em className="miss-pill">Missing</em> : <span className="status-dot">{schedule.label}</span>}{row.contractEndDate ? ` · ends ${row.contractEndDate}` : ''}</td>
+                  <td>{stored && (
+                    <div className="income-row-actions">
+                      <button type="button" onClick={() => start(nextKind, row)}>Edit</button>
+                      <button type="button" onClick={() => onRemove(row.id)}>Delete</button>
+                    </div>
+                  )}</td>
+                </tr>
+              );
+            })}
+            {!visible.length && <tr><td colSpan="4" className="income-empty">No {title.toLowerCase()} this month.</td></tr>}
+          </tbody>
+        </table>
       </section>
     );
   }
@@ -82,6 +91,14 @@ export function IncomeBoard({ month, records, stored, baselineRetainer, baseline
   return (
     <div className="income-board">
       {!stored && <p className="income-gap" role="status">Client lines are not saved on this server yet. The forecast is unchanged.</p>}
+      <div className="table-tools">
+        <input aria-label="Search clients" placeholder="Search" value={query} onChange={(event) => setQuery(event.target.value)} />
+        <select aria-label="Filter schedule" value={scheduleFilter} onChange={(event) => setScheduleFilter(event.target.value)}>
+          <option value="all">All</option>
+          <option value="scheduled">Scheduled</option>
+          <option value="missing">Missing</option>
+        </select>
+      </div>
       <div className="income-tabs" role="tablist" aria-label="Income or costs">
         <button type="button" role="tab" aria-selected={pane === 'income'} onClick={() => setPane('income')}>Income</button>
         <button type="button" role="tab" aria-selected={pane === 'costs'} onClick={() => setPane('costs')}>Costs</button>

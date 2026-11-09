@@ -39,6 +39,8 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
   const [drafts, setDrafts] = useState({});
   const [adding, setAdding] = useState(null);
   const [sheetError, setSheetError] = useState('');
+  const [lineQuery, setLineQuery] = useState('');
+  const [lineKind, setLineKind] = useState('all');
   const monthStripRef = useRef(null);
 
   const page = section === 'sources' || section === 'plan' ? 'sources' : 'toki';
@@ -248,34 +250,59 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
       {baseline.synthetic && <p className="caveat">{SYNTHETIC_BANNER}</p>}
 
       {page === 'toki' && chartSeries && (
-        <div className="chart-carousel">
-          <div className="stats" data-panel="month" data-on={board === 'month' ? 'true' : 'false'}>
-            <Tile label="Income" value={showMoney(billingShown)} />
-            <Tile label="Costs" value={showMoney(costShown)} />
-            <Tile label="Result" value={showMoney(billingShown == null || costShown == null ? null : billingShown - costShown)} />
+        <div className="bento">
+          <article className="card glass bento-summary">
+            <div className="k">This month</div>
+            <div className="v num">{showMoney(billingShown == null || costShown == null ? null : billingShown - costShown)}</div>
+            <p className="sub">{monthName} {year}</p>
+            <div className="bento-actions">
+              <button type="button" className="btn" onClick={() => onSection?.('sources')}>Income</button>
+              <button type="button" className="btn btn-ghost" onClick={() => setBoard('groups')}>Groups</button>
+            </div>
+          </article>
+          <div className="bento-stats">
+            <Tile icon="income" highlight label="Income" value={showMoney(billingShown)} />
+            <Tile icon="cost" label="Costs" value={showMoney(costShown)} />
+            <Tile icon="result" label="Result" value={showMoney(billingShown == null || costShown == null ? null : billingShown - costShown)} />
+            <Tile icon="year" label="Known months" value={String(chartSeries.year.filter((item) => item.total != null).length)} />
           </div>
-          <div className="chart-panel" data-panel="month" data-on={board === 'month' ? 'true' : 'false'}>
-            <p className="phone-result">Result {showMoney(billingShown == null || costShown == null ? null : billingShown - costShown)}</p>
-            <HorizontalBars name="Income and costs" points={chartSeries.compare.points} series={chartSeries.compare.series} format={formatPounds} />
+          <div className="bento-chart">
+            {board === 'month' && <HorizontalBars name="This month" tabs={<ChartTabs board={board} setBoard={setBoard} />} points={chartSeries.compare.points} series={chartSeries.compare.series} format={formatPounds} />}
+            {board === 'year' && <YearColumns name="Income" tabs={<ChartTabs board={board} setBoard={setBoard} />} months={chartSeries.year} selectedId={month} onOpen={(key) => { setMonth(key); onSection?.('sources'); }} format={formatPounds} />}
+            {board === 'groups' && <HorizontalBars name="Cost groups" tabs={<ChartTabs board={board} setBoard={setBoard} />} points={chartSeries.groups.points} series={chartSeries.groups.series} format={formatPounds} />}
           </div>
-          <div className="chart-panel" data-panel="year" data-on={board === 'year' ? 'true' : 'false'}>
-            <YearColumns name="Income through the year" months={chartSeries.year} selectedId={month} onOpen={(key) => { setMonth(key); onSection?.('sources'); }} format={formatPounds} />
-          </div>
-          <div className="chart-panel" data-panel="groups" data-on={board === 'groups' ? 'true' : 'false'}>
-            <HorizontalBars name="Cost groups" points={chartSeries.groups.points} series={chartSeries.groups.series} format={formatPounds} />
-          </div>
-          <div className="chart-segments" role="tablist" aria-label="Toki charts" onKeyDown={(event) => {
-            const order = ['month', 'year', 'groups'];
-            const index = order.indexOf(board);
-            if (event.key === 'ArrowRight') setBoard(order[(index + 1) % order.length]);
-            if (event.key === 'ArrowLeft') setBoard(order[(index + order.length - 1) % order.length]);
-          }}>
-            {[['month', 'This month'], ['year', 'Year'], ['groups', 'Groups']].map(([id, label]) => (
-              <button key={id} type="button" role="tab" aria-selected={board === id} onClick={() => setBoard(id)}>{label}</button>
-            ))}
-          </div>
-          <p className="quiet quiet-full">{baseline.grossProfitMeaning} A gap on a chart is missing information, not zero.</p>
-          <p className="quiet quiet-short">Not profit after costs. A gap means missing, not zero.</p>
+          <section className="card glass bento-table">
+            <header className="table-tools">
+              <h2>Forecast lines</h2>
+              <input aria-label="Search lines" placeholder="Search" value={lineQuery} onChange={(event) => setLineQuery(event.target.value)} />
+              <select aria-label="Filter lines" value={lineKind} onChange={(event) => setLineKind(event.target.value)}>
+                <option value="all">All</option>
+                <option value="sale">Income</option>
+                <option value="cost">Costs</option>
+              </select>
+            </header>
+            <div className="ledger-scroll">
+              <table>
+                <thead><tr><th>Line</th><th>Kind</th><th>Amount</th><th>Status</th></tr></thead>
+                <tbody>
+                  {lines.filter((line) => (lineKind === 'all' || line.kind === lineKind) && String(line.party || '').toLowerCase().includes(lineQuery.toLowerCase())).map((line) => (
+                    <tr key={line.key}>
+                      <td>{line.party}</td>
+                      <td>{line.kind === 'sale' ? (line.workType === 'project' ? 'Project' : line.workType === 'retainer' ? 'Retainer' : 'Income') : 'Cost'}</td>
+                      <td className="num">{showMoney(line.minor)}</td>
+                      <td>{line.minor == null ? <em className="miss-pill">Missing</em> : <span className="status-dot">In forecast</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+          <section className="card glass bento-progress">
+            <div className="k">Costs against income</div>
+            <div className="v num">{showMoney(costShown)}</div>
+            <p className="sub">of {showMoney(billingShown)} income. A missing side is not zero.</p>
+            <div className="prow"><span className="bar"><i style={{ width: billingShown ? `${Math.min(100, Math.round(((costShown || 0) / billingShown) * 100))}%` : '0%' }} /></span></div>
+          </section>
         </div>
       )}
 
@@ -379,17 +406,17 @@ function Summary({ billing, costs }) {
 export function AutomationsScreen({ example, board, error }) {
   if (!example && board?.posts != null) {
     return (
-      <section>
-        <p style={muted}>Logged posts from the run log for this month. A missing or old post is not a failure. The registry export is separate.</p>
-        <div className="stats">
-          <Tile label="Logged posts" value={String(board.posts)} />
-          <Tile label="Accounts" value={String(board.accounts)} />
-          <Tile label="Zap ids that posted" value={String(board.reportingZapIds)} />
-          <Tile label="Estimated value" value={`£${Number(board.estimate.value || 0).toLocaleString('en-GB')}`} />
+      <section className="bento">
+        <p className="bento-span caveat">Logged posts from the run log for this month. A missing or old post is not a failure. The registry export is separate.</p>
+        <div className="bento-stats">
+          <Tile icon="posts" highlight label="Logged posts" value={String(board.posts)} />
+          <Tile icon="accounts" label="Accounts" value={String(board.accounts)} />
+          <Tile icon="zap" label="Zap ids" value={String(board.reportingZapIds)} />
+          <Tile icon="value" label="Estimated value" value={`£${Number(board.estimate.value || 0).toLocaleString('en-GB')}`} />
         </div>
         <p style={muted}>{board.reportingZapIdsMeaning} Posts with no zap id: {board.postsWithoutZapId}. {board.estimate.label} Last 7 days in this set: {board.postsLast7Days}.</p>
-        <div style={tableWrap}>
-          <table style={table}>
+        <div className="card glass bento-table ledger-scroll">
+          <table>
             <thead><tr><th style={th}>Account</th><th style={th}>Posts</th><th style={th}>Zap ids that posted</th><th style={th}>Latest</th></tr></thead>
             <tbody>
               {board.accountRows.map((row) => (
@@ -419,15 +446,16 @@ export function AutomationsScreen({ example, board, error }) {
   }
   const exampleBoard = automationBoard(syntheticWorkflows(), syntheticEvents());
   return (
-    <section>
-      <p style={exampleBanner}>{SYNTHETIC_BANNER}</p>
-          <div className="stats">
-            <Tile label="Checkpoints" value={String(exampleBoard.checkpoints)} />
-            <Tile label="Unique runs" value={exampleBoard.uniqueRuns == null ? 'Not known' : String(exampleBoard.uniqueRuns)} />
-            <Tile label="Estimated value" value={exampleBoard.savings.withheld ? 'Not calculated' : formatPounds(exampleBoard.savings.minor)} />
+    <section className="bento">
+      <p className="bento-span caveat">{SYNTHETIC_BANNER}</p>
+          <div className="bento-stats">
+            <Tile icon="posts" highlight label="Checkpoints" value={String(exampleBoard.checkpoints)} />
+            <Tile icon="accounts" label="Unique runs" value={exampleBoard.uniqueRuns == null ? 'Not known' : String(exampleBoard.uniqueRuns)} />
+            <Tile icon="value" label="Estimated value" value={exampleBoard.savings.withheld ? 'Not calculated' : formatPounds(exampleBoard.savings.minor)} />
+            <Tile icon="zap" label="Workflows" value={String(exampleBoard.rows.length)} />
           </div>
-      <div style={tableWrap}>
-        <table style={table}>
+      <div className="card glass bento-table ledger-scroll">
+        <table>
           <thead><tr><th style={th}>Workflow</th><th style={th}>Status</th></tr></thead>
           <tbody>
             {exampleBoard.rows.map((row) => (
@@ -444,11 +472,53 @@ export function AutomationsScreen({ example, board, error }) {
   );
 }
 
-function Tile({ label, value }) {
+function ChartTabs({ board, setBoard }) {
   return (
-    <article className="card glass">
+    <div className="chart-segments" role="tablist" aria-label="Toki charts" onKeyDown={(event) => {
+      const order = ['month', 'year', 'groups'];
+      const index = order.indexOf(board);
+      if (event.key === 'ArrowRight') setBoard(order[(index + 1) % order.length]);
+      if (event.key === 'ArrowLeft') setBoard(order[(index + order.length - 1) % order.length]);
+    }}>
+      {[['month', 'This month'], ['year', 'Year'], ['groups', 'Groups']].map(([id, label]) => (
+        <button key={id} type="button" role="tab" aria-selected={board === id} onClick={() => setBoard(id)}>{label}</button>
+      ))}
+    </div>
+  );
+}
+
+function StatIcon({ name }) {
+  const paths = {
+    income: 'M4 17l6-6 4 4 6-8M14 7h6v6',
+    cost: 'M5 7h14M7 7l1 12h8l1-12M9 7V5h6v2',
+    result: 'M12 3v18M7 8l5-5 5 5',
+    year: 'M5 5h14v14H5zM5 9h14M9 5v4',
+    posts: 'M6 7h12v10H6zM8 11h8M8 14h5',
+    accounts: 'M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM4 19c0-2.5 1.8-4 4-4s4 1.5 4 4',
+    zap: 'M13 3L5 14h7l-1 7 8-11h-7l1-7z',
+    value: 'M12 3v18M16 7H9.5a2.5 2.5 0 0 0 0 5H14a2.5 2.5 0 0 1 0 5H7',
+    net: 'M4 12h16M12 4v16',
+    chase: 'M4 16V8l8-4 8 4v8l-8 4-8-4z',
+    savings: 'M5 10h14v8H5zM8 10V8a4 4 0 0 1 8 0v2',
+    tax: 'M7 4h10v16H7zM9 8h6M9 12h6',
+    isa: 'M12 4l8 4v6c0 4-3.5 6-8 8-4.5-2-8-4-8-8V8l8-4z',
+  };
+  return (
+    <span className="stat-ico" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <path d={paths[name] || paths.income} />
+      </svg>
+    </span>
+  );
+}
+
+export function Tile({ label, value, icon = 'income', highlight = false, delta = null }) {
+  return (
+    <article className={highlight ? 'card glass hero' : 'card glass'}>
+      <StatIcon name={icon} />
       <div className="k">{label}</div>
       <div className="v num">{value}</div>
+      {delta ? <span className={String(delta).includes('−') ? 'chip down' : 'chip'}>{String(delta).includes('−') ? '↓' : '↑'} {delta}</span> : null}
     </article>
   );
 }

@@ -9,6 +9,7 @@ import { monthsToTarget, projectPath } from '../../../vendor/jrl-finance/code/li
 import { confirmDelete, dayGroup, filterConversations, pageConversations } from '../../../lib/jrl/sora';
 import { ComparisonBars, InteractiveSeriesChart } from './charts';
 import { PotCard } from './PotCard';
+import { Tile } from './TokiScreen';
 import { blankPotRecord, latestPortfolioValue } from '../../../lib/jrl/pots';
 import '../jrl.css';
 
@@ -143,8 +144,12 @@ export default function JrlScreen({ gate }) {
               <span>{auth?.expired ? 'The JRL session expired. Sign in again. The ledger was not filled in.' : auth?.supabaseUser ? `Signed in to JRL. The session expires ${auth.expiresAt ? new Date(auth.expiresAt).toLocaleString('en-GB') : 'on its own'}.` : auth?.ownerLink ? 'The owner link is on. The ledger was not opened from the stored connection.' : (!auth?.configured ? `JRL sign-in needs ${(auth?.missing || ['JRL_SUPABASE_URL', 'JRL_SUPABASE_ANON_KEY']).join(' and ')} on this server. The legacy anon key is accepted. No service role is used.` : 'Sign in with the JRL account. The cockpit password does not open the ledger.')}</span>
               {auth?.supabaseUser ? <button type="button" className="nudge-btn" onClick={async () => { await fetch('/api/cockpit/jrl/session', { method: 'DELETE', headers: { 'x-cockpit-link': '1' } }); window.location.assign('/cockpit#jrl'); }}>Sign out of JRL</button> : auth?.configured && !auth?.ownerLink ? <a className="nudge-btn" href={auth?.handoff || '/cockpit/jrl/login?return=/cockpit%23jrl'}>JRL sign-in</a> : null}
           </div>
-          {section === 'overview' && <PotCard record={potRecord} ledger={ledger} portfolioAvailable={Boolean(latestPortfolioValue(ledger))} onChange={onPots} editable={potStored} />}
-          {auth?.supabaseUser && section === 'overview' && <Overview ledger={ledger} targets={targets} />}
+          {section === 'overview' && (
+            <div className="bento">
+              <PotCard record={potRecord} ledger={ledger} portfolioAvailable={Boolean(latestPortfolioValue(ledger))} onChange={onPots} editable={potStored} />
+              {auth?.supabaseUser && <Overview ledger={ledger} targets={targets} />}
+            </div>
+          )}
           {auth?.supabaseUser && section === 'month' && (
             <MonthForm form={form} setForm={setForm} period={period} setPeriod={setPeriod} options={window.options} ledger={ledger} onSave={onSave} note={saveNote} />
           )}
@@ -185,16 +190,14 @@ function Overview({ ledger, targets }) {
   })), BENCHMARK_RATE);
   perf.earningsThisMonth = latest.hl_value == null ? null : latest.earned;
   const chartValue = latest.hl_chart_value;
+  const icons = { 'Net total': 'net', 'Chase balance': 'chase', 'Savings pot': 'savings', 'Tax pot': 'tax', 'HargLans ISA': 'isa' };
   return (
-    <>
-      <div className="stats">
-        {cards.map(([label, value, hero]) => (
-          <article key={label} className={hero ? 'card glass hero' : 'card glass'}>
-            <div className="k">{label}</div>
-            <div className="v num">{money(value)}</div>
-            {previous ? <span className="chip">{money(value - (label === 'Net total' ? previous.net_total : label === 'Chase balance' ? previous.chase_total : label === 'Savings pot' ? previous.savings_total : label === 'Tax pot' ? previous.tax_total : previous.hl_contributed))}</span> : null}
-          </article>
-        ))}
+    <div className="bento-contents">
+      <div className="bento-stats">
+        {cards.map(([label, value, hero]) => {
+          const before = !previous ? null : label === 'Net total' ? previous.net_total : label === 'Chase balance' ? previous.chase_total : label === 'Savings pot' ? previous.savings_total : label === 'Tax pot' ? previous.tax_total : previous.hl_contributed;
+          return <Tile key={label} icon={icons[label]} highlight={hero} label={label} value={money(value)} delta={before == null ? null : money(value - before)} />;
+        })}
       </div>
       <p className="caveat">HargLans ISA on the card is contributions, not the portfolio value. Net is Chase plus contributions. Gain is not added into that headline.</p>
       {targets.length > 0 && (
@@ -223,7 +226,7 @@ function Overview({ ledger, targets }) {
           <p id="jrl-month-detail" aria-live="polite">Selected month {focus || latest.period}. Earnings stay unknown when that month has no fresh reading.</p>
         </section>
       </div>
-      <section className="panel glass gap">
+      <section className="panel glass gap bento-progress">
         <h2>HargLans ISA</h2>
         <div className="perf">
           <div className="mini"><div className="k">{latest.hl_carried ? 'Value carried forward' : 'Portfolio value'}</div><div className="v">{money(chartValue)}</div></div>
@@ -235,7 +238,7 @@ function Overview({ ledger, targets }) {
           <div key={row.years} className="prow"><span className="yr">{row.years}y</span><span className="bar"><i style={{ width: '100%' }} /></span><span className="amt">{money(row.value)}</span></div>
         ))}
       </section>
-      <section className="ledger glass gap">
+      <section className="ledger glass gap bento-table">
         <div className="ledger-head"><h2>Ledger</h2></div>
         <div className="ledger-scroll">
           <table>
@@ -256,7 +259,7 @@ function Overview({ ledger, targets }) {
           </table>
         </div>
       </section>
-    </>
+    </div>
   );
 }
 

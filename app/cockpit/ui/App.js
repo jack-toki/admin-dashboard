@@ -7,6 +7,7 @@ import { readCollapsed, toggleCollapsed, visibleNav, NAV_STORAGE_KEY, TOKI_VIEWS
 import { readTheme, writeTheme } from '../../../lib/theme';
 import { NavMark } from './marks';
 import { syntheticBaseline } from '../../../lib/fixtures/synthetic';
+import { exampleEntries } from '../../../lib/jrl/example';
 import '../jrl.css';
 import '../cockpit.css';
 
@@ -33,10 +34,15 @@ export default function App({ role, areas, client, fixture = false }) {
     setStoredForecast(syntheticBaseline());
     setForecastError('');
     setPlan([]);
-    setDetails([]);
-    setDetailStored(false);
+    setDetails([
+      { id: 'syn-retainer', kind: 'retainer', party: 'Example Studio', services: 'Design', amountMinor: 150000, firstPaymentMonth: '2026-01', contractEndDate: '2026-06-30', totalPayments: 6, comment: 'Scheduled 2 of 6', source: 'manual' },
+      { id: 'syn-retainer-2', kind: 'retainer', party: 'Northwind', services: 'Support', amountMinor: 80000, firstPaymentMonth: '2026-01', contractEndDate: null, contractEndUnknown: true, comment: '', source: 'manual' },
+      { id: 'syn-project', kind: 'project', party: 'Example Launch', services: 'Site', amountMinor: 240000, firstPaymentMonth: '2026-03', contractEndDate: '2026-05-31', totalPayments: 3, comment: '', source: 'manual' },
+      { id: 'syn-project-2', kind: 'project', party: 'Harbour', services: 'Film', amountMinor: null, firstPaymentMonth: '', contractEndDate: null, comment: 'Scheduled 1 of 4', source: 'manual' },
+    ]);
+    setDetailStored(true);
     setStatus({ coverage: { clientOnWithIngest: 0, clientOn: 3, jackOwnOnWithIngest: 0, jackOwnOn: 1, louise: 'not in this fixture' } });
-    setJrl({ status: 200, body: { entries: [], source: { connected: false, ledger: 'not_loaded' }, auth: { supabaseUser: false, ownerLink: false } } });
+    setJrl({ status: 200, body: { entries: exampleEntries(), source: { connected: true, ledger: 'readable' }, auth: { supabaseUser: true, ownerLink: true } } });
     setRunError('run_log_not_configured');
   }, [fixture]);
 
@@ -233,10 +239,12 @@ export default function App({ role, areas, client, fixture = false }) {
   const who = role === 'admin' ? 'Jack' : (client || role);
   const hello = greeting();
   const subtitle = area === 'jrl'
-    ? 'Personal pots and the ledger. A missing figure stays missing.'
+    ? 'Personal pots and the ledger. A gap stays a gap.'
     : area === 'automations'
-      ? 'Run coverage for this cockpit. Nothing here calls Zapier.'
-      : 'Forecast, income, and costs. The workbook is not read while this is open.';
+      ? 'What has run, and what has not posted yet.'
+      : tokiView === 'sources'
+        ? 'Retainers on the left, projects on the right.'
+        : 'Stay on top of the month, the year, and what is still missing.';
 
   return (
     <div className="jrl-root" data-theme={theme === 'dark' ? 'dark' : 'light'}>
@@ -287,22 +295,24 @@ export default function App({ role, areas, client, fixture = false }) {
                 </button>
               ))}
               {areas.includes('toki') && TOKI_VIEWS.map((view) => (
-                <button key={view.id} type="button" role="tab" aria-selected={area === 'toki' && tokiView === view.id} onClick={() => { setArea('toki'); setTokiView(view.id); }}>{view.label}</button>
+                <button key={view.id} type="button" role="tab" aria-label={view.label} aria-selected={area === 'toki' && tokiView === view.id} onClick={() => { setArea('toki'); setTokiView(view.id); }}>Money</button>
               ))}
             </div>
-            <div className="fx-theme">
-              <button type="button" aria-label="Light" aria-pressed={theme === 'light'} onClick={() => setThemeMode('light')}><SunIcon /></button>
-              <button type="button" aria-label="Dark" aria-pressed={theme === 'dark'} onClick={() => setThemeMode('dark')}><MoonIcon /></button>
-            </div>
-            <button type="button" className="fx-signout" aria-label="Sign out" onClick={onSignOut}><LogoutIcon /></button>
-            <div className="fx-user">
-              <span className="fx-avatar" aria-hidden="true">{String(who).slice(0, 1)}</span>
-              <span className="fx-user-text">
-                <b>{who}</b>
-                <span>{client || role}</span>
-              </span>
-              <ChevronIcon />
-            </div>
+            <details className="fx-user">
+              <summary>
+                <span className="fx-avatar" aria-hidden="true">{String(who).slice(0, 1)}</span>
+                <span className="fx-user-text">
+                  <b>{who}</b>
+                  <span>{client || role}</span>
+                </span>
+                <ChevronIcon />
+              </summary>
+              <div className="fx-menu">
+                <button type="button" onClick={() => setThemeMode('light')}>Light</button>
+                <button type="button" onClick={() => setThemeMode('dark')}>Dark</button>
+                <button type="button" onClick={onSignOut}>Sign out</button>
+              </div>
+            </details>
           </header>
           <div className="fx-greet">
             <h1>{hello}, {who}</h1>
@@ -312,7 +322,7 @@ export default function App({ role, areas, client, fixture = false }) {
             {area === 'toki' && <TokiScreen baseline={baseline} actuals={actuals} evidence={evidence} plan={plan} planNote={planNote} onSave={onSave} onRemove={onRemove} formError={formError} forecastError={forecastError} section={tokiView} onSection={setTokiView} details={details} detailStored={detailStored} onSaveDetail={onSaveDetail} onRemoveDetail={onRemoveDetail} />}
             {area === 'automations' && (
               <>
-                <AutomationsScreen board={runBoard} error={runError} />
+                <AutomationsScreen example={fixture} board={runBoard} error={runError} />
                 {status?.coverage && <p className="caveat">The ingest alias was not called. The last export snapshot recorded {status.coverage.clientOnWithIngest} of {status.coverage.clientOn} client workflows on, and {status.coverage.jackOwnOnWithIngest} of {status.coverage.jackOwnOn} on Jack’s own account. Louise was {status.coverage.louise}.</p>}
               </>
             )}
