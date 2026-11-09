@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { formatPounds } from '../../../lib/money';
 import { deriveLedger } from '../../../lib/jrl/finance';
 import { incomeBreakdown, workingMonthLines, sumLines } from '../../../lib/planning/entries';
@@ -27,10 +27,17 @@ function hoursLabel(hours) {
 }
 
 function Tile({ label, value, onClick }) {
+  const valueRef = useRef(null);
+  useLayoutEffect(() => {
+    const node = valueRef.current;
+    if (!node) return undefined;
+    node.style.fontSize = '17px';
+    return undefined;
+  }, [value]);
   return (
     <button type="button" className="ov-tile" title={String(value)} onClick={onClick}>
       <span>{label}</span>
-      <b className={value === '—' ? 'num no-data' : 'num'}>{value}</b>
+      <b ref={valueRef} className={value === '—' ? 'num no-data' : 'num'}>{value}</b>
     </button>
   );
 }
@@ -103,7 +110,7 @@ function IncomeChart({ series, details, onOpen }) {
                   <i data-bar="actual" data-state={month.actual == null ? 'missing' : (month.actual === 0 ? 'zero' : 'value')} style={month.actual ? { height: '100%' } : undefined} />
                 </button>
               </span>
-              <span className="ov-x">{month.label}</span>
+              <span className="ov-x" data-letter={month.label.slice(0, 1)}>{month.label.slice(0, 3)}</span>
             </div>
           ))}
         </div>
@@ -258,7 +265,7 @@ export function OverviewScreen({ forecast, plan = [], actuals = null, details = 
             </button>
           )) : <p className="no-data">None in the next 3 months.</p>}
         </section>
-        <div className="ov-tiles ov-tiles-3">
+        <div className="ov-tiles ov-tiles-2">
           <Tile label="Costs" value={costs == null ? '—' : formatPounds(costs)} onClick={() => openToki({ month, board: 'groups', detail: { title: 'Costs', fields: [{ label: 'Month', value: month }, { label: 'Costs', value: costs == null ? '—' : formatPounds(costs) }] } })} />
           <Tile label="Profit" value={income == null || costs == null ? '—' : formatPounds(income - costs)} onClick={() => openToki({ month, detail: { title: 'Profit', fields: [{ label: 'Month', value: month }, { label: 'Profit', value: income == null || costs == null ? '—' : formatPounds(income - costs) }] } })} />
           <Tile label="Year to date" value={ytd ? formatPounds(ytd) : '—'} onClick={() => openToki({ board: 'year' })} />
