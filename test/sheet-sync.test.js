@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { decideSheetWrite, findForecastInput, isInputCell } = require('../lib/forecast/sheetSync');
-const { applyLiveRead, baselineSourceHash, readForecastSheet, refreshStoredBaseline } = require('../lib/forecast/liveSheet');
+const { applyLiveRead, attachSheetText, baselineSourceHash, readForecastSheet, refreshStoredBaseline } = require('../lib/forecast/liveSheet');
 const { sourceHash } = require('../lib/forecast/import');
 const { forecastBaselineRow } = require('../lib/store');
 const { pushForecastValue } = require('../lib/forecast/pushSheet');
@@ -214,7 +214,7 @@ test('a live read keeps entered text and includes Jack Salary and Target', async
   const next = refreshStoredBaseline(stored, live);
   assert.equal(next.length, 26);
   assert.equal(next[0].displayed, '£3,000.00');
-  assert.deepEqual(next[0].userEntered, { stringValue: '3000' });
+  assert.deepEqual(next[0].userEntered, { numberValue: '3000' });
   assert.equal(next.slice(1).every((cell) => cell.userEntered.numberValue === 1 && cell.displayed === '£1.00'), true);
   assert.equal(next.filter((cell) => cell.label === 'Jack Salary').every((cell) => cell.enteredMinor === 300000), true);
   assert.equal(next.filter((cell) => cell.label === 'Target').every((cell) => cell.enteredMinor === 500000), true);
@@ -235,7 +235,7 @@ test('a live read keeps entered text and includes Jack Salary and Target', async
   assert.equal(unchanged[0].sourceHash, kept.sourceHash);
   assert.equal(baselineSourceHash(unchanged[0]), kept.sourceHash);
   const written = forecastBaselineRow(changed, 'hash');
-  assert.deepEqual(written.user_entered, { stringValue: '3000' });
+  assert.deepEqual(written.user_entered, { numberValue: '3000' });
   assert.equal(written.displayed, '£3,000.00');
   const untouched = forecastBaselineRow({ ...changed, userEntered: undefined, displayed: undefined }, 'hash');
   assert.equal(Object.hasOwn(untouched, 'user_entered'), false);
@@ -248,6 +248,88 @@ test('a live read keeps entered text and includes Jack Salary and Target', async
   });
   assert.equal(recorded.sheetRuntime, true);
   assert.equal(recorded.cells.length, 26);
+});
+
+test('an unchanged sheet rewrites no stored column', () => {
+  const make = (overrides) => {
+    const cell = {
+      id: 'baseline:sheet:1455407915:B10:2026-11-01',
+      spreadsheetId: 'sheet',
+      sheetId: 1455407915,
+      sourceCell: 'B10',
+      rowNumber: 10,
+      label: 'Retained Clients',
+      kind: 'revenue',
+      period: '2026-11-01',
+      cellState: 'value',
+      nullState: 'amount',
+      enteredMinor: 1500,
+      amountMinor: 1500,
+      effectiveMinor: 1500,
+      userEntered: { numberValue: '15' },
+      displayed: '£15.00',
+      currency: 'GBP',
+      groupId: 'clients',
+      ...overrides,
+    };
+    cell.sourceHash = baselineSourceHash(cell);
+    return cell;
+  };
+  const stored = [
+    make({}),
+    make({
+      id: 'baseline:sheet:1455407915:B11:2026-11-01',
+      sourceCell: 'B11',
+      rowNumber: 11,
+      label: 'Project Work',
+      enteredMinor: 0,
+      amountMinor: 0,
+      effectiveMinor: 0,
+      cellState: 'zero',
+      nullState: 'zero',
+      userEntered: { numberValue: '0' },
+      displayed: '£0.00',
+    }),
+    make({
+      id: 'baseline:sheet:1455407915:B12:2026-11-01',
+      sourceCell: 'B12',
+      rowNumber: 12,
+      label: 'Other',
+      kind: 'cost',
+      enteredMinor: null,
+      amountMinor: null,
+      effectiveMinor: null,
+      cellState: 'blank',
+      nullState: 'blank',
+      userEntered: null,
+      displayed: null,
+    }),
+  ];
+  const live = stored.map((cell) => ({
+    ...cell,
+    userEntered: cell.userEntered?.numberValue != null ? { stringValue: String(cell.userEntered.numberValue) } : { stringValue: '' },
+    displayed: cell.displayed,
+  }));
+  const next = refreshStoredBaseline(stored, live);
+  const columns = ['id', 'spreadsheetId', 'sheetId', 'sourceCell', 'rowNumber', 'label', 'period', 'cellState', 'enteredMinor', 'amountMinor', 'userEntered', 'displayed', 'sourceHash', 'currency', 'groupId'];
+  assert.equal(next.length, stored.length);
+  next.forEach((cell, index) => {
+    assert.equal(cell, stored[index]);
+    columns.forEach((key) => assert.deepEqual(cell[key], stored[index][key]));
+    assert.deepEqual(forecastBaselineRow(cell, 'snap'), forecastBaselineRow(stored[index], 'snap'));
+  });
+  const gridCell = { sourceCell: 'B10', label: 'Retained Clients', kind: 'revenue', period: '2026-11-01', enteredMinor: 2000 };
+  const formatted = Array.from({ length: 10 }, () => []);
+  const entered = Array.from({ length: 10 }, () => []);
+  formatted[9][1] = '£20.00';
+  entered[9][1] = 20;
+  attachSheetText([gridCell], formatted, entered);
+  assert.deepEqual(gridCell.userEntered, { numberValue: '20' });
+  const changed = refreshStoredBaseline([stored[0]], [{ ...gridCell, rowNumber: 10, month: '2026-11' }]);
+  assert.notEqual(changed[0], stored[0]);
+  assert.deepEqual(changed[0].userEntered, { numberValue: '20' });
+  assert.equal(changed[0].displayed, '£20.00');
+  assert.equal(changed[0].enteredMinor, 2000);
 });
 
 test('an automatic task hides for this period and returns next period', () => {
