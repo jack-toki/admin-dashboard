@@ -3,10 +3,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { deriveLedger, ENTRY_FIELDS } from '../../../lib/jrl/finance';
 import { monthWindow } from '../../../lib/jrl/months';
 import { personalMonthlyPlan } from '../../../lib/jrl/targets';
-import { performance, projection, BENCHMARK_RATE } from '../../../vendor/jrl-finance/code/lib/finance.ts';
+import { performance, BENCHMARK_RATE } from '../../../vendor/jrl-finance/code/lib/finance.ts';
 import { afford } from '../../../vendor/jrl-finance/code/lib/afford.ts';
 import { monthsToTarget, projectPath } from '../../../vendor/jrl-finance/code/lib/targets.ts';
-import { confirmDelete, dayGroup, filterConversations, pageConversations } from '../../../lib/jrl/sora';
+import { applyRange, forecastRate, forecastSeries, ledgerYears, stateAnnualRate, yearOverlay } from '../../../lib/jrl/chartRange';
 import { ComparisonBars, InteractiveSeriesChart } from './charts';
 import { PotCard } from './PotCard';
 import { Tile } from './TokiScreen';
@@ -19,14 +19,12 @@ const LINKS = [
   ['month', "This month's figures", 'Month'],
   ['targets', 'Targets', 'Targets'],
   ['spending', 'Spending', 'Spending'],
-  ['sora', 'Sora', 'Sora'],
 ];
 
 const EMPTY = {
   overview: 'Nothing here yet',
   targets: 'No targets yet',
   spending: 'Nothing logged this month',
-  sora: 'No conversations yet.',
 };
 
 export default function JrlScreen({ gate }) {
@@ -35,14 +33,9 @@ export default function JrlScreen({ gate }) {
   const [entries, setEntries] = useState([]);
   const [targets, setTargets] = useState([]);
   const [purchases, setPurchases] = useState([]);
-  const [conversations, setConversations] = useState([]);
   const [form, setForm] = useState({ tax_in: '', savings_in: '', hl_in: '', savings_out: '', hl_value: '' });
   const [period, setPeriod] = useState('');
   const [saveNote, setSaveNote] = useState('');
-  const [filter, setFilter] = useState('all');
-  const [cursor, setCursor] = useState(null);
-  const [openId, setOpenId] = useState('');
-  const [confirmId, setConfirmId] = useState('');
   const [price, setPrice] = useState('');
   const [budget, setBudget] = useState('');
   const [floor, setFloor] = useState('500');
@@ -74,7 +67,6 @@ export default function JrlScreen({ gate }) {
     setEntries(Array.isArray(gate?.body?.entries) ? gate.body.entries : []);
     setTargets([]);
     setPurchases([]);
-    setConversations([]);
   }, [gate]);
 
   function onTheme() {
@@ -131,7 +123,10 @@ export default function JrlScreen({ gate }) {
     return <p>This sign-in cannot open personal finances.</p>;
   }
 
-  const paged = pageConversations(filterConversations(conversations, filter), cursor);
+  async function clearConnection() {
+    await fetch('/api/cockpit/jrl/session', { method: 'DELETE', headers: { 'x-cockpit-link': '1' } });
+    window.location.assign('/cockpit#jrl');
+  }
 
   return (
     <>
@@ -139,6 +134,12 @@ export default function JrlScreen({ gate }) {
             {LINKS.map(([id, label]) => (
               <button key={id} type="button" className={section === id ? 'tgt-mode on' : 'tgt-mode'} onClick={() => setSection(id)}>{label}</button>
             ))}
+            {auth?.supabaseUser ? (
+              <details className="jrl-menu">
+                <summary>Ledger settings</summary>
+                <button type="button" onClick={clearConnection}>Clear stored connection</button>
+              </details>
+            ) : null}
           </div>
           {auth?.pinRequired ? (
             <form className="panel glass" onSubmit={async (event) => {
@@ -154,13 +155,7 @@ export default function JrlScreen({ gate }) {
               {saveNote ? <p className="entry-err">{saveNote}</p> : null}
               <button className="btn" type="submit">Open JRL</button>
             </form>
-          ) : (
-          <div className="nudge glass">
-              <span className="nudge-dot" />
-              <span>{auth?.supabaseUser ? `Opened from this cockpit sign-in. The ledger session expires ${auth.expiresAt ? new Date(auth.expiresAt).toLocaleString('en-GB') : 'on its own'}.` : 'Nothing is loaded from the ledger yet. A gap stays empty. No email code is requested.'}</span>
-              {auth?.supabaseUser ? <button type="button" className="nudge-btn" onClick={async () => { await fetch('/api/cockpit/jrl/session', { method: 'DELETE', headers: { 'x-cockpit-link': '1' } }); window.location.assign('/cockpit#jrl'); }}>Clear stored connection</button> : null}
-          </div>
-          )}
+          ) : null}
           {!auth?.pinRequired && section === 'overview' && !auth?.supabaseUser && (
             <section className="panel glass"><h2>Nothing here yet</h2><p className="sub">Pots and the ledger appear when the stored connection can read them. Missing months stay blank.</p></section>
           )}
@@ -177,9 +172,6 @@ export default function JrlScreen({ gate }) {
           {auth?.supabaseUser && section === 'spending' && (
             <Spending purchases={purchases} targets={targets} savings={latest?.savings_total || 0} price={price} setPrice={setPrice} budget={budget} setBudget={setBudget} floor={floor} setFloor={setFloor} savingsFirst={savingsFirst} setSavingsFirst={setSavingsFirst} />
           )}
-          {auth?.supabaseUser && section === 'sora' && (
-            <Sora rows={paged.page} filter={filter} setFilter={(value) => { setFilter(value); setCursor(null); }} next={paged.next} onMore={() => setCursor(paged.next)} openId={openId} setOpenId={setOpenId} confirmId={confirmId} setConfirmId={setConfirmId} onDelete={(id) => { if (confirmDelete(true).ok) setConversations((rows) => rows.filter((row) => row.id !== id)); }} />
-          )}
     </>
   );
 }
@@ -193,15 +185,29 @@ function money(value) {
 function Overview({ ledger, targets }) {
   const [focus, setFocus] = useState(null);
   const [detail, setDetail] = useState(null);
+  const [which, setWhich] = useState('latest');
+  const [range, setRange] = useState({ preset: 'all', year: new Date().getFullYear(), from: '', to: '' });
+  const [overlay, setOverlay] = useState(false);
+  const [layers, setLayers] = useState({ none: true, m200: false, m500: false, custom: false });
+  const [customMonthly, setCustomMonthly] = useState('100');
   const latest = ledger.at(-1);
   if (!latest) return <div className="panel glass"><h2>{EMPTY.overview}</h2><p className="sub">Five totals, targets, and the ledger appear when a Supabase user session can read them. Nothing here is filled with a made-up balance.</p></div>;
-  const previous = ledger.at(-2);
-  const cards = [
-    ['Net total', latest.net_total, true],
-    ['Chase balance', latest.chase_total, false],
-    ['Savings pot', latest.savings_total, false],
-    ['Tax pot', latest.tax_total, false],
-    ['HargLans ISA', latest.hl_contributed, false],
+  const shown = which === 'last' ? ledger.at(-2) : latest;
+  const previous = which === 'last' ? ledger.at(-3) : ledger.at(-2);
+  const view = applyRange(ledger, range, new Date());
+  const years = ledgerYears(ledger);
+  const cards = shown ? [
+    ['Net total', shown.net_total, true],
+    ['Chase balance', shown.chase_total, false],
+    ['Savings pot', shown.savings_total, false],
+    ['Tax pot', shown.tax_total, false],
+    ['HargLans ISA', shown.hl_contributed, false],
+  ] : [
+    ['Net total', null, true],
+    ['Chase balance', null, false],
+    ['Savings pot', null, false],
+    ['Tax pot', null, false],
+    ['HargLans ISA', null, false],
   ];
   const perf = performance(ledger.map((row) => ({
     period: row.period,
@@ -209,11 +215,16 @@ function Overview({ ledger, targets }) {
     hl_contributed: row.hl_contributed,
     hl_value: row.hl_chart_value ?? 0,
   })), BENCHMARK_RATE);
-  perf.earningsThisMonth = latest.hl_value == null ? null : latest.earned;
-  const chartValue = latest.hl_chart_value;
+  perf.earningsThisMonth = shown?.hl_value == null ? null : shown?.earned;
+  const chartValue = shown?.hl_chart_value;
   const icons = { 'Net total': 'net', 'Chase balance': 'chase', 'Savings pot': 'savings', 'Tax pot': 'tax', 'HargLans ISA': 'isa' };
   return (
     <div className="bento-contents">
+      <div className="jrl-figures" role="group" aria-label="Summary month">
+        <button type="button" aria-pressed={which === 'latest'} onClick={() => setWhich('latest')}>This month</button>
+        <button type="button" aria-pressed={which === 'last'} onClick={() => setWhich('last')}>Last month</button>
+        <span>{shown ? shown.period : 'No prior month'}</span>
+      </div>
       <div className="bento-stats">
         {cards.map(([label, value, hero]) => {
           const before = !previous ? null : label === 'Net total' ? previous.net_total : label === 'Chase balance' ? previous.chase_total : label === 'Savings pot' ? previous.savings_total : label === 'Tax pot' ? previous.tax_total : previous.hl_contributed;
@@ -224,7 +235,7 @@ function Overview({ ledger, targets }) {
       {targets.length > 0 && (
         <div className="tstrip">
           {targets.map((target) => {
-            const current = target.track === 'savings' ? latest.savings_total : target.track === 'tax' ? latest.tax_total : latest.net_total;
+            const current = target.track === 'savings' ? shown?.savings_total : target.track === 'tax' ? shown?.tax_total : shown?.net_total;
             const pct = target.target ? Math.round((current / target.target) * 100) : 0;
             return (
               <div key={target.id} className="tstrip-item glass">
@@ -239,25 +250,23 @@ function Overview({ ledger, targets }) {
         <section className="panel glass">
           <h2>Allocation</h2>
           <p className="sub">Savings, tax, and contributions. Market gain stays out.</p>
-          <Allocation row={latest} onOpen={(item) => setDetail({ title: item.label, fields: [{ label: 'Amount', value: money(item.value) }, { label: 'Note', value: item.status }] })} />
+          <Allocation row={shown || latest} onOpen={(item) => setDetail({ title: item.label, fields: [{ label: 'Amount', value: money(item.value) }, { label: 'Note', value: item.status }] })} />
         </section>
         <section className="panel glass">
           <h2>Growth</h2>
-          <Growth ledger={ledger} selectedId={focus || latest.period} onSelect={(id) => { setFocus(id); const row = ledger.find((item) => item.period === id); setDetail({ title: id, fields: row ? ledgerFields(row) : [] }); }} />
+          <ChartRange range={range} years={years} overlay={overlay} onRange={setRange} onOverlay={setOverlay} />
+          <Growth ledger={view.rows} overlay={overlay} selectedId={focus || shown?.period || latest.period} onSelect={(id) => { setFocus(id); const row = ledger.find((item) => item.period === id); setDetail({ title: id, fields: row ? ledgerFields(row) : [] }); }} />
           <p id="jrl-month-detail" aria-live="polite">Selected month {focus || latest.period}. Earnings stay unknown when that month has no fresh reading.</p>
         </section>
       </div>
       <section className="panel glass gap section-wide">
         <h2>HargLans ISA</h2>
         <div className="perf">
-          <div className="mini"><div className="k">{latest.hl_carried ? 'Value carried forward' : 'Portfolio value'}</div><div className="v">{money(chartValue)}</div></div>
-          <div className="mini"><div className="k">Earned this month</div><div className="v">{money(perf.earningsThisMonth)}</div></div>
-          <div className="mini"><div className="k">Gain so far</div><div className="v">{money(latest.gain)}</div></div>
+          <div className="mini"><div className="k">{shown?.hl_carried ? 'Value carried forward' : 'Portfolio value'}</div><div className="v">{money(chartValue)}</div></div>
+          <div className="mini"><div className="k">{which === 'last' ? 'Earned that month' : 'Earned this month'}</div><div className="v">{money(perf.earningsThisMonth)}</div></div>
+          <div className="mini"><div className="k">Gain so far</div><div className="v">{money(shown?.gain)}</div></div>
         </div>
-        {perf.verdict ? <div className="verdict-row"><span className={perf.verdict === 'lagging' ? 'badge bad' : 'badge'}>{perf.verdict}</span><span>{ledger.length < 12 ? 'Under 12 months, the money-weighted figure swings.' : `${perf.gapPP?.toFixed(1)} points versus 7%.`} No new money in the projection.</span></div> : <p className="caveat">No money-weighted return until there is a real reading. A missing value is not zero.</p>}
-        {(chartValue == null ? [] : projection(chartValue)).slice(0, 4).map((row) => (
-          <div key={row.years} className="prow"><span className="yr">{row.years}y</span><span className="bar"><i style={{ width: '100%' }} /></span><span className="amt">{money(row.value)}</span></div>
-        ))}
+        <Forecast ledger={view.rows} layers={layers} setLayers={setLayers} customMonthly={customMonthly} setCustomMonthly={setCustomMonthly} />
       </section>
       <section className="ledger glass gap bento-table">
         <div className="ledger-head"><h2>Ledger</h2></div>
@@ -316,8 +325,33 @@ function Allocation({ row, onOpen }) {
   );
 }
 
-function Growth({ ledger, selectedId, onSelect }) {
-  const points = ledger.map((row) => ({ id: row.period, label: row.period }));
+function ChartRange({ range, years, overlay, onRange, onOverlay }) {
+  const year = Number(range.year) || new Date().getFullYear();
+  return (
+    <div className="jrl-range">
+      <div className="jrl-presets" role="group" aria-label="Chart dates">
+        <button type="button" aria-pressed={range.preset === 'all'} onClick={() => onRange({ ...range, preset: 'all', from: '', to: '' })}>All time</button>
+        <button type="button" aria-pressed={range.preset === 'year'} onClick={() => onRange({ ...range, preset: 'year', year })}>This year</button>
+        <label>Year <select aria-label="Year" value={year} onChange={(event) => onRange({ ...range, preset: 'year', year: Number(event.target.value) })}>{(years.length ? years : [year]).map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+        <button type="button" aria-pressed={range.preset === 'last'} onClick={() => onRange({ ...range, preset: 'last' })}>Last month</button>
+        <button type="button" aria-pressed={overlay} onClick={() => onOverlay(!overlay)}>Year overlay</button>
+      </div>
+      <div className="jrl-presets">
+        <label>From <input aria-label="From month" type="month" value={range.from || ''} onChange={(event) => onRange({ ...range, preset: 'custom', from: event.target.value })} /></label>
+        <label>To <input aria-label="To month" type="month" value={range.to || ''} onChange={(event) => onRange({ ...range, preset: 'custom', to: event.target.value })} /></label>
+      </div>
+    </div>
+  );
+}
+
+function Growth({ ledger, overlay, selectedId, onSelect }) {
+  const overlaid = overlay ? yearOverlay(ledger, (row) => row.chase_total) : null;
+  const points = overlaid ? overlaid.points : ledger.map((row) => ({ id: row.period, label: row.period.slice(0, 7) }));
+  const series = overlaid ? overlaid.series.map((item, index) => ({ ...item, opacity: Math.max(0.35, 1 - index * 0.18) })) : [
+    { id: 'chase', label: 'Chase', kind: 'history', values: ledger.map((row) => ({ id: row.period, value: row.chase_total, status: 'Derived from savings plus tax.' })) },
+    { id: 'contrib', label: 'Contributions', kind: 'history', opacity: 0.55, values: ledger.map((row) => ({ id: row.period, value: row.hl_contributed, status: 'Contributions, not market value.' })) },
+    { id: 'value', label: 'Portfolio value', kind: 'history', opacity: 0.35, values: ledger.map((row) => ({ id: row.period, value: row.hl_chart_value, status: row.hl_value == null ? 'Carried or not supplied. Gain unknown.' : 'Supplied reading.' })) },
+  ];
   return (
     <InteractiveSeriesChart
       name="growth"
@@ -325,13 +359,56 @@ function Growth({ ledger, selectedId, onSelect }) {
       selectedId={selectedId}
       onSelect={onSelect}
       format={money}
-      caption="Chase and contributions come from the saved flows. A carried portfolio value is not a new gain."
-      series={[
-        { id: 'chase', label: 'Chase', color: 'var(--ink)', values: ledger.map((row) => ({ id: row.period, value: row.chase_total, status: 'Derived from savings plus tax.' })) },
-        { id: 'contrib', label: 'Contributions', color: 'var(--c1)', values: ledger.map((row) => ({ id: row.period, value: row.hl_contributed, status: 'Contributions, not market value.' })) },
-        { id: 'value', label: 'Portfolio value', color: 'var(--pos)', values: ledger.map((row) => ({ id: row.period, value: row.hl_chart_value, status: row.hl_value == null ? 'Carried or not supplied. Gain unknown.' : 'Supplied reading.' })) },
-      ]}
+      xTitle={overlay ? 'Month' : 'Month'}
+      yTitle="£"
+      caption={overlay ? 'Each line is one year of Chase, January to December. The saved months stay in the ledger.' : 'Chase and contributions come from the saved flows. A carried portfolio value is not a new gain.'}
+      series={series}
     />
+  );
+}
+
+function Forecast({ ledger, layers, setLayers, customMonthly, setCustomMonthly }) {
+  const history = ledger.filter((row) => row.hl_chart_value != null).map((row) => ({ id: row.period, label: row.period.slice(0, 7), value: row.hl_chart_value }));
+  const current = history.at(-1)?.value ?? null;
+  const contributed = ledger.at(-1)?.hl_contributed;
+  const tracked = stateAnnualRate({ current, contributed, months: ledger.length });
+  const chosen = forecastRate(tracked, ledger.length);
+  const rate = chosen.rate;
+  const chart = forecastSeries({
+    history,
+    current,
+    annualRate: rate,
+    monthsOfHistory: ledger.length,
+    overlays: [
+      { id: 'none', label: 'No new money', monthly: 0, on: layers.none },
+      { id: 'm200', label: '+£200/month', monthly: 200, on: layers.m200 },
+      { id: 'm500', label: '+£500/month', monthly: 500, on: layers.m500 },
+      { id: 'custom', label: `+£${Number(customMonthly) || 0}/month`, monthly: Number(customMonthly) || 0, on: layers.custom },
+    ],
+  });
+  function toggle(id) {
+    setLayers((currentLayers) => ({ ...currentLayers, [id]: !currentLayers[id] }));
+  }
+  return (
+    <div className="jrl-forecast">
+      <div className="jrl-presets" role="group" aria-label="Forecast overlays">
+        <button type="button" aria-pressed={layers.none} onClick={() => toggle('none')}>No new money</button>
+        <button type="button" aria-pressed={layers.m200} onClick={() => toggle('m200')}>+£200/month</button>
+        <button type="button" aria-pressed={layers.m500} onClick={() => toggle('m500')}>+£500/month</button>
+        <button type="button" aria-pressed={layers.custom} onClick={() => toggle('custom')}>Custom</button>
+        <label>Monthly <input aria-label="Custom monthly amount" inputMode="decimal" value={customMonthly} onChange={(event) => setCustomMonthly(event.target.value)} /></label>
+      </div>
+      {chosen.benchmark ? <p className="caveat">Under 12 months, the money-weighted figure swings. Forecasts use 7% until there is a year of readings.</p> : <p className="caveat">Forecasts use the tracked state rate ({((rate || 0) * 100).toFixed(1)}% a year). Orange lines are forecasts.</p>}
+      <InteractiveSeriesChart
+        name="forecast"
+        points={chart.points}
+        series={chart.series.map((item) => ({ ...item, color: item.kind === 'forecast' ? 'var(--orange)' : undefined }))}
+        format={money}
+        xTitle="Years"
+        yTitle="£"
+        caption="Tracked history stays. Forecasts start from the latest reading."
+      />
+    </div>
   );
 }
 
@@ -452,42 +529,6 @@ function Spending({ purchases, targets, savings, price, setPrice, budget, setBud
           </tbody>
         </table>
       </div>
-    </section>
-  );
-}
-
-function Sora({ rows, filter, setFilter, next, onMore, openId, setOpenId, confirmId, setConfirmId, onDelete }) {
-  return (
-    <section className="ledger glass">
-      <div className="sora-head ledger-head"><div><h2>Sora</h2><p className="sub">Every ask, and what she did</p></div></div>
-      <div className="sora-filters">
-        {[['all', 'All'], ['actions', 'With actions'], ['alerts', 'Alerts'], ['failed', 'Failed']].map(([id, label]) => (
-          <button key={id} type="button" className={filter === id ? 'tgt-mode on' : 'tgt-mode'} onClick={() => setFilter(id)}>{label}</button>
-        ))}
-      </div>
-      {!rows.length ? <p className="sub" style={{ padding: '0 20px 16px' }}>{EMPTY.sora}</p> : rows.map((row) => (
-        <article key={row.id} className={openId === row.id ? 'sora-ask open' : 'sora-ask'}>
-          <div className="sora-day">{dayGroup(row.started_at)}</div>
-          <button type="button" className="sora-row" onClick={() => setOpenId(openId === row.id ? '' : row.id)}>
-            <span className="sora-time">{row.started_at.slice(11, 16)}</span>
-            <span className="sora-sum">{row.summary}</span>
-            {row.actions.some((action) => action.ok === false) ? <span className="sora-fail" aria-label="Failed action" /> : null}
-          </button>
-          {openId === row.id && (
-            <div className="sora-body">
-              <div className="sora-chat">
-                {row.transcript.map((line, index) => <div key={index} className={`sora-line ${line.role}`}><p>{line.text}</p></div>)}
-              </div>
-              <ul className="sora-actions">{row.actions.map((action) => <li key={action.label} className="sora-act">{action.label}{action.ok ? '' : ' · failed'}</li>)}</ul>
-              <div className="sora-del">
-                {confirmId === row.id ? <button type="button" className="btn" onClick={() => onDelete(row.id)}>Delete this conversation</button> : <button type="button" className="sora-del-link" onClick={() => setConfirmId(row.id)}>Delete</button>}
-              </div>
-            </div>
-          )}
-        </article>
-      ))}
-      {next ? <div className="sora-more"><button type="button" className="nudge-btn" onClick={onMore}>Load more</button></div> : null}
-      <p className="foot-note">There is no composer on this page. Load more uses the signed-in Supabase session when that session exists. This list is empty without it.</p>
     </section>
   );
 }

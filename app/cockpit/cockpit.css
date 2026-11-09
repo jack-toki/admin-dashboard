@@ -65,7 +65,29 @@
 .chart-plot { position: relative; }
 .chart-svg { width: 100%; height: auto; display: block; }
 .chart-hit { cursor: pointer; }
-.chart-tip { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: var(--tip); color: var(--ink); border: .5px solid var(--hair); font-size: .86rem; }
+.chart-tip { position: absolute; z-index: 6; margin: 0; max-width: 240px; padding: 8px 10px; border-radius: 10px; background: var(--tip, var(--surface)); color: var(--ink); border: .5px solid var(--hair); font-size: .92rem; line-height: 1.35; white-space: pre-line; pointer-events: none; box-shadow: 0 8px 22px rgba(0,0,0,.16); }
+.chart-axis { fill: var(--muted); font-size: 12px; }
+.chart-grid { stroke: rgba(23,23,23,.12); stroke-width: 1; }
+.jrl-root[data-theme="dark"] .chart-grid { stroke: rgba(255,255,255,.12); }
+.chart-card[data-chart="growth"] svg,
+.chart-card[data-chart="forecast"] svg { max-height: 168px; }
+.jrl-forecast { max-width: 640px; }
+.jrl-range, .jrl-figures, .jrl-presets { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.jrl-figures { margin: 0 0 8px; }
+.jrl-figures button, .jrl-presets button, .jrl-menu summary {
+  border: 0; background: var(--control); color: var(--ink); border-radius: 999px; min-height: 34px; padding: 0 12px; font: inherit; cursor: pointer;
+}
+.jrl-figures button[aria-pressed="true"], .jrl-presets button[aria-pressed="true"] { background: #171717; color: #fff; }
+.jrl-forecast .jrl-presets button[aria-pressed="true"] { background: var(--orange); color: #fff; }
+.jrl-root[data-theme="dark"] .jrl-figures button[aria-pressed="true"],
+.jrl-root[data-theme="dark"] .jrl-presets button[aria-pressed="true"] { background: #f4f4f4; color: #111; }
+.jrl-root[data-theme="dark"] .jrl-forecast .jrl-presets button[aria-pressed="true"] { background: var(--orange); color: #fff; }
+.jrl-presets label, .jrl-figures span { color: var(--muted); font-size: .92rem; display: inline-flex; align-items: center; gap: 6px; }
+.jrl-presets input, .jrl-presets select { font: inherit; color: var(--ink); background: var(--control); border: 0; border-radius: 8px; min-height: 34px; padding: 0 8px; }
+.jrl-menu { margin-left: auto; }
+.jrl-menu summary { list-style: none; }
+.jrl-menu button { display: block; width: 100%; text-align: left; border: 0; background: var(--surface); color: var(--ink); font: inherit; padding: 8px 10px; cursor: pointer; }
+.chart-card .chart-hit { fill: transparent !important; stroke: none !important; }
 .chart-key { display: inline-flex; align-items: center; gap: 7px; background: none; border: 0; color: var(--muted); font: inherit; cursor: pointer; }
 .chart-key[aria-pressed="false"] { opacity: .45; text-decoration: line-through; }
 .chart-key i { width: 20px; height: 3px; border-radius: 2px; display: inline-block; }
@@ -826,11 +848,13 @@ button.quick-card { cursor: pointer; }
 .col-slot[aria-pressed="true"] i[data-bar="project"][data-state="value"] {
   background: repeating-linear-gradient(-45deg, var(--orange) 0 3px, rgba(255,255,255,.5) 3px 5px) !important;
 }
-.chart-card polyline { stroke: #171717 !important; }
-.chart-card circle { fill: #171717 !important; }
-.jrl-root[data-theme="dark"] .chart-card polyline { stroke: #f4f4f4 !important; }
-.jrl-root[data-theme="dark"] .chart-card circle { fill: #f4f4f4 !important; }
-.chart-card g:hover polyline, .chart-card g:hover circle { stroke: var(--orange) !important; fill: var(--orange) !important; }
+.chart-card polyline:not([data-kind="forecast"]) { stroke: #171717 !important; }
+.chart-card circle:not(.chart-hit):not([data-kind="forecast"]) { fill: #171717 !important; }
+.chart-card polyline[data-kind="forecast"] { stroke: var(--orange) !important; }
+.chart-card circle[data-kind="forecast"] { fill: var(--orange) !important; }
+.jrl-root[data-theme="dark"] .chart-card polyline:not([data-kind="forecast"]) { stroke: #f4f4f4 !important; }
+.jrl-root[data-theme="dark"] .chart-card circle:not(.chart-hit):not([data-kind="forecast"]) { fill: #f4f4f4 !important; }
+.chart-card g:hover polyline:not([data-kind="forecast"]), .chart-card g:hover circle:not(.chart-hit):not([data-kind="forecast"]) { stroke: var(--orange) !important; fill: var(--orange) !important; }
 .chart-key i.swatch-retainer { width: 10px; height: 10px; border-radius: 2px; background: #171717 !important; }
 .jrl-root[data-theme="dark"] .chart-key i.swatch-retainer { background: #f4f4f4 !important; }
 .chart-key i.swatch-project { width: 10px; height: 10px; border-radius: 2px; background: repeating-linear-gradient(-45deg, #171717 0 2px, rgba(255,255,255,.55) 2px 4px) !important; }
