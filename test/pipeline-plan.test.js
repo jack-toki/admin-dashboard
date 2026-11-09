@@ -100,6 +100,8 @@ test('the forecast stack uses section headers for actual and potential', () => {
   const january = stack.months[1];
   assert.equal(january.segments.find((segment) => segment.id === 'potential-10').clients[0].name, 'Enquiry Co');
   assert.equal(january.segments.find((segment) => segment.id === 'potential-75').minor, 0);
+  assert.equal(stack.segments.find((segment) => segment.id === 'potential-75').legend, 'Potential 75% (High side, waiting for approval)');
+  assert.equal(stack.segments.find((segment) => segment.id === 'potential-75').legend.includes('Potential · 75% ·'), false);
   const screen = fs.readFileSync(path.join(__dirname, '../app/cockpit/ui/ForecastScreen.js'), 'utf8');
   assert.match(screen, /pipelineStack/);
   assert.match(screen, /fs-seg/);

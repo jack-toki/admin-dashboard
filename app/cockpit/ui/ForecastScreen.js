@@ -46,7 +46,7 @@ function PlanChart({ stack }) {
         {keys.map((item) => (
           <button key={item.id} type="button" className="chart-key" aria-pressed={!hidden[item.id]} title={item.sheet || item.label} onClick={() => setHidden((current) => ({ ...current, [item.id]: !current[item.id] }))}>
             <i data-seg={item.id} />
-            {item.label}{item.sheet && !item.label.includes(item.sheet) ? ` · ${item.sheet}` : ''}
+            {item.legend || item.label}
           </button>
         ))}
       </div>

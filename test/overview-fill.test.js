@@ -92,7 +92,10 @@ test('overview loads JRL and Automations on mount and paints client bars', () =>
   assert.match(app, /runsLoading=\{runsLoading\}/);
   assert.match(screen, /Loading client time/);
   assert.match(screen, /spark empty ov-spark/);
-  assert.match(css, /\.overview-card \.ov-client i\[data-state="value"\] \{ background: #171717; \}/);
+  assert.match(css, /\.overview-card \.ov-client i\[data-state="value"\] \{ background: var\(--series-retainer\); \}/);
+  assert.match(css, /--chart-burgundy:\s*#3C0016/);
+  assert.match(css, /--chart-red:\s*#F92424/);
+  assert.match(css, /--chart-sand:\s*#D1C0A5/);
   assert.match(css, /\.overview-card \.ov-spark \{ flex: 0 0 120px; height: 120px;/);
   assert.match(css, /\.ov-tile b \{[^}]*font-size: 17px/);
   assert.match(css, /\.overview-card \.ov-income \.ov-x \{[^}]*font-size: 12px/);

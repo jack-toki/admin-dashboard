@@ -317,9 +317,9 @@ function Allocation({ row, onOpen }) {
       format={money}
       caption="Savings, tax, and contributions. Portfolio value is not in this comparison."
       items={[
-        { id: 'savings', label: 'Savings pot', value: row.savings_total, color: 'var(--pos)', status: 'Pot from flows. Not market value.' },
-        { id: 'tax', label: 'Tax pot', value: row.tax_total, color: 'var(--c1)', status: 'Pot from flows. Not market value.' },
-        { id: 'hl', label: 'HargLans contributions', value: row.hl_contributed, color: 'var(--ink)', status: 'Contributions, not portfolio value.' },
+        { id: 'savings', label: 'Savings pot', value: row.savings_total, color: 'var(--chart-burgundy-100)', status: 'Pot from flows. Not market value.' },
+        { id: 'tax', label: 'Tax pot', value: row.tax_total, color: 'var(--chart-red-100)', status: 'Pot from flows. Not market value.' },
+        { id: 'hl', label: 'HargLans contributions', value: row.hl_contributed, color: 'var(--chart-sand-100)', status: 'Contributions, not portfolio value.' },
       ]}
     />
   );
@@ -398,11 +398,11 @@ function Forecast({ ledger, layers, setLayers, customMonthly, setCustomMonthly }
         <button type="button" aria-pressed={layers.custom} onClick={() => toggle('custom')}>Custom</button>
         <label>Monthly <input aria-label="Custom monthly amount" inputMode="decimal" value={customMonthly} onChange={(event) => setCustomMonthly(event.target.value)} /></label>
       </div>
-      {chosen.benchmark ? <p className="caveat">Under 12 months, the money-weighted figure swings. Forecasts use 7% until there is a year of readings.</p> : <p className="caveat">Forecasts use the tracked state rate ({((rate || 0) * 100).toFixed(1)}% a year). Orange lines are forecasts.</p>}
+      {chosen.benchmark ? <p className="caveat">Under 12 months, the money-weighted figure swings. Forecasts use 7% until there is a year of readings.</p> : <p className="caveat">Forecasts use the tracked state rate ({((rate || 0) * 100).toFixed(1)}% a year). Red and sand lines are forecasts.</p>}
       <InteractiveSeriesChart
         name="forecast"
         points={chart.points}
-        series={chart.series.map((item) => ({ ...item, color: item.kind === 'forecast' ? 'var(--orange)' : undefined }))}
+        series={chart.series.map((item, index) => ({ ...item, color: item.kind === 'forecast' ? ['var(--chart-red-100)', 'var(--chart-red-60)', 'var(--chart-sand-100)', 'var(--chart-sand-50)'][index % 4] : 'var(--chart-burgundy-100)' }))}
         format={money}
         xTitle="Years"
         yTitle="£"
