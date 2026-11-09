@@ -4,7 +4,7 @@ import { validateEntry } from '../../../lib/planning/entries';
 import { TokiScreen, AutomationsScreen } from './TokiScreen';
 import { OverviewScreen } from './OverviewScreen';
 import { ForecastScreen } from './ForecastScreen';
-import { deriveAutoTasks } from '../../../lib/planning/autoTasks';
+import { INITIAL_TOKI_MONTH, deriveAutoTasks, forecastCellsFromRows } from '../../../lib/planning/autoTasks';
 import JrlScreen from './JrlScreen';
 import { readCollapsed, toggleCollapsed, visibleNav, NAV_STORAGE_KEY, TOKI_VIEWS } from '../../../lib/nav/sidebar';
 import { readTheme, writeTheme } from '../../../lib/theme';
@@ -433,7 +433,7 @@ export default function App({ role, areas, client, fixture = false }) {
             <p>{subtitle}</p>
           </div>
           <main className="main">
-            {area === 'overview' && <OverviewScreen forecast={storedForecast} plan={plan} actuals={actuals} details={details} jrl={jrl} jrlLoading={jrlLoading} runs={runBoard} runsLoading={runsLoading} outstanding={outstanding} auto={deriveAutoTasks({ period: new Date().toISOString().slice(0, 7), cells: (storedForecast?.rows || []).flatMap((row) => Object.entries(row.cells || {}).map(([key, cell]) => ({ label: row.label, kind: row.kind, rowNumber: row.rowNumber, month: key, enteredMinor: cell.blank ? null : cell.minor, nullState: cell.blank ? 'blank' : 'amount' }))), details, entries: jrlLoading ? null : (jrl?.body?.entries || []), posts: runsLoading ? null : (runBoard?.posts ?? null), dismissals })} onOpen={openSpace} />}
+            {area === 'overview' && <OverviewScreen forecast={storedForecast} plan={plan} actuals={actuals} details={details} jrl={jrl} jrlLoading={jrlLoading} runs={runBoard} runsLoading={runsLoading} outstanding={outstanding} auto={deriveAutoTasks({ period: INITIAL_TOKI_MONTH, cells: forecastCellsFromRows(storedForecast?.rows), details, entries: jrlLoading ? null : (jrl?.body?.entries || []), posts: runsLoading ? null : (runBoard?.posts ?? null), dismissals })} onOpen={openSpace} />}
             {area === 'forecast' && <ForecastScreen />}
             {area === 'toki' && <TokiScreen baseline={baseline} actuals={actuals} evidence={evidence} plan={plan} planNote={planNote} onSave={onSave} onRemove={onRemove} formError={formError} forecastError={forecastError} section={tokiView} onSection={setTokiView} details={details} detailStored={detailStored} onSaveDetail={onSaveDetail} onRemoveDetail={onRemoveDetail} outstanding={outstanding} outstandingStored={outstandingStored} onAddOutstanding={onAddOutstanding} onCompleteOutstanding={onCompleteOutstanding} jrlEntries={jrl?.body?.entries || []} automationPosts={runBoard?.posts ?? null} dismissals={dismissals} onDismissAuto={onDismissAuto} focus={focus} onFocusApplied={() => setFocus(null)} />}
             {area === 'automations' && (

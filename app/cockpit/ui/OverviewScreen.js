@@ -5,6 +5,7 @@ import { formatPounds } from '../../../lib/money';
 import { deriveLedger } from '../../../lib/jrl/finance';
 import { incomeBreakdown, workingMonthLines, sumLines } from '../../../lib/planning/entries';
 import { savingsFromZaps } from '../../../lib/automations/savings';
+import { openOutstandingItems } from '../../../lib/planning/autoTasks';
 import {
   clientSavings,
   hourTicks,
@@ -229,7 +230,7 @@ export function OverviewScreen({ forecast, plan = [], actuals = null, details = 
   const jrlPending = Boolean(jrlLoading && !jrl);
   const saved = savingsFromZaps(runs?.zapRows || [], rates);
   const clients = clientSavings(runs?.zapRows || [], rates);
-  const openCount = outstanding.filter((item) => !item?.doneAt).length;
+  const openCount = openOutstandingItems(outstanding, auto).length;
   const jrlSpark = ledger.map((row) => ({ id: row.period, value: row.net_total }));
   const openToki = (extra = {}) => onOpen?.({ area: 'toki', ...extra });
   const openAuto = (extra = {}) => onOpen?.({ area: 'automations', ...extra });
