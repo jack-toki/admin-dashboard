@@ -92,6 +92,9 @@ test('a tombstone stops the same source id from coming back', () => {
   assert.equal(shown.length, 1);
   const hidden = presentDetails([{ ...source[0], deletedAt: '2026-11-08T00:00:00Z' }], source);
   assert.equal(hidden.length, 0);
+  const storedOnly = presentDetails([{ ...source[0], party: 'Stored Co' }], []);
+  assert.equal(storedOnly.length, 1);
+  assert.equal(storedOnly[0].party, 'Stored Co');
   const override = presentDetails([{ ...source[0], party: 'Renamed', amountMinor: 200 }], source);
   assert.equal(override.length, 1);
   assert.equal(override[0].party, 'Renamed');
