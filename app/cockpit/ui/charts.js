@@ -1,5 +1,6 @@
 'use client';
 import { useId, useState } from 'react';
+import { axisFrame, pointFraction } from '../../../lib/jrl/chartRange';
 
 export function InteractiveSeriesChart({
   name,
@@ -20,10 +21,9 @@ export function InteractiveSeriesChart({
   const max = Math.max(1, ...values.map((value) => Math.abs(Number(value))));
   const width = 640;
   const height = 168;
-  const padL = 52;
-  const padR = 16;
-  const padT = 16;
-  const padB = 32;
+  const frame = axisFrame({ width, height });
+  const { padL, padR, padT, padB } = frame;
+  const xAt = (index) => padL + pointFraction(points, index) * (width - padL - padR);
 
   function place(event) {
     const host = event.currentTarget?.ownerSVGElement?.parentElement || event.currentTarget;
@@ -69,17 +69,17 @@ export function InteractiveSeriesChart({
       </div>
       <div className="chart-plot" onMouseLeave={() => setTip(null)}>
         <svg viewBox={`0 0 ${width} ${height}`} role="group" aria-label={name}>
-          <text x="8" y="14" className="chart-axis">{yTitle || '£'}</text>
+          <text x={frame.yTitle.x} y={frame.yTitle.y} textAnchor={frame.yTitle.anchor} className="chart-axis">{yTitle || '£'}</text>
           {[0, 0.5, 1].map((step) => {
             const y = padT + (1 - step) * (height - padT - padB);
             return <g key={step}><line x1={padL} x2={width - padR} y1={y} y2={y} className="chart-grid" /><text x={padL - 6} y={y + 3} textAnchor="end" className="chart-axis">{format(max * step)}</text></g>;
           })}
-          <text x={width - padR} y={height - 6} textAnchor="end" className="chart-axis">{xTitle || 'Month'}</text>
+          <text x={frame.xTitle.x} y={frame.xTitle.y} textAnchor={frame.xTitle.anchor} className="chart-axis">{xTitle || 'Month'}</text>
           {visible.map((item) => {
             const coords = points.map((point, index) => {
               const value = item.values.find((entry) => entry.id === point.id);
               if (value?.value == null || !Number.isFinite(Number(value.value))) return null;
-              const x = padL + (index * (width - padL - padR)) / Math.max(points.length - 1, 1);
+              const x = xAt(index);
               const y = padT + (1 - Math.abs(Number(value.value)) / max) * (height - padT - padB);
               return { x, y, point };
             }).filter(Boolean);
@@ -94,17 +94,18 @@ export function InteractiveSeriesChart({
             );
           })}
           {points.map((point, index) => {
-            const x = padL + (index * (width - padL - padR)) / Math.max(points.length - 1, 1);
-            const slot = (width - padL - padR) / Math.max(points.length, 1);
+            const x = xAt(index);
+            const prev = index === 0 ? padL : (xAt(index - 1) + x) / 2;
+            const next = index === points.length - 1 ? width - padR : (x + xAt(index + 1)) / 2;
             return (
               <g key={point.id}>
-                {point.label ? <text x={x} y={height - 8} textAnchor="middle" className="chart-axis">{point.label}</text> : null}
+                {point.label ? <text x={x} y={frame.labelY} textAnchor="middle" className="chart-axis">{point.label}</text> : null}
                 <rect
                   className="chart-hit"
                   data-chart-point={point.id}
-                  x={x - slot / 2}
+                  x={prev}
                   y={padT}
-                  width={slot}
+                  width={Math.max(8, next - prev)}
                   height={height - padT - padB}
                   fill="transparent"
                   tabIndex="0"
