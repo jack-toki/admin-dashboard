@@ -1,5 +1,6 @@
 import { db } from '../../../lib/supabase';
 import { buildDashboard } from '../../../lib/aggregate';
+import { readRateRows } from '../../../lib/cockpit/rates';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -59,6 +60,7 @@ export async function GET(req) {
     if (data.length < pageSize) break;
   }
   const sheet = await getSheet();
-  const dashboard = buildDashboard(rows, sheet, { period, from: from.toISOString(), to: to.toISOString() });
+  const rates = await readRateRows();
+  const dashboard = buildDashboard(rows, sheet, { period, from: from.toISOString(), to: to.toISOString() }, rates);
   return Response.json(dashboard);
 }

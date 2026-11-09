@@ -120,6 +120,28 @@ test('a blank line that is usually empty is not an outstanding forecast gap', ()
   assert.equal(required.some((task) => task.taskKey === 'sheet-gaps'), true);
 });
 
+test('two rows with the same label are judged separately', () => {
+  const months = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'].map((id) => `2026-${id}`);
+  const row = (rowNumber, filled) => months.map((month) => ({
+    label: 'Accountants',
+    kind: 'cost',
+    rowNumber,
+    month,
+    nullState: filled.includes(month) ? 'amount' : 'blank',
+    enteredMinor: filled.includes(month) ? 100 : null,
+  }));
+  const falsePositive = deriveAutoTasks({
+    period: '2026-11',
+    cells: [...row(21, months), ...row(30, [])],
+  });
+  assert.equal(falsePositive.some((task) => task.taskKey === 'sheet-gaps'), false);
+  const realGap = deriveAutoTasks({
+    period: '2026-11',
+    cells: [...row(21, months.filter((month) => month !== '2026-11')), ...row(30, [])],
+  });
+  assert.match(realGap.find((task) => task.taskKey === 'sheet-gaps').title, /^1 forecast input missing/);
+});
+
 test('savings use a saved rate or the documented default', () => {
   assert.equal(minutesForZap('Send invoice', null).minutes, 6);
   assert.match(minutesForZap('Send invoice', null).formula, /6 minutes/);
