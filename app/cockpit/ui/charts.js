@@ -339,7 +339,7 @@ export function YearColumns({ name, months, selectedId, onOpen, format, tabs = n
               data-index={index}
               data-chart-point={month.id}
               aria-pressed={month.id === selectedId}
-              aria-label={`${month.label}. Income ${moneyText(month.total, format)}. ${month.lines.map((line) => linePhrase(line, format)).join('. ')}. Opens income and costs.`}
+              aria-label={`${month.label}. Income ${moneyText(month.total, format)}. ${month.lines.map((line) => linePhrase(line, format)).join('. ')}. Opens this month.`}
               onClick={() => onOpen?.(month.id)}
               onFocus={() => setFocusId(month.id)}
               onBlur={() => setFocusId('')}
@@ -391,7 +391,7 @@ export function YearColumns({ name, months, selectedId, onOpen, format, tabs = n
   );
 }
 
-export function HorizontalBars({ name, points, series, format, tabs = null }) {
+export function HorizontalBars({ name, points, series, format, tabs = null, onOpen }) {
   const [hidden, setHidden] = useState({});
   const [focusId, setFocusId] = useState('');
   const visible = series.filter((item) => !hidden[item.id]);
@@ -430,6 +430,7 @@ export function HorizontalBars({ name, points, series, format, tabs = null }) {
                     data-chart-point={point.id}
                     data-series={item.id}
                     aria-label={`${point.label}. ${item.label} ${moneyText(value, format)}. ${lineText}`}
+                    onClick={() => onOpen?.(point.id)}
                     onFocus={() => setFocusId(point.id)}
                     onBlur={() => setFocusId('')}
                     onMouseEnter={() => setFocusId(point.id)}
@@ -465,28 +466,13 @@ export function HorizontalBars({ name, points, series, format, tabs = null }) {
   );
 }
 
-export function ComparisonBars({ name, items, format, caption }) {
-  const [hidden, setHidden] = useState({});
+export function ComparisonBars({ name, items, format, caption, onOpen }) {
   const [tip, setTip] = useState(null);
   const tipId = useId();
-  const visible = items.filter((item) => !hidden[item.id] && item.value != null);
+  const visible = items.filter((item) => item.value != null);
   const max = Math.max(1, ...visible.map((item) => Math.abs(item.value)));
   return (
     <figure className="chart-card" data-chart={name}>
-      <div className="cl" role="group" aria-label={`${name} series`}>
-        {items.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className="chart-key"
-            aria-pressed={!hidden[item.id]}
-            onClick={() => setHidden((current) => ({ ...current, [item.id]: !current[item.id] }))}
-          >
-            <i style={{ background: item.color }} />
-            {item.label}
-          </button>
-        ))}
-      </div>
       <div className="chart-bars" role="group" aria-label={name}>
         {visible.map((item) => (
           <button
@@ -498,6 +484,7 @@ export function ComparisonBars({ name, items, format, caption }) {
             aria-describedby={tip?.id === item.id ? tipId : undefined}
             onMouseEnter={() => setTip({ id: item.id, text: `${item.label} · ${format(item.value)} · ${item.status}` })}
             onFocus={() => setTip({ id: item.id, text: `${item.label} · ${format(item.value)} · ${item.status}` })}
+            onClick={() => onOpen?.(item)}
             onPointerDown={() => setTip({ id: item.id, text: `${item.label} · ${format(item.value)} · ${item.status}` })}
             onBlur={() => setTip(null)}
           >

@@ -12,7 +12,7 @@ function blank(kind) {
   return { kind, party: '', services: '', amount: '', firstPaymentMonth: '', contractEndDate: '', totalPayments: '', comment: '' };
 }
 
-export function IncomeBoard({ month, records, stored, baselineRetainer, baselineProject, onSave, onRemove, costContent }) {
+export function IncomeBoard({ month, records, stored, baselineRetainer, baselineProject, onSave, onRemove, costContent, onOpen }) {
   const [pane, setPane] = useState('income');
   const [kind, setKind] = useState('retainer');
   const [editing, setEditing] = useState('');
@@ -69,8 +69,8 @@ export function IncomeBoard({ month, records, stored, baselineRetainer, baseline
               const schedule = scheduleFor(row, month);
               const tone = row.amountMinor == null || schedule.state === 'unknown' ? 'miss' : schedule.state === 'scheduled' ? 'ok' : 'warn';
               return (
-                <tr key={row.id}>
-                  <td><input type="checkbox" aria-label={`Select ${row.party}`} /></td>
+                <tr key={row.id} className="click-row" onClick={() => onOpen?.(row)}>
+                  <td><input type="checkbox" aria-label={`Select ${row.party}`} onClick={(event) => event.stopPropagation()} /></td>
                   <td><strong>{row.party}</strong></td>
                   <td>{row.amountMinor == null ? <span className="status-dot miss">Missing</span> : formatPounds(row.amountMinor)}</td>
                   <td><span className={`status-dot ${tone}`}>{schedule.state === 'unknown' ? 'Missing' : schedule.label}</span>{row.contractEndDate ? ` · ends ${row.contractEndDate}` : ''}</td>

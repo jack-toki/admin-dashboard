@@ -10,6 +10,7 @@ import { confirmDelete, dayGroup, filterConversations, pageConversations } from 
 import { ComparisonBars, InteractiveSeriesChart } from './charts';
 import { PotCard } from './PotCard';
 import { Tile } from './TokiScreen';
+import { DetailDrawer, DetailFields } from './DetailDrawer';
 import { blankPotRecord, latestPortfolioValue } from '../../../lib/jrl/pots';
 import '../jrl.css';
 
@@ -172,6 +173,7 @@ function money(value) {
 
 function Overview({ ledger, targets }) {
   const [focus, setFocus] = useState(null);
+  const [detail, setDetail] = useState(null);
   const latest = ledger.at(-1);
   if (!latest) return <div className="panel glass"><h2>{EMPTY.overview}</h2><p className="sub">Five totals, targets, and the ledger appear when a Supabase user session can read them. Nothing here is filled with a made-up balance.</p></div>;
   const previous = ledger.at(-2);
@@ -196,10 +198,10 @@ function Overview({ ledger, targets }) {
       <div className="bento-stats">
         {cards.map(([label, value, hero]) => {
           const before = !previous ? null : label === 'Net total' ? previous.net_total : label === 'Chase balance' ? previous.chase_total : label === 'Savings pot' ? previous.savings_total : label === 'Tax pot' ? previous.tax_total : previous.hl_contributed;
-          return <Tile key={label} icon={icons[label]} highlight={hero} label={label} value={money(value)} delta={before == null ? null : money(value - before)} />;
+          return <Tile key={label} icon={icons[label]} highlight={hero} label={label} value={money(value)} delta={before == null ? null : money(value - before)} onOpen={() => setDetail({ title: label, fields: [{ label: 'Amount', value: money(value) }, { label: 'Previous month', value: before == null ? 'No prior month' : money(before) }] })} />;
         })}
       </div>
-      <p className="caveat">HargLans ISA on the card is contributions, not the portfolio value. Net is Chase plus contributions. Gain is not added into that headline.</p>
+      <p className="caveat section-wide">HargLans ISA on the card is contributions, not the portfolio value. Net is Chase plus contributions. Gain is not added into that headline.</p>
       {targets.length > 0 && (
         <div className="tstrip">
           {targets.map((target) => {
@@ -218,15 +220,15 @@ function Overview({ ledger, targets }) {
         <section className="panel glass">
           <h2>Allocation</h2>
           <p className="sub">Savings, tax, and contributions. Market gain stays out.</p>
-          <Allocation row={latest} />
+          <Allocation row={latest} onOpen={(item) => setDetail({ title: item.label, fields: [{ label: 'Amount', value: money(item.value) }, { label: 'Note', value: item.status }] })} />
         </section>
         <section className="panel glass">
           <h2>Growth</h2>
-          <Growth ledger={ledger} selectedId={focus || latest.period} onSelect={setFocus} />
+          <Growth ledger={ledger} selectedId={focus || latest.period} onSelect={(id) => { setFocus(id); const row = ledger.find((item) => item.period === id); setDetail({ title: id, fields: row ? ledgerFields(row) : [] }); }} />
           <p id="jrl-month-detail" aria-live="polite">Selected month {focus || latest.period}. Earnings stay unknown when that month has no fresh reading.</p>
         </section>
       </div>
-      <section className="panel glass gap bento-progress">
+      <section className="panel glass gap section-wide">
         <h2>HargLans ISA</h2>
         <div className="perf">
           <div className="mini"><div className="k">{latest.hl_carried ? 'Value carried forward' : 'Portfolio value'}</div><div className="v">{money(chartValue)}</div></div>
@@ -245,8 +247,8 @@ function Overview({ ledger, targets }) {
             <thead><tr><th><span className="sr">Select</span></th><th>Month</th><th>Savings</th><th>Tax</th><th>Chase</th><th>HargLans ISA</th><th>ISA value</th><th>Gain</th></tr></thead>
             <tbody>
               {[...ledger].reverse().map((row, index) => (
-                <tr key={row.period} className={index === 0 ? 'latest' : undefined}>
-                  <td><input type="checkbox" aria-label={`Select ${row.period}`} /></td>
+                <tr key={row.period} className={index === 0 ? 'latest click-row' : 'click-row'} onClick={() => setDetail({ title: row.period, fields: ledgerFields(row) })}>
+                  <td><input type="checkbox" aria-label={`Select ${row.period}`} onClick={(event) => event.stopPropagation()} /></td>
                   <td>{row.period}</td>
                   <td>{money(row.savings_total)}</td>
                   <td>{money(row.tax_total)}</td>
@@ -260,14 +262,30 @@ function Overview({ ledger, targets }) {
           </table>
         </div>
       </section>
+      <DetailDrawer title={detail?.title || ''} onClose={() => setDetail(null)}>
+        {detail && <DetailFields fields={detail.fields} />}
+      </DetailDrawer>
     </div>
   );
 }
 
-function Allocation({ row }) {
+function ledgerFields(row) {
+  return [
+    { label: 'Month', value: row.period },
+    { label: 'Savings', value: money(row.savings_total) },
+    { label: 'Tax', value: money(row.tax_total) },
+    { label: 'Chase', value: money(row.chase_total) },
+    { label: 'HargLans contributions', value: money(row.hl_contributed) },
+    { label: 'ISA value', value: row.hl_value == null ? 'Missing' : money(row.hl_value) },
+    { label: 'Gain', value: row.gain == null ? 'Missing' : money(row.gain) },
+  ];
+}
+
+function Allocation({ row, onOpen }) {
   return (
     <ComparisonBars
       name="allocation"
+      onOpen={onOpen}
       format={money}
       caption="Savings, tax, and contributions. Portfolio value is not in this comparison."
       items={[
@@ -288,7 +306,7 @@ function Growth({ ledger, selectedId, onSelect }) {
       selectedId={selectedId}
       onSelect={onSelect}
       format={money}
-      caption="Example data. Chase and contributions come from the flows. A carried portfolio value is not a new gain."
+      caption="Chase and contributions come from the saved flows. A carried portfolio value is not a new gain."
       series={[
         { id: 'chase', label: 'Chase', color: 'var(--ink)', values: ledger.map((row) => ({ id: row.period, value: row.chase_total, status: 'Derived from savings plus tax.' })) },
         { id: 'contrib', label: 'Contributions', color: 'var(--c1)', values: ledger.map((row) => ({ id: row.period, value: row.hl_contributed, status: 'Contributions, not market value.' })) },

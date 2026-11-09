@@ -1,12 +1,11 @@
 'use client';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { formatPounds } from '../../../lib/money';
-import { automationBoard } from '../../../lib/finance/screen';
 import { workingMonthLines, sumLines, incomeBreakdown } from '../../../lib/planning/entries';
-import { syntheticWorkflows, syntheticEvents, SYNTHETIC_BANNER } from '../../../lib/fixtures/synthetic';
 import { TOKI_VIEWS } from '../../../lib/nav/sidebar';
 import { HorizontalBars, YearColumns } from './charts';
 import { IncomeBoard } from './IncomeBoard';
+import { DetailDrawer, DetailFields } from './DetailDrawer';
 
 const MONTHS = [
   ['01', 'Jan', 'January'], ['02', 'Feb', 'February'], ['03', 'Mar', 'March'], ['04', 'Apr', 'April'],
@@ -31,7 +30,7 @@ function showMoney(minor) {
   return formatPounds(minor);
 }
 
-export function TokiScreen({ example, baseline, actuals, evidence, plan, planNote, onSave, onRemove, formError, forecastError, section = 'toki', onSection, details = [], detailStored = false, onSaveDetail, onRemoveDetail }) {
+export function TokiScreen({ example, baseline, actuals, evidence, plan, planNote, onSave, onRemove, formError, forecastError, section = 'toki', onSection, details = [], detailStored = false, onSaveDetail, onRemoveDetail, outstanding = [], outstandingStored = false, onAddOutstanding, onCompleteOutstanding }) {
   const [month, setMonth] = useState('2026-01');
   const [board, setBoard] = useState('year');
   const [editAll, setEditAll] = useState(false);
@@ -40,7 +39,10 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
   const [adding, setAdding] = useState(null);
   const [sheetError, setSheetError] = useState('');
   const [lineQuery, setLineQuery] = useState('');
+  const [detail, setDetail] = useState(null);
   const [lineKind, setLineKind] = useState('all');
+  const [quick, setQuick] = useState(null);
+  const [todoTitle, setTodoTitle] = useState('');
   const monthStripRef = useRef(null);
 
   const page = section === 'sources' || section === 'plan' ? 'sources' : 'toki';
@@ -125,7 +127,7 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
       <section>
         <div className="panel glass">
           <h2>{forecastError ? 'The stored forecast could not be read' : 'No forecast is stored yet'}</h2>
-          <p style={muted}>{forecastError ? 'The workbook is not used as a fallback.' : 'The workbook is not read while the app is running. Stored cells are the forecast. Example data stays off until you ask for it.'}</p>
+          <p style={muted}>{forecastError ? 'The workbook is not used as a fallback.' : 'No stored forecast is on this server yet. Nothing here is filled in.'}</p>
         </div>
       </section>
     );
@@ -247,8 +249,6 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
           ))}
         </div>
       </div>
-      {baseline.synthetic && <p className="caveat">{SYNTHETIC_BANNER}</p>}
-
       {page === 'toki' && chartSeries && (
         <div className="bento">
           <article className="card glass bento-summary">
@@ -261,15 +261,48 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
             </div>
           </article>
           <div className="bento-stats">
-            <Tile icon="income" highlight label="Income" value={showMoney(billingShown)} delta={monthDelta(chartSeries.year, month, 'total')} />
-            <Tile icon="cost" label="Costs" value={showMoney(costShown)} delta={null} note="No prior month" />
-            <Tile icon="result" label="Result" value={showMoney(billingShown == null || costShown == null ? null : billingShown - costShown)} delta={null} note="No prior month" />
-            <Tile icon="year" label="Known months" value={String(chartSeries.year.filter((item) => item.total != null).length)} delta={null} note="No prior month" />
+            <Tile icon="income" label="Income" value={showMoney(billingShown)} delta={monthDelta(chartSeries.year, month, 'total')} onOpen={() => setDetail({ title: 'Income', fields: [{ label: 'Month', value: `${monthName} ${year}` }, { label: 'Income', value: showMoney(billingShown) }] })} />
+            <Tile icon="cost" label="Costs" value={showMoney(costShown)} delta={null} note="No prior month" onOpen={() => setDetail({ title: 'Costs', fields: [{ label: 'Month', value: `${monthName} ${year}` }, { label: 'Costs', value: showMoney(costShown) }] })} />
+            <Tile icon="result" label="Result" value={showMoney(billingShown == null || costShown == null ? null : billingShown - costShown)} delta={null} note="No prior month" onOpen={() => setDetail({ title: 'Result', fields: [{ label: 'Month', value: `${monthName} ${year}` }, { label: 'Result', value: showMoney(billingShown == null || costShown == null ? null : billingShown - costShown) }] })} />
+            <Tile icon="year" label="Known months" value={String(chartSeries.year.filter((item) => item.total != null).length)} delta={null} note="No prior month" onOpen={() => setDetail({ title: 'Known months', fields: [{ label: 'Year', value: year }, { label: 'Known months', value: String(chartSeries.year.filter((item) => item.total != null).length) }] })} />
           </div>
           <div className="bento-chart">
-            {board === 'month' && <HorizontalBars name="This month" tabs={<ChartTabs board={board} setBoard={setBoard} />} points={chartSeries.compare.points} series={chartSeries.compare.series} format={formatPounds} />}
-            {board === 'year' && <YearColumns name="Income" subtitle="Retainer and project income by month" tabs={<ChartTabs board={board} setBoard={setBoard} />} months={chartSeries.year} selectedId={month} onOpen={(key) => { setMonth(key); onSection?.('sources'); }} format={formatPounds} />}
-            {board === 'groups' && <HorizontalBars name="Cost groups" tabs={<ChartTabs board={board} setBoard={setBoard} />} points={chartSeries.groups.points} series={chartSeries.groups.series} format={formatPounds} />}
+            {board === 'month' && <HorizontalBars name="This month" tabs={<ChartTabs board={board} setBoard={setBoard} />} points={chartSeries.compare.points} series={chartSeries.compare.series} format={formatPounds} onOpen={(id) => { const point = chartSeries.compare.points.find((item) => item.id === id); setDetail({ title: point?.label || 'This month', fields: (point?.lines || []).map((line) => ({ label: line.name, value: line.minor == null ? 'Missing' : formatPounds(line.minor) })) }); }} />}
+            {board === 'year' && <YearColumns name="Income" subtitle="Retainer and project income by month" tabs={<ChartTabs board={board} setBoard={setBoard} />} months={chartSeries.year} selectedId={month} onOpen={(key) => { const item = chartSeries.year.find((entry) => entry.id === key); setMonth(key); setDetail({ title: item?.label || key, fields: [{ label: 'Income', value: showMoney(item?.total) }, ...(item?.lines || []).map((line) => ({ label: line.name, value: line.minor == null ? 'Missing' : formatPounds(line.minor) }))] }); }} format={formatPounds} />}
+            {board === 'groups' && <HorizontalBars name="Cost groups" tabs={<ChartTabs board={board} setBoard={setBoard} />} points={chartSeries.groups.points} series={chartSeries.groups.series} format={formatPounds} onOpen={(id) => { const point = chartSeries.groups.points.find((item) => item.id === id); setDetail({ title: point?.label || 'Cost group', fields: [{ label: 'Amount', value: showMoney(point?.segments?.[0]?.value ?? point?.lines?.[0]?.minor) }] }); }} />}
+          </div>
+          <div className="quick-row">
+            <button type="button" className="card glass quick-card" onClick={() => { setDetail(null); setQuick({ kind: 'additional_cost', party: '', amount: '', firstPaymentMonth: month, contractEndDate: '' }); }}>
+              <h3>Add a cost</h3>
+              <p className="sub">Saved with this month’s costs. Not added to the forecast.</p>
+            </button>
+            <button type="button" className="card glass quick-card" onClick={() => { setDetail(null); setQuick({ kind: 'project', party: '', amount: '', services: '', firstPaymentMonth: month, contractEndDate: '' }); }}>
+              <h3>Add a project</h3>
+              <p className="sub">A project line in the private income store.</p>
+            </button>
+            <button type="button" className="card glass quick-card" onClick={() => { setDetail(null); setQuick({ kind: 'retainer', party: '', amount: '', services: '', firstPaymentMonth: month, contractEndDate: '' }); }}>
+              <h3>Add a retainer</h3>
+              <p className="sub">A retainer needs a contract end. It is not added to the forecast.</p>
+            </button>
+            <article className="card glass quick-card">
+              <h3>Outstanding</h3>
+              {!outstandingStored && <p className="sub">Outstanding items are not saved on this server yet.</p>}
+              <ul className="todo-list">
+                {outstanding.map((item) => (
+                  <li key={item.id}>
+                    <label>
+                      <input type="checkbox" aria-label={`Mark done: ${item.title}`} onChange={() => onCompleteOutstanding?.(item.id)} />
+                      <span>{item.title}</span>
+                    </label>
+                  </li>
+                ))}
+                {!outstanding.length && <li className="sub">Nothing outstanding.</li>}
+              </ul>
+              <form className="quick-add" onSubmit={(event) => { event.preventDefault(); if (!todoTitle.trim() || !outstandingStored) return; onAddOutstanding?.(todoTitle.trim()); setTodoTitle(''); }}>
+                <input aria-label="New outstanding item" placeholder="Add an item" value={todoTitle} onChange={(event) => setTodoTitle(event.target.value)} />
+                <button type="submit" className="btn" disabled={!outstandingStored}>Add</button>
+              </form>
+            </article>
           </div>
           <section className="card glass bento-table">
             <header className="table-tools">
@@ -286,8 +319,8 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
                 <thead><tr><th><span className="sr">Select</span></th><th>Line</th><th>Kind</th><th>Amount</th><th>Status</th></tr></thead>
                 <tbody>
                   {lines.filter((line) => (lineKind === 'all' || line.kind === lineKind) && String(line.party || '').toLowerCase().includes(lineQuery.toLowerCase())).map((line) => (
-                    <tr key={line.key}>
-                      <td><input type="checkbox" aria-label={`Select ${line.party}`} /></td>
+                    <tr key={line.key} className="click-row" onClick={() => setDetail({ title: line.party, fields: [{ label: 'Kind', value: line.kind === 'sale' ? (line.workType || 'Income') : 'Cost' }, { label: 'Amount', value: showMoney(line.minor) }, { label: 'Month', value: month }] })}>
+                      <td><input type="checkbox" aria-label={`Select ${line.party}`} onClick={(event) => event.stopPropagation()} /></td>
                       <td>{line.party}</td>
                       <td>{line.kind === 'sale' ? (line.workType === 'project' ? 'Project' : line.workType === 'retainer' ? 'Retainer' : 'Income') : 'Cost'}</td>
                       <td className="num">{showMoney(line.minor)}</td>
@@ -319,6 +352,7 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
             month={month}
             records={details}
             stored={detailStored}
+            onOpen={(row) => setDetail({ title: row.party, fields: [{ label: 'Kind', value: row.kind }, { label: 'Services', value: row.services || 'Missing' }, { label: 'Amount', value: row.amountMinor == null ? 'Missing' : formatPounds(row.amountMinor) }, { label: 'First payment', value: row.firstPaymentMonth || 'Missing' }, { label: 'Contract end', value: row.contractEndUnknown ? 'Unknown' : (row.contractEndDate || 'Missing') }, { label: 'Comment', value: row.comment || 'None' }] })}
             baselineRetainer={incomeBreakdown(lines).retainer}
             baselineProject={incomeBreakdown(lines).project}
             onSave={onSaveDetail}
@@ -350,6 +384,30 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
           />
         </div>
       )}
+      <DetailDrawer title={detail?.title || (quick ? (quick.kind === 'additional_cost' ? 'Add a cost' : quick.kind === 'project' ? 'Add a project' : 'Add a retainer') : '')} onClose={() => { setDetail(null); setQuick(null); }}>
+        {detail && !quick && <DetailFields fields={detail.fields} />}
+        {quick && (
+          <form className="drawer-form" onSubmit={async (event) => {
+            event.preventDefault();
+            if (!detailStored) return;
+            const ok = await onSaveDetail?.({ ...quick, observedMonth: quick.kind === 'additional_cost' ? month : quick.firstPaymentMonth });
+            if (ok) setQuick(null);
+          }}>
+            {!detailStored && <p className="sub">Client lines are not saved on this server yet. The forecast is unchanged.</p>}
+            <label>Name<input aria-label="Name or client" value={quick.party} onChange={(event) => setQuick({ ...quick, party: event.target.value })} /></label>
+            <label>Amount<input aria-label="Amount in pounds" inputMode="decimal" value={quick.amount} onChange={(event) => setQuick({ ...quick, amount: event.target.value })} /></label>
+            {quick.kind !== 'additional_cost' && (
+              <>
+                <label>Services<input aria-label="Services" value={quick.services || ''} onChange={(event) => setQuick({ ...quick, services: event.target.value })} /></label>
+                <label>First payment<input aria-label="First payment month" type="month" value={quick.firstPaymentMonth || ''} onChange={(event) => setQuick({ ...quick, firstPaymentMonth: event.target.value })} /></label>
+                <label>Contract end<input aria-label="Contract end date" type="date" value={quick.contractEndDate || ''} onChange={(event) => setQuick({ ...quick, contractEndDate: event.target.value })} /></label>
+              </>
+            )}
+            {formError && <p role="alert">{formError}</p>}
+            <button type="submit" className="btn" disabled={!detailStored}>Save</button>
+          </form>
+        )}
+      </DetailDrawer>
     </section>
   );
 }
@@ -404,71 +462,99 @@ function Summary({ billing, costs }) {
   );
 }
 
-export function AutomationsScreen({ example, board, error }) {
-  if (!example && board?.posts != null) {
-    return (
-      <section className="bento">
-        <p className="bento-span caveat">Logged posts from the run log for this month. A missing or old post is not a failure. The registry export is separate.</p>
-        <div className="bento-stats">
-          <Tile icon="posts" highlight label="Logged posts" value={String(board.posts)} />
-          <Tile icon="accounts" label="Accounts" value={String(board.accounts)} />
-          <Tile icon="zap" label="Zap ids" value={String(board.reportingZapIds)} />
-          <Tile icon="value" label="Estimated value" value={`£${Number(board.estimate.value || 0).toLocaleString('en-GB')}`} />
+function runFields(row) {
+  return [
+    { label: 'Account', value: row.name },
+    { label: 'Log label', value: row.logAccount || 'Missing' },
+    { label: 'Ingest slug', value: row.ingestSlug || 'Not linked' },
+    { label: 'Posts', value: String(row.runs) },
+    { label: 'Zap ids that posted', value: String(row.reportingZapIds) },
+    { label: 'Posts without a zap id', value: String(row.postsWithoutZapId) },
+    { label: 'Latest', value: row.latest ? row.latest.slice(0, 16).replace('T', ' ') : 'None' },
+  ];
+}
+
+export function AutomationsScreen({ board, error }) {
+  const [view, setView] = useState('cards');
+  const [detail, setDetail] = useState(null);
+  const rows = board?.accountRows || [];
+  const ready = board?.posts != null;
+  const max = Math.max(1, ...rows.map((row) => row.runs || 0));
+  return (
+    <section className="bento">
+      <div className="card glass bento-span" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div>
+          <h2 style={{ margin: 0 }}>Runs</h2>
+          <p className="sub">{ready ? 'Logged posts for this month. A missing post is not a failure.' : (error === 'run_log_not_configured' ? 'The run log is not configured on this server.' : error ? 'The run log could not be read.' : 'No runs in this month.')}</p>
         </div>
-        <p style={muted}>{board.reportingZapIdsMeaning} Posts with no zap id: {board.postsWithoutZapId}. {board.estimate.label} Last 7 days in this set: {board.postsLast7Days}.</p>
+        <div className="auto-switch" role="tablist" aria-label="Automations view">
+          {[['cards', 'Cards'], ['table', 'Table'], ['graph', 'Graph']].map(([id, label]) => (
+            <button key={id} type="button" role="tab" aria-pressed={view === id} onClick={() => setView(id)}>{label}</button>
+          ))}
+        </div>
+      </div>
+      {ready && (
+        <div className="bento-stats">
+          <Tile icon="posts" label="Logged posts" value={String(board.posts)} onOpen={() => setDetail({ title: 'Logged posts', fields: [{ label: 'Posts', value: String(board.posts) }, { label: 'Last 7 days', value: String(board.postsLast7Days) }, { label: 'Without a zap id', value: String(board.postsWithoutZapId) }] })} />
+          <Tile icon="accounts" label="Accounts" value={String(board.accounts)} onOpen={() => setDetail({ title: 'Accounts', fields: [{ label: 'Accounts', value: String(board.accounts) }] })} />
+          <Tile icon="zap" label="Zap ids" value={String(board.reportingZapIds)} onOpen={() => setDetail({ title: 'Zap ids', fields: [{ label: 'Zap ids that posted', value: String(board.reportingZapIds) }, { label: 'Meaning', value: board.reportingZapIdsMeaning }] })} />
+          <Tile icon="value" label="Estimated value" value={`£${Number(board.estimate?.value || 0).toLocaleString('en-GB')}`} onOpen={() => setDetail({ title: 'Estimated value', fields: [{ label: 'Value', value: `£${Number(board.estimate?.value || 0).toLocaleString('en-GB')}` }, { label: 'Note', value: board.estimate?.label }] })} />
+        </div>
+      )}
+      {view === 'cards' && (
+        <div className="auto-cards bento-span">
+          {rows.map((row) => (
+            <button key={row.logAccount || row.name} type="button" className="card glass auto-card" onClick={() => setDetail({ title: row.name, fields: runFields(row) })}>
+              {runFields(row).map((field) => <p key={field.label} className="sub"><b style={{ color: 'inherit' }}>{field.label}.</b> {field.value}</p>)}
+            </button>
+          ))}
+          {!rows.length && <p className="sub">No accounts posted this month.</p>}
+        </div>
+      )}
+      {view === 'table' && (
         <div className="card glass bento-table ledger-scroll">
           <table>
-            <thead><tr><th style={th}>Account</th><th style={th}>Posts</th><th style={th}>Zap ids that posted</th><th style={th}>Latest</th></tr></thead>
+            <thead>
+              <tr>
+                <th style={th}>Account</th>
+                <th style={th}>Log label</th>
+                <th style={th}>Ingest slug</th>
+                <th style={th}>Posts</th>
+                <th style={th}>Zap ids that posted</th>
+                <th style={th}>Posts without a zap id</th>
+                <th style={th}>Latest</th>
+              </tr>
+            </thead>
             <tbody>
-              {board.accountRows.map((row) => (
-                <tr key={row.logAccount || row.name}>
-                  <td style={td}>{row.name}</td>
-                  <td style={td}>{row.runs}</td>
-                  <td style={td}>{row.reportingZapIds}</td>
-                  <td style={td}>{row.latest ? row.latest.slice(0, 16).replace('T', ' ') : 'None'}</td>
+              {rows.map((row) => (
+                <tr key={row.logAccount || row.name} className="click-row" onClick={() => setDetail({ title: row.name, fields: runFields(row) })}>
+                  {runFields(row).map((field) => <td key={field.label} style={td}>{field.value}</td>)}
                 </tr>
               ))}
+              {!rows.length && <tr><td style={td} colSpan="7">No accounts posted this month.</td></tr>}
             </tbody>
           </table>
         </div>
-        <p style={muted}>{board.registry.note}</p>
-      </section>
-    );
-  }
-  if (!example) {
-    return (
-      <section>
-        <div className="panel glass">
-          <h2>{error === 'run_log_not_configured' ? 'The run log is not configured on this server' : error ? 'The run log could not be read' : 'Reading the run log'}</h2>
-          <p style={muted}>{error === 'run_log_not_configured' ? 'Signed-in Automations needs SUPABASE_URL and SUPABASE_SERVICE_KEY for the Toki project. No posts were marked failed.' : 'A workflow with no posts is not treated as failed. Time and money stay estimates until a post is measured.'}</p>
-        </div>
-      </section>
-    );
-  }
-  const exampleBoard = automationBoard(syntheticWorkflows(), syntheticEvents());
-  return (
-    <section className="bento">
-      <p className="bento-span caveat">{SYNTHETIC_BANNER}</p>
-          <div className="bento-stats">
-            <Tile icon="posts" highlight label="Checkpoints" value={String(exampleBoard.checkpoints)} />
-            <Tile icon="accounts" label="Unique runs" value={exampleBoard.uniqueRuns == null ? 'Not known' : String(exampleBoard.uniqueRuns)} />
-            <Tile icon="value" label="Estimated value" value={exampleBoard.savings.withheld ? 'Not calculated' : formatPounds(exampleBoard.savings.minor)} />
-            <Tile icon="zap" label="Workflows" value={String(exampleBoard.rows.length)} />
-          </div>
-      <div className="card glass bento-table ledger-scroll">
-        <table>
-          <thead><tr><th style={th}>Workflow</th><th style={th}>Status</th></tr></thead>
-          <tbody>
-            {exampleBoard.rows.map((row) => (
-              <tr key={row.zapId}>
-                <td style={td}>{row.title}</td>
-                <td style={td}>{row.health.state === 'no_events' ? 'No events yet' : row.health.state === 'last_event_succeeded' ? 'Last event succeeded' : row.health.state}</td>
-              </tr>
+      )}
+      {view === 'graph' && (
+        <div className="card glass bento-span">
+          <h2>Posts per account</h2>
+          <div className="run-bars">
+            {rows.map((row) => (
+              <button key={row.logAccount || row.name} type="button" className="run-bar" onClick={() => setDetail({ title: row.name, fields: runFields(row) })}>
+                <span>{row.name}</span>
+                <i style={{ width: `${Math.max(4, Math.round((row.runs / max) * 100))}%` }} />
+                <b>{row.runs}</b>
+              </button>
             ))}
-          </tbody>
-        </table>
-      </div>
-      <p style={muted}>{exampleBoard.savings.label}</p>
+            {!rows.length && <p className="sub">No posts to chart this month.</p>}
+          </div>
+        </div>
+      )}
+      {ready && <p className="sub bento-span">{board.registry?.note}</p>}
+      <DetailDrawer title={detail?.title || ''} onClose={() => setDetail(null)}>
+        {detail && <DetailFields fields={detail.fields} />}
+      </DetailDrawer>
     </section>
   );
 }
@@ -522,10 +608,10 @@ function monthDelta(months, monthId, field) {
   return formatPounds(current - prior);
 }
 
-export function Tile({ label, value, icon = 'income', highlight = false, delta = null, note = null }) {
+export function Tile({ label, value, icon = 'income', highlight = false, delta = null, note = null, onOpen }) {
   const down = typeof delta === 'string' && (delta.startsWith('-') || delta.includes('−'));
   return (
-    <article className={highlight ? 'card glass hero' : 'card glass'}>
+    <article className={highlight ? 'card glass hero' : 'card glass'} role={onOpen ? 'button' : undefined} tabIndex={onOpen ? 0 : undefined} onClick={onOpen} onKeyDown={(event) => { if (onOpen && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onOpen(); } }}>
       <StatIcon name={icon} />
       <div className="k">{label}</div>
       <div className="v num">{value}</div>

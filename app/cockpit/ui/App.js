@@ -21,6 +21,8 @@ export default function App({ role, areas, client, fixture = false }) {
   const [plan, setPlan] = useState([]);
   const [details, setDetails] = useState([]);
   const [detailStored, setDetailStored] = useState(false);
+  const [outstanding, setOutstanding] = useState([]);
+  const [outstandingStored, setOutstandingStored] = useState(false);
   const [planNote, setPlanNote] = useState('');
   const [formError, setFormError] = useState('');
   const [storedForecast, setStoredForecast] = useState(null);
@@ -41,7 +43,6 @@ export default function App({ role, areas, client, fixture = false }) {
       { id: 'syn-project-2', kind: 'project', party: 'Harbour', services: 'Film', amountMinor: null, firstPaymentMonth: '', contractEndDate: null, comment: 'Scheduled 1 of 4', source: 'manual' },
     ]);
     setDetailStored(true);
-    setStatus({ coverage: { clientOnWithIngest: 0, clientOn: 3, jackOwnOnWithIngest: 0, jackOwnOn: 1, louise: 'not in this fixture' } });
     setJrl({ status: 200, body: { entries: exampleEntries(), source: { connected: true, ledger: 'readable' }, auth: { supabaseUser: true, ownerLink: true } } });
     setRunError('run_log_not_configured');
   }, [fixture]);
@@ -118,7 +119,17 @@ export default function App({ role, areas, client, fixture = false }) {
       setDetails(body.records || []);
       setDetailStored(body.stored === true);
     }).catch(() => setDetailStored(false));
-  }, [areas]);
+  }, [areas, fixture]);
+
+  useEffect(() => {
+    if (fixture || !areas.includes('toki')) return;
+    fetch('/api/cockpit/outstanding').then(async (res) => {
+      if (!res.ok) return;
+      const body = await res.json();
+      setOutstanding(body.items || []);
+      setOutstandingStored(body.stored === true);
+    }).catch(() => setOutstandingStored(false));
+  }, [areas, fixture]);
 
   useEffect(() => {
     setCollapsed(readCollapsed(window.localStorage));
@@ -208,6 +219,35 @@ export default function App({ role, areas, client, fixture = false }) {
       return;
     }
     setDetails((current) => current.filter((row) => row.id !== id));
+  }
+
+  async function onAddOutstanding(title) {
+    const res = await fetch('/api/cockpit/outstanding', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || !body.item) {
+      setFormError(body.error === 'outstanding_schema_required' ? 'Outstanding items are not saved on this server yet.' : 'That item was not saved.');
+      return false;
+    }
+    setFormError('');
+    setOutstanding((current) => [...current, body.item]);
+    return true;
+  }
+
+  async function onCompleteOutstanding(id) {
+    const res = await fetch('/api/cockpit/outstanding', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    if (!res.ok) {
+      setFormError('That item was not marked done.');
+      return;
+    }
+    setOutstanding((current) => current.filter((item) => item.id !== id));
   }
 
   async function onRemove(id) {
@@ -320,10 +360,10 @@ export default function App({ role, areas, client, fixture = false }) {
             <p>{subtitle}</p>
           </div>
           <main className="main">
-            {area === 'toki' && <TokiScreen baseline={baseline} actuals={actuals} evidence={evidence} plan={plan} planNote={planNote} onSave={onSave} onRemove={onRemove} formError={formError} forecastError={forecastError} section={tokiView} onSection={setTokiView} details={details} detailStored={detailStored} onSaveDetail={onSaveDetail} onRemoveDetail={onRemoveDetail} />}
+            {area === 'toki' && <TokiScreen baseline={baseline} actuals={actuals} evidence={evidence} plan={plan} planNote={planNote} onSave={onSave} onRemove={onRemove} formError={formError} forecastError={forecastError} section={tokiView} onSection={setTokiView} details={details} detailStored={detailStored} onSaveDetail={onSaveDetail} onRemoveDetail={onRemoveDetail} outstanding={outstanding} outstandingStored={outstandingStored} onAddOutstanding={onAddOutstanding} onCompleteOutstanding={onCompleteOutstanding} />}
             {area === 'automations' && (
               <>
-                <AutomationsScreen example={fixture} board={runBoard} error={runError} />
+                <AutomationsScreen board={runBoard} error={runError} />
                 {status?.coverage && <p className="caveat">The ingest alias was not called. The last export snapshot recorded {status.coverage.clientOnWithIngest} of {status.coverage.clientOn} client workflows on, and {status.coverage.jackOwnOnWithIngest} of {status.coverage.jackOwnOn} on Jack’s own account. Louise was {status.coverage.louise}.</p>}
               </>
             )}
