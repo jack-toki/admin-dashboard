@@ -28,7 +28,7 @@ function hoursLabel(hours) {
 
 function Tile({ label, value, onClick }) {
   return (
-    <button type="button" className="ov-tile" onClick={onClick}>
+    <button type="button" className="ov-tile" title={String(value)} onClick={onClick}>
       <span>{label}</span>
       <b className={value === '—' ? 'num no-data' : 'num'}>{value}</b>
     </button>
@@ -56,7 +56,7 @@ function IncomeChart({ series, details, onOpen }) {
   const tipRows = tipMonth && tip?.kind && tip.kind !== 'actual' ? segmentLines(details, tip.kind, tipMonth.id, tipMonth[tip.kind]) : [];
   const tipValue = tip?.kind === 'retainer' ? tipMonth?.retainer : tip?.kind === 'project' ? tipMonth?.project : tipMonth?.actual;
   return (
-    <div className="ov-chart" onMouseLeave={() => setTip(null)}>
+    <div className="ov-chart ov-income" onMouseLeave={() => setTip(null)}>
       <p className="ov-axis-name">£</p>
       <div className="ov-legend" role="group" aria-label="Income series">
         <span><i className="swatch-retainer" />Retainer (forecast)</span>
@@ -258,7 +258,7 @@ export function OverviewScreen({ forecast, plan = [], actuals = null, details = 
             </button>
           )) : <p className="no-data">None in the next 3 months.</p>}
         </section>
-        <div className="ov-tiles">
+        <div className="ov-tiles ov-tiles-3">
           <Tile label="Costs" value={costs == null ? '—' : formatPounds(costs)} onClick={() => openToki({ month, board: 'groups', detail: { title: 'Costs', fields: [{ label: 'Month', value: month }, { label: 'Costs', value: costs == null ? '—' : formatPounds(costs) }] } })} />
           <Tile label="Profit" value={income == null || costs == null ? '—' : formatPounds(income - costs)} onClick={() => openToki({ month, detail: { title: 'Profit', fields: [{ label: 'Month', value: month }, { label: 'Profit', value: income == null || costs == null ? '—' : formatPounds(income - costs) }] } })} />
           <Tile label="Year to date" value={ytd ? formatPounds(ytd) : '—'} onClick={() => openToki({ board: 'year' })} />
@@ -281,7 +281,7 @@ export function OverviewScreen({ forecast, plan = [], actuals = null, details = 
             return <i key={point.id} style={{ height: `${height}%` }} />;
           })}
         </div>
-        <div className="ov-tiles">
+        <div className="ov-tiles ov-tiles-3">
           <Tile label="Ledger" value={pending(jrlPending, latest ? `${ledger.length} ${ledger.length === 1 ? 'month' : 'months'}` : null)} onClick={() => onOpen?.('jrl')} />
           <Tile label="Savings" value={pending(jrlPending, latest ? `£${Math.round(latest.savings_total || 0).toLocaleString('en-GB')}` : null)} onClick={() => onOpen?.('jrl')} />
           <Tile label="Outstanding" value={pending(jrlPending, String(auto.filter((task) => task.taskKey === 'jrl-month' || task.taskKey === 'pots-stale').length))} onClick={() => onOpen?.('jrl')} />
