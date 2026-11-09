@@ -9,27 +9,42 @@ export function InteractiveSeriesChart({
   onSelect,
   format,
   caption,
+  xTitle,
+  yTitle,
 }) {
   const [hidden, setHidden] = useState({});
   const [tip, setTip] = useState(null);
   const tipId = useId();
   const visible = series.filter((item) => !hidden[item.id]);
-  const values = visible.flatMap((item) => item.values.map((point) => point.value)).filter((value) => value != null);
-  const max = Math.max(1, ...values.map((value) => Math.abs(value)));
+  const values = visible.flatMap((item) => item.values.map((point) => point.value)).filter((value) => value != null && Number.isFinite(Number(value)));
+  const max = Math.max(1, ...values.map((value) => Math.abs(Number(value))));
   const width = 640;
-  const height = 220;
-  const pad = 36;
+  const height = 168;
+  const padL = 52;
+  const padR = 16;
+  const padT = 16;
+  const padB = 32;
 
-  function show(point, item, event) {
-    const value = item.values.find((entry) => entry.id === point.id);
+  function place(event) {
+    const host = event.currentTarget?.ownerSVGElement?.parentElement || event.currentTarget;
+    const box = host?.getBoundingClientRect?.();
+    if (!box) return { x: 12, y: 12 };
+    const x = Math.min(Math.max(8, event.clientX - box.left + 14), Math.max(8, box.width - 220));
+    const y = Math.min(Math.max(8, event.clientY - box.top - 28), Math.max(8, box.height - 72));
+    return { x, y };
+  }
+
+  function show(point, event) {
+    const lines = visible.map((item) => {
+      const value = item.values.find((entry) => entry.id === point.id);
+      const shown = value?.value == null || !Number.isFinite(Number(value.value)) ? '—' : format(Number(value.value));
+      return `${item.label} ${shown}`;
+    });
     setTip({
       id: point.id,
-      seriesId: item.id,
-      text: `${point.label} · ${item.label} · ${value?.value == null ? 'Missing information' : format(value.value)} · ${value?.status || 'Unknown'}`,
+      ...place(event),
+      text: `${point.label || 'Point'}\n${lines.join('\n')}`,
     });
-    if (event?.currentTarget && typeof event.currentTarget.focus === 'function' && event.type === 'pointerdown') {
-      event.currentTarget.focus();
-    }
   }
 
   function choose(point) {
@@ -52,50 +67,53 @@ export function InteractiveSeriesChart({
           </button>
         ))}
       </div>
-      <div className="chart-plot">
+      <div className="chart-plot" onMouseLeave={() => setTip(null)}>
         <svg viewBox={`0 0 ${width} ${height}`} role="group" aria-label={name}>
+          <text x="8" y="14" className="chart-axis">{yTitle || '£'}</text>
+          {[0, 0.5, 1].map((step) => {
+            const y = padT + (1 - step) * (height - padT - padB);
+            return <g key={step}><line x1={padL} x2={width - padR} y1={y} y2={y} className="chart-grid" /><text x={padL - 6} y={y + 3} textAnchor="end" className="chart-axis">{format(max * step)}</text></g>;
+          })}
+          <text x={width - padR} y={height - 6} textAnchor="end" className="chart-axis">{xTitle || 'Month'}</text>
           {visible.map((item) => {
             const coords = points.map((point, index) => {
               const value = item.values.find((entry) => entry.id === point.id);
-              if (value?.value == null) return null;
-              const x = pad + (index * (width - pad * 2)) / Math.max(points.length - 1, 1);
-              const y = height - pad - (Math.abs(value.value) / max) * (height - pad * 2);
-              return { x, y, point, value };
+              if (value?.value == null || !Number.isFinite(Number(value.value))) return null;
+              const x = padL + (index * (width - padL - padR)) / Math.max(points.length - 1, 1);
+              const y = padT + (1 - Math.abs(Number(value.value)) / max) * (height - padT - padB);
+              return { x, y, point };
             }).filter(Boolean);
             const line = coords.map((spot) => `${spot.x},${spot.y}`).join(' ');
             return (
               <g key={item.id}>
-                {coords.length > 1 && <polyline fill="none" stroke={item.color} strokeWidth="2.5" points={line} />}
+                {coords.length > 1 && <polyline data-kind={item.kind || 'history'} fill="none" stroke={item.color || 'currentColor'} strokeWidth="1.6" points={line} opacity={item.kind === 'forecast' ? 0.55 : (item.opacity ?? 1)} />}
                 {coords.map((spot) => (
-                  <circle key={spot.point.id} cx={spot.x} cy={spot.y} r="4" fill={item.color} />
+                  <circle key={spot.point.id} data-kind={item.kind || 'history'} cx={spot.x} cy={spot.y} r="2.4" fill={item.color || 'currentColor'} opacity={item.kind === 'forecast' ? 0.7 : 1} />
                 ))}
               </g>
             );
           })}
           {points.map((point, index) => {
-            const x = pad + (index * (width - pad * 2)) / Math.max(points.length - 1, 1);
-            return visible.map((item, seriesIndex) => {
-              const value = item.values.find((entry) => entry.id === point.id);
-              const y = value?.value == null
-                ? height - pad
-                : height - pad - (Math.abs(value.value) / max) * (height - pad * 2);
-              return (
-                <circle
-                  key={`${item.id}-${point.id}`}
+            const x = padL + (index * (width - padL - padR)) / Math.max(points.length - 1, 1);
+            const slot = (width - padL - padR) / Math.max(points.length, 1);
+            return (
+              <g key={point.id}>
+                {point.label ? <text x={x} y={height - 8} textAnchor="middle" className="chart-axis">{point.label}</text> : null}
+                <rect
                   className="chart-hit"
                   data-chart-point={point.id}
-                  data-series={item.id}
-                  cx={x + (visible.length > 1 ? (seriesIndex - (visible.length - 1) / 2) * 0 : 0)}
-                  cy={value?.value == null ? height - 18 : y}
-                  r="11"
+                  x={x - slot / 2}
+                  y={padT}
+                  width={slot}
+                  height={height - padT - padB}
                   fill="transparent"
                   tabIndex="0"
                   role="button"
-                  aria-label={`${point.label}, ${item.label}, ${value?.value == null ? 'Missing information' : format(value.value)}, ${value?.status || 'unknown'}`}
-                  aria-describedby={tip?.id === point.id && tip?.seriesId === item.id ? tipId : undefined}
-                  onMouseEnter={(event) => show(point, item, event)}
-                  onFocus={(event) => show(point, item, event)}
-                  onPointerDown={(event) => show(point, item, event)}
+                  aria-label={point.label || point.id}
+                  aria-describedby={tip?.id === point.id ? tipId : undefined}
+                  onMouseEnter={(event) => show(point, event)}
+                  onMouseMove={(event) => show(point, event)}
+                  onFocus={(event) => show(point, event)}
                   onClick={() => choose(point)}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
@@ -105,11 +123,11 @@ export function InteractiveSeriesChart({
                   }}
                   onBlur={() => setTip(null)}
                 />
-              );
-            });
+              </g>
+            );
           })}
         </svg>
-        {tip && <div id={tipId} role="status" className="chart-tip">{tip.text}</div>}
+        {tip && <div id={tipId} role="tooltip" className="chart-tip" style={{ left: tip.x, top: tip.y }}>{tip.text}</div>}
       </div>
       {caption && <p className="caveat">{caption}</p>}
       <div className="ledger-scroll">
