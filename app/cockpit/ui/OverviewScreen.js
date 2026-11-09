@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { cursorPoint, usePlacedTooltip } from './CursorTooltip';
 import { formatPounds } from '../../../lib/money';
 import { deriveLedger } from '../../../lib/jrl/finance';
 import { incomeBreakdown, workingMonthLines, sumLines } from '../../../lib/planning/entries';
@@ -43,9 +44,9 @@ function Tile({ label, value, onClick }) {
   );
 }
 
-function SegmentTip({ title, rows, forecast, showClients }) {
+function SegmentTip({ title, rows, forecast, showClients, tipRef, style }) {
   return (
-    <div className="ov-tip" role="tooltip">
+    <div ref={tipRef} className="ov-tip" role="tooltip" style={style}>
       <b>{title}</b>
       {showClients && (rows.length ? rows.map((row) => (
         <p key={row.id}><span>{row.name}</span><b className="num">{row.minor == null ? '—' : formatPounds(row.minor)}</b></p>
@@ -56,7 +57,9 @@ function SegmentTip({ title, rows, forecast, showClients }) {
 }
 
 function IncomeChart({ series, details, onOpen }) {
+  const hostRef = useRef(null);
   const [tip, setTip] = useState(null);
+  const placed = usePlacedTooltip(hostRef, tip);
   const stacked = series.map((month) => (month.retainer || 0) + (month.project || 0));
   const actuals = series.map((month) => month.actual).filter((value) => value != null);
   const scale = poundTicks(Math.max(1, ...stacked, ...actuals));
@@ -71,7 +74,7 @@ function IncomeChart({ series, details, onOpen }) {
         <span><i className="swatch-project" />Project (forecast)</span>
         <span><i className="swatch-actual" />Actual received</span>
       </div>
-      <div className="ov-plot">
+      <div className="ov-plot" ref={hostRef}>
         <div className="ov-y" aria-hidden="true">
           {scale.ticks.map((tick) => <span key={tick}>{poundsLabel(tick)}</span>)}
         </div>
@@ -90,8 +93,9 @@ function IncomeChart({ series, details, onOpen }) {
                         className="ov-seg"
                         aria-label={`${month.label} ${kind === 'retainer' ? 'retainer' : 'project'} forecast`}
                         style={known && value !== 0 ? { height: `${(Math.abs(value) / scale.topMinor) * 100}%` } : undefined}
-                        onMouseEnter={() => setTip({ id: month.id, kind })}
-                        onFocus={() => setTip({ id: month.id, kind })}
+                        onMouseEnter={(event) => setTip({ id: month.id, kind, ...cursorPoint(event) })}
+                        onMouseMove={(event) => setTip({ id: month.id, kind, ...cursorPoint(event) })}
+                        onFocus={(event) => setTip({ id: month.id, kind, ...cursorPoint(event) })}
                         onClick={() => onOpen({ area: 'toki', month: month.id, board: 'year', kind, detail: monthDetail(month, kind, details) })}
                       >
                         <i data-bar={kind} data-state={known ? (value === 0 ? 'zero' : 'value') : 'missing'} />
@@ -104,8 +108,9 @@ function IncomeChart({ series, details, onOpen }) {
                   className="ov-seg ov-actual"
                   style={month.actual ? { height: `${(Math.abs(month.actual) / scale.topMinor) * 100}%` } : undefined}
                   aria-label={`${month.label} actual received`}
-                  onMouseEnter={() => setTip({ id: month.id, kind: 'actual' })}
-                  onFocus={() => setTip({ id: month.id, kind: 'actual' })}
+                  onMouseEnter={(event) => setTip({ id: month.id, kind: 'actual', ...cursorPoint(event) })}
+                  onMouseMove={(event) => setTip({ id: month.id, kind: 'actual', ...cursorPoint(event) })}
+                  onFocus={(event) => setTip({ id: month.id, kind: 'actual', ...cursorPoint(event) })}
                   onClick={() => onOpen({ area: 'toki', month: month.id, board: 'year', detail: { title: month.label, fields: [{ label: 'Actual received', value: month.actual == null ? '—' : formatPounds(month.actual) }] } })}
                 >
                   <i data-bar="actual" data-state={month.actual == null ? 'missing' : (month.actual === 0 ? 'zero' : 'value')} style={month.actual ? { height: '100%' } : undefined} />
@@ -118,6 +123,8 @@ function IncomeChart({ series, details, onOpen }) {
         <p className="ov-axis-name ov-x-name">Month</p>
         {tip && tipMonth ? (
           <SegmentTip
+            tipRef={placed.tipRef}
+            style={placed.style}
             title={`${tipMonth.label} · ${tip.kind === 'retainer' ? 'Retainer' : tip.kind === 'project' ? 'Project' : 'Actual received'}`}
             rows={tip.kind === 'actual' ? [] : tipRows}
             showClients={tip.kind !== 'actual'}
@@ -142,13 +149,15 @@ function monthDetail(month, kind, details) {
 }
 
 function ClientChart({ clients, loading, onOpen }) {
+  const hostRef = useRef(null);
   const [tip, setTip] = useState(null);
+  const placed = usePlacedTooltip(hostRef, tip);
   const scale = hourTicks(Math.max(0, ...clients.map((client) => client.hours)));
-  const active = clients.find((client) => client.name === tip);
+  const active = clients.find((client) => client.name === tip?.name);
   return (
     <div className="ov-chart" onMouseLeave={() => setTip(null)}>
       <p className="ov-axis-name">Hours saved</p>
-      <div className="ov-plot">
+      <div className="ov-plot" ref={hostRef}>
         <div className="ov-y" aria-hidden="true">
           {scale.ticks.map((tick) => <span key={tick}>{hoursLabel(tick)}</span>)}
         </div>
@@ -161,8 +170,9 @@ function ClientChart({ clients, loading, onOpen }) {
                   className="ov-seg ov-client"
                   style={client.hours ? { height: `${(client.hours / scale.top) * 100}%` } : undefined}
                   aria-label={`${client.name}, ${hoursLabel(client.hours)} saved`}
-                  onMouseEnter={() => setTip(client.name)}
-                  onFocus={() => setTip(client.name)}
+                  onMouseEnter={(event) => setTip({ name: client.name, ...cursorPoint(event) })}
+                  onMouseMove={(event) => setTip({ name: client.name, ...cursorPoint(event) })}
+                  onFocus={(event) => setTip({ name: client.name, ...cursorPoint(event) })}
                   onClick={() => onOpen({
                     area: 'automations',
                     detail: {
@@ -178,14 +188,14 @@ function ClientChart({ clients, loading, onOpen }) {
                   <i data-bar="hours" data-state={client.hours ? 'value' : 'zero'} />
                 </button>
               </span>
-              <span className="ov-x" title={client.name} onMouseEnter={() => setTip(client.name)}>{client.name}</span>
+              <span className="ov-x" title={client.name} onMouseEnter={(event) => setTip({ name: client.name, ...cursorPoint(event) })} onMouseMove={(event) => setTip({ name: client.name, ...cursorPoint(event) })}>{client.name}</span>
             </div>
           ))}
           {loading ? <p className="ov-empty">Loading client time…</p> : !clients.length ? <p className="ov-empty">No client time this month.</p> : null}
         </div>
         <p className="ov-axis-name ov-x-name">Client</p>
         {active ? (
-          <div className="ov-tip" role="tooltip">
+          <div ref={placed.tipRef} className="ov-tip" role="tooltip" style={placed.style}>
             <b>{active.name}</b>
             <p><span>Time saved</span><b className="num">{hoursLabel(active.hours)}</b></p>
             <p><span>£ saved</span><b className="num">£{active.pounds.toLocaleString('en-GB')}</b></p>
@@ -297,7 +307,7 @@ export function OverviewScreen({ forecast, plan = [], actuals = null, details = 
         <div className={runsPending ? 'kpi no-data loading' : posts == null ? 'kpi no-data' : 'kpi num'}>{pending(runsPending, posts == null ? null : hoursLabel(saved.hours))}</div>
         <p className="k">Time saved</p>
         <ClientChart clients={runsPending ? [] : clients} loading={runsPending} onOpen={onOpen} />
-        <div className="ov-tiles">
+        <div className="ov-tiles ov-tiles-2">
           <Tile label="Time saved" value={pending(runsPending, posts == null ? null : hoursLabel(saved.hours))} onClick={() => openAuto()} />
           <Tile label="£ saved" value={pending(runsPending, posts == null ? null : `£${saved.pounds.toLocaleString('en-GB')}`)} onClick={() => openAuto({ detail: { title: '£ saved', fields: clients.map((client) => ({ label: client.name, value: `£${client.pounds.toLocaleString('en-GB')}` })) } })} />
           <Tile label="Active Zaps" value={pending(runsPending, runs?.zapRows ? String(runs.zapRows.length) : null)} onClick={() => openAuto()} />
