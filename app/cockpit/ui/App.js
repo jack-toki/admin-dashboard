@@ -33,6 +33,8 @@ export default function App({ role, areas, client, fixture = false }) {
   const [forecastError, setForecastError] = useState('');
   const [runBoard, setRunBoard] = useState(null);
   const [runError, setRunError] = useState('');
+  const [jrlLoading, setJrlLoading] = useState(!fixture);
+  const [runsLoading, setRunsLoading] = useState(!fixture);
   const [focus, setFocus] = useState(null);
 
   function openSpace(target) {
@@ -84,13 +86,26 @@ export default function App({ role, areas, client, fixture = false }) {
   }, [areas]);
 
   useEffect(() => {
-    if (fixture || area !== 'jrl') return;
-    fetch('/api/cockpit/jrl').then(async (res) => setJrl({ status: res.status, body: await res.json() }));
-  }, [area]);
+    if (fixture) return undefined;
+    let cancel = false;
+    setJrlLoading(true);
+    fetch('/api/cockpit/jrl').then(async (res) => {
+      if (cancel) return;
+      setJrl({ status: res.status, body: await res.json().catch(() => ({})) });
+    }).catch(() => {
+      if (!cancel) setJrl({ status: 0, body: {} });
+    }).finally(() => {
+      if (!cancel) setJrlLoading(false);
+    });
+    return () => { cancel = true; };
+  }, [fixture]);
 
   useEffect(() => {
-    if (area !== 'automations') return;
+    if (fixture) return undefined;
+    let cancel = false;
+    setRunsLoading(true);
     fetch('/api/cockpit/automations').then(async (res) => {
+      if (cancel) return;
       const body = await res.json().catch(() => ({}));
       if (!res.ok || !body.summary) {
         setRunBoard(null);
@@ -100,10 +115,14 @@ export default function App({ role, areas, client, fixture = false }) {
       setRunError('');
       setRunBoard(body.summary);
     }).catch(() => {
+      if (cancel) return;
       setRunBoard(null);
       setRunError('run_log_unreadable');
+    }).finally(() => {
+      if (!cancel) setRunsLoading(false);
     });
-  }, [area]);
+    return () => { cancel = true; };
+  }, [fixture]);
 
   useEffect(() => {
     if (fixture || !areas.includes('toki')) return;
@@ -399,7 +418,7 @@ export default function App({ role, areas, client, fixture = false }) {
             <p>{subtitle}</p>
           </div>
           <main className="main">
-            {area === 'overview' && <OverviewScreen forecast={storedForecast} plan={plan} actuals={actuals} details={details} jrl={jrl} runs={runBoard} outstanding={outstanding} auto={deriveAutoTasks({ period: new Date().toISOString().slice(0, 7), cells: (storedForecast?.rows || []).flatMap((row) => Object.entries(row.cells || {}).map(([key, cell]) => ({ label: row.label, kind: row.kind, rowNumber: row.rowNumber, month: key, enteredMinor: cell.blank ? null : cell.minor, nullState: cell.blank ? 'blank' : 'amount' }))), details, entries: jrl?.body?.entries || [], posts: runBoard?.posts ?? null, dismissals })} onOpen={openSpace} />}
+            {area === 'overview' && <OverviewScreen forecast={storedForecast} plan={plan} actuals={actuals} details={details} jrl={jrl} jrlLoading={jrlLoading} runs={runBoard} runsLoading={runsLoading} outstanding={outstanding} auto={deriveAutoTasks({ period: new Date().toISOString().slice(0, 7), cells: (storedForecast?.rows || []).flatMap((row) => Object.entries(row.cells || {}).map(([key, cell]) => ({ label: row.label, kind: row.kind, rowNumber: row.rowNumber, month: key, enteredMinor: cell.blank ? null : cell.minor, nullState: cell.blank ? 'blank' : 'amount' }))), details, entries: jrlLoading ? null : (jrl?.body?.entries || []), posts: runsLoading ? null : (runBoard?.posts ?? null), dismissals })} onOpen={openSpace} />}
             {area === 'toki' && <TokiScreen baseline={baseline} actuals={actuals} evidence={evidence} plan={plan} planNote={planNote} onSave={onSave} onRemove={onRemove} formError={formError} forecastError={forecastError} section={tokiView} onSection={setTokiView} details={details} detailStored={detailStored} onSaveDetail={onSaveDetail} onRemoveDetail={onRemoveDetail} outstanding={outstanding} outstandingStored={outstandingStored} onAddOutstanding={onAddOutstanding} onCompleteOutstanding={onCompleteOutstanding} jrlEntries={jrl?.body?.entries || []} automationPosts={runBoard?.posts ?? null} dismissals={dismissals} onDismissAuto={onDismissAuto} focus={focus} onFocusApplied={() => setFocus(null)} />}
             {area === 'automations' && (
               <>

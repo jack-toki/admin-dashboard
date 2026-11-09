@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const { incomeBreakdown, workingMonthLines } = require('../lib/planning/entries');
 const { savingsFromZaps } = require('../lib/automations/savings');
 const { incomeYear, clientsForSegment, segmentLines, retainersEnding, retainersHaveEndDates, clientSavings } = require('../lib/cockpit/overview');
@@ -77,4 +78,20 @@ test('overview client hours match the automations per-zap total', () => {
   assert.equal(clients.reduce((sum, client) => sum + client.pounds, 0), total.pounds);
   assert.equal(clients.reduce((sum, client) => sum + client.hours, 0), total.hours);
   assert.equal(clients[0].name, 'Louise');
+});
+
+test('overview loads JRL and Automations on mount and paints client bars', () => {
+  const app = fs.readFileSync(require('node:path').join(__dirname, '../app/cockpit/ui/App.js'), 'utf8');
+  const screen = fs.readFileSync(require('node:path').join(__dirname, '../app/cockpit/ui/OverviewScreen.js'), 'utf8');
+  const css = fs.readFileSync(require('node:path').join(__dirname, '../app/cockpit/cockpit.css'), 'utf8');
+  assert.equal(app.includes("area !== 'jrl'"), false);
+  assert.equal(app.includes("area !== 'automations'"), false);
+  assert.match(app, /fetch\('\/api\/cockpit\/jrl'\)/);
+  assert.match(app, /fetch\('\/api\/cockpit\/automations'\)/);
+  assert.match(app, /jrlLoading=\{jrlLoading\}/);
+  assert.match(app, /runsLoading=\{runsLoading\}/);
+  assert.match(screen, /Loading client time/);
+  assert.match(screen, /spark empty ov-spark/);
+  assert.match(css, /\.overview-card \.ov-client i\[data-state="value"\] \{ background: #171717; \}/);
+  assert.match(css, /\.overview-card \.ov-spark \{ flex: none; height: 72px;/);
 });

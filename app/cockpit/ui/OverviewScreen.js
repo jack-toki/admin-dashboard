@@ -133,7 +133,7 @@ function monthDetail(month, kind, details) {
   };
 }
 
-function ClientChart({ clients, onOpen }) {
+function ClientChart({ clients, loading, onOpen }) {
   const [tip, setTip] = useState(null);
   const scale = hourTicks(Math.max(0, ...clients.map((client) => client.hours)));
   const active = clients.find((client) => client.name === tip);
@@ -173,7 +173,7 @@ function ClientChart({ clients, onOpen }) {
               <span className="ov-x" title={client.name}>{client.name}</span>
             </div>
           ))}
-          {!clients.length && <p className="ov-empty">No client time this month.</p>}
+          {loading ? <p className="ov-empty">Loading client time…</p> : !clients.length ? <p className="ov-empty">No client time this month.</p> : null}
         </div>
         <p className="ov-axis-name ov-x-name">Client</p>
         {active ? (
@@ -188,7 +188,12 @@ function ClientChart({ clients, onOpen }) {
   );
 }
 
-export function OverviewScreen({ forecast, plan = [], actuals = null, details = [], jrl, runs, outstanding = [], auto = [], onOpen }) {
+function pending(loading, value, empty = '—') {
+  if (loading) return 'Loading';
+  return value == null || value === '' ? empty : value;
+}
+
+export function OverviewScreen({ forecast, plan = [], actuals = null, details = [], jrl, jrlLoading = false, runs, runsLoading = false, outstanding = [], auto = [], onOpen }) {
   const [rates, setRates] = useState([]);
   useEffect(() => {
     let cancel = false;
@@ -214,6 +219,8 @@ export function OverviewScreen({ forecast, plan = [], actuals = null, details = 
   const ledger = deriveLedger(jrl?.body?.entries || []);
   const latest = ledger.at(-1);
   const posts = runs?.posts;
+  const runsPending = Boolean(runsLoading && runs == null);
+  const jrlPending = Boolean(jrlLoading && !jrl);
   const saved = savingsFromZaps(runs?.zapRows || [], rates);
   const clients = clientSavings(runs?.zapRows || [], rates);
   const openCount = outstanding.length + auto.length;
@@ -255,8 +262,8 @@ export function OverviewScreen({ forecast, plan = [], actuals = null, details = 
           <Tile label="Costs" value={costs == null ? '—' : formatPounds(costs)} onClick={() => openToki({ month, board: 'groups', detail: { title: 'Costs', fields: [{ label: 'Month', value: month }, { label: 'Costs', value: costs == null ? '—' : formatPounds(costs) }] } })} />
           <Tile label="Profit" value={income == null || costs == null ? '—' : formatPounds(income - costs)} onClick={() => openToki({ month, detail: { title: 'Profit', fields: [{ label: 'Month', value: month }, { label: 'Profit', value: income == null || costs == null ? '—' : formatPounds(income - costs) }] } })} />
           <Tile label="Year to date" value={ytd ? formatPounds(ytd) : '—'} onClick={() => openToki({ board: 'year' })} />
-          <Tile label="Time saved" value={posts == null ? '—' : hoursLabel(saved.hours)} onClick={() => openAuto()} />
-          <Tile label="£ saved" value={posts == null ? '—' : `£${saved.pounds.toLocaleString('en-GB')}`} onClick={() => openAuto({ detail: { title: '£ saved', fields: clients.map((client) => ({ label: client.name, value: `£${client.pounds.toLocaleString('en-GB')}` })) } })} />
+          <Tile label="Time saved" value={pending(runsPending, posts == null ? null : hoursLabel(saved.hours))} onClick={() => openAuto()} />
+          <Tile label="£ saved" value={pending(runsPending, posts == null ? null : `£${saved.pounds.toLocaleString('en-GB')}`)} onClick={() => openAuto({ detail: { title: '£ saved', fields: clients.map((client) => ({ label: client.name, value: `£${client.pounds.toLocaleString('en-GB')}` })) } })} />
           <Tile label="Next retainer" value={nextRetainer?.party || '—'} onClick={() => openToki(nextRetainer ? { section: 'sources', detail: { title: nextRetainer.party, fields: [{ label: 'Kind', value: 'Retainer' }, { label: 'Amount', value: nextRetainer.amountMinor == null ? '—' : formatPounds(nextRetainer.amountMinor) }] } } : { section: 'sources' })} />
           <Tile label="Outstanding" value={String(openCount)} onClick={() => openToki()} />
         </div>
@@ -264,31 +271,33 @@ export function OverviewScreen({ forecast, plan = [], actuals = null, details = 
       </article>
       <article className="card glass overview-card">
         <h2>JRL</h2>
-        <div className={latest ? 'kpi num' : 'kpi no-data'}>{latest ? `£${Math.round(latest.net_total || 0).toLocaleString('en-GB')}` : '—'}</div>
+        <div className={jrlPending ? 'kpi no-data loading' : latest ? 'kpi num' : 'kpi no-data'}>{pending(jrlPending, latest ? `£${Math.round(latest.net_total || 0).toLocaleString('en-GB')}` : null)}</div>
         <p className="k">Net {latest?.period || 'this month'}</p>
-        <div className={jrlSpark.filter((point) => Number.isFinite(point.value)).length < 2 ? 'spark empty ov-spark' : 'spark ov-spark'} aria-hidden="true">
+        <div className={jrlSpark.filter((point) => Number.isFinite(point.value)).length < 2 ? 'spark empty ov-spark' : 'spark ov-spark'} aria-hidden="true" aria-busy={jrlPending || undefined}>
           {jrlSpark.filter((point) => Number.isFinite(point.value)).length >= 2 && jrlSpark.map((point) => {
-            const max = Math.max(...jrlSpark.map((item) => Math.abs(item.value) || 0), 1);
-            return <i key={point.id} style={{ height: Number.isFinite(point.value) ? `${Math.max(8, Math.round((Math.abs(point.value) / max) * 100))}%` : '8%' }} />;
+            const finite = jrlSpark.map((item) => item.value).filter((value) => Number.isFinite(value));
+            const max = Math.max(...finite.map((value) => Math.abs(value)), 1);
+            const height = Number.isFinite(point.value) ? Math.max(12, Math.round((Math.abs(point.value) / max) * 100)) : 12;
+            return <i key={point.id} style={{ height: `${height}%` }} />;
           })}
         </div>
         <div className="ov-tiles">
-          <Tile label="Ledger" value={latest ? `${ledger.length} ${ledger.length === 1 ? 'month' : 'months'}` : '—'} onClick={() => onOpen?.('jrl')} />
-          <Tile label="Savings" value={latest ? `£${Math.round(latest.savings_total || 0).toLocaleString('en-GB')}` : '—'} onClick={() => onOpen?.('jrl')} />
-          <Tile label="Outstanding" value={String(auto.filter((task) => task.taskKey === 'jrl-month' || task.taskKey === 'pots-stale').length)} onClick={() => onOpen?.('jrl')} />
+          <Tile label="Ledger" value={pending(jrlPending, latest ? `${ledger.length} ${ledger.length === 1 ? 'month' : 'months'}` : null)} onClick={() => onOpen?.('jrl')} />
+          <Tile label="Savings" value={pending(jrlPending, latest ? `£${Math.round(latest.savings_total || 0).toLocaleString('en-GB')}` : null)} onClick={() => onOpen?.('jrl')} />
+          <Tile label="Outstanding" value={pending(jrlPending, String(auto.filter((task) => task.taskKey === 'jrl-month' || task.taskKey === 'pots-stale').length))} onClick={() => onOpen?.('jrl')} />
         </div>
         <button type="button" className="btn" onClick={() => onOpen?.('jrl')}>View JRL</button>
       </article>
       <article className="card glass overview-card">
         <h2>Automations</h2>
-        <div className={posts == null ? 'kpi no-data' : 'kpi num'}>{posts == null ? '—' : hoursLabel(saved.hours)}</div>
+        <div className={runsPending ? 'kpi no-data loading' : posts == null ? 'kpi no-data' : 'kpi num'}>{pending(runsPending, posts == null ? null : hoursLabel(saved.hours))}</div>
         <p className="k">Time saved</p>
-        <ClientChart clients={clients} onOpen={onOpen} />
+        <ClientChart clients={runsPending ? [] : clients} loading={runsPending} onOpen={onOpen} />
         <div className="ov-tiles">
-          <Tile label="Time saved" value={posts == null ? '—' : hoursLabel(saved.hours)} onClick={() => openAuto()} />
-          <Tile label="£ saved" value={posts == null ? '—' : `£${saved.pounds.toLocaleString('en-GB')}`} onClick={() => openAuto({ detail: { title: '£ saved', fields: clients.map((client) => ({ label: client.name, value: `£${client.pounds.toLocaleString('en-GB')}` })) } })} />
-          <Tile label="Active Zaps" value={runs?.zapRows ? String(runs.zapRows.length) : '—'} onClick={() => openAuto()} />
-          <Tile label="Posts" value={posts == null ? '—' : String(posts)} onClick={() => openAuto()} />
+          <Tile label="Time saved" value={pending(runsPending, posts == null ? null : hoursLabel(saved.hours))} onClick={() => openAuto()} />
+          <Tile label="£ saved" value={pending(runsPending, posts == null ? null : `£${saved.pounds.toLocaleString('en-GB')}`)} onClick={() => openAuto({ detail: { title: '£ saved', fields: clients.map((client) => ({ label: client.name, value: `£${client.pounds.toLocaleString('en-GB')}` })) } })} />
+          <Tile label="Active Zaps" value={pending(runsPending, runs?.zapRows ? String(runs.zapRows.length) : null)} onClick={() => openAuto()} />
+          <Tile label="Posts" value={pending(runsPending, posts == null ? null : String(posts))} onClick={() => openAuto()} />
         </div>
         <button type="button" className="btn" onClick={() => openAuto()}>View Automations</button>
       </article>
