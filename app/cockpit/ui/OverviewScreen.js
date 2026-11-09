@@ -1,8 +1,9 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { formatPounds } from '../../../lib/money';
 import { deriveLedger } from '../../../lib/jrl/finance';
-import { moneySaved } from '../../../lib/automations/savings';
+import { savingsFromZaps } from '../../../lib/automations/savings';
 
 function shown(minor) {
   if (minor == null || !Number.isFinite(minor)) return '—';
@@ -23,6 +24,15 @@ function Spark({ points }) {
 }
 
 export function OverviewScreen({ forecast, details = [], jrl, runs, outstanding = [], auto = [], onOpen }) {
+  const [rates, setRates] = useState([]);
+  useEffect(() => {
+    let cancel = false;
+    fetch('/api/cockpit/rates').then(async (res) => {
+      const body = await res.json().catch(() => ({}));
+      if (!cancel && Array.isArray(body.rows)) setRates(body.rows);
+    }).catch(() => {});
+    return () => { cancel = true; };
+  }, []);
   const month = new Date().toISOString().slice(0, 7);
   const rows = forecast?.rows || [];
   const months = [...new Set(rows.flatMap((row) => Object.keys(row.cells || {})))].sort();
@@ -39,7 +49,7 @@ export function OverviewScreen({ forecast, details = [], jrl, runs, outstanding 
   const ledger = deriveLedger(jrl?.body?.entries || []);
   const latest = ledger.at(-1);
   const posts = runs?.posts;
-  const saved = moneySaved({ runs: posts || 0, minutes: 7, hourlyRate: 50 });
+  const saved = savingsFromZaps(runs?.zapRows || [], rates);
   const openCount = outstanding.length + auto.length;
   const tokiSpark = months.map((key) => ({ id: key, value: incomeOf(key) }));
   const jrlSpark = ledger.map((row) => ({ id: row.period, value: row.net_total }));
