@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { formatPounds } from '../../../lib/money';
-import { activeInMonth, reconcileKind, scheduleFor } from '../../../lib/planning/incomeDetail';
+import { reconcileKind, scheduleFor, shownInMonth } from '../../../lib/planning/incomeDetail';
 
 function money(minor) {
   if (minor == null || !Number.isFinite(minor)) return 'Missing information';
@@ -47,7 +47,7 @@ export function IncomeBoard({ month, records, stored, baselineRetainer, baseline
   }
 
   function column(title, rows, nextKind) {
-    const visible = rows.filter((row) => activeInMonth(row, month) || !row.firstPaymentMonth);
+    const visible = rows.filter((row) => shownInMonth(row, month));
     return (
       <section className="income-col" data-pane={nextKind} data-on={kind === nextKind || pane === 'income' ? 'true' : 'false'}>
         <header>

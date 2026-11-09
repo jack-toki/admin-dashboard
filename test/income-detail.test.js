@@ -6,7 +6,7 @@ const path = require('path');
 const { signSession, cookieName } = require('../lib/auth');
 const { incomeDetailGet, incomeDetailPost, incomeDetailDelete } = require('../lib/cockpit/http');
 const { workingMonthLines, incomeBreakdown, sumLines } = require('../lib/planning/entries');
-const { scheduleFor, detailSum, reconcileKind, validateIncomeDetail, presentDetails } = require('../lib/planning/incomeDetail');
+const { scheduleFor, detailSum, reconcileKind, validateIncomeDetail, presentDetails, shownInMonth } = require('../lib/planning/incomeDetail');
 const { adaptSnapshot, loadIncomeSource } = require('../lib/planning/incomeSource');
 const { syntheticBaseline } = require('../lib/fixtures/synthetic');
 
@@ -86,6 +86,68 @@ test('client lines do not change the forecast total and the gap can be negative'
   assert.equal(validateIncomeDetail({ kind: 'retainer', party: '', amountMinor: 1 }).ok, false);
 });
 
+test('stored snapshot rows stay visible without a source file and do not multiply across the year', () => {
+  const months = [...Array.from({ length: 12 }, (_, index) => `2026-${String(index + 1).padStart(2, '0')}`), '2027-01'];
+  const stamped = months.map((month, index) => ({
+    id: `snap_${month}`,
+    sourceRowId: `retainer:${index + 1}`,
+    source: 'snapshot',
+    layer: 'detail',
+    kind: 'retainer',
+    party: 'Example Retainer',
+    amountMinor: month === '2026-11' ? 0 : 1000,
+    contractEndDate: null,
+    contractEndUnknown: true,
+    firstPaymentMonth: null,
+    observedMonth: month,
+    comment: month === '2026-11' ? '2 of 6' : '',
+    deletedAt: null,
+  }));
+  const unknown = {
+    id: 'snap_unknown',
+    sourceRowId: 'retainer:unknown',
+    source: 'snapshot',
+    kind: 'retainer',
+    party: 'Unknown Amount',
+    amountMinor: null,
+    contractEndUnknown: true,
+    observedMonth: '2026-11',
+    comment: '3 of 6',
+    deletedAt: null,
+  };
+  const duplicate = { ...stamped[10], id: 'snap_dup' };
+  const shown = presentDetails([...stamped, duplicate, unknown], []);
+  assert.equal(shown.filter((row) => row.sourceRowId === 'retainer:11').length, 1);
+  assert.equal(shown.length, 14);
+  for (const month of months) {
+    const visible = shown.filter((row) => shownInMonth(row, month));
+    assert.equal(visible.filter((row) => row.sourceRowId !== 'retainer:unknown').length, 1);
+    assert.equal(visible[0].observedMonth === month || visible.some((row) => row.observedMonth === month), true);
+  }
+  assert.equal(detailSum(shown, '2026-11', 'retainer'), null);
+  assert.equal(detailSum(shown.filter((row) => row.amountMinor != null), '2026-11', 'retainer'), 0);
+  assert.equal(detailSum(shown.filter((row) => row.amountMinor != null), '2026-10', 'retainer'), 1000);
+  assert.equal(detailSum(shown.filter((row) => row.amountMinor != null), '2027-01', 'retainer'), 1000);
+  const noted = scheduleFor(unknown, '2026-11');
+  assert.equal(noted.state, 'unknown');
+  assert.equal(noted.received, false);
+  assert.equal(noted.label, 'Noted 3 of 6 · schedule unknown');
+  assert.equal(validateIncomeDetail(unknown).record.firstPaymentMonth, null);
+  assert.equal(validateIncomeDetail(unknown).record.contractEndDate, null);
+  assert.equal(validateIncomeDetail(unknown).record.totalPayments, null);
+  const file = [{ ...stamped[0], id: 'file_copy', party: 'From file', amountMinor: 999 }];
+  const edited = presentDetails([{ ...stamped[0], party: 'Edited', amountMinor: 50 }], file);
+  assert.equal(edited.length, 1);
+  assert.equal(edited[0].party, 'Edited');
+  assert.equal(edited[0].amountMinor, 50);
+  const removed = presentDetails([{ ...stamped[0], deletedAt: '2026-11-08T00:00:00Z' }], file);
+  assert.equal(removed.length, 0);
+  const baseline = syntheticBaseline();
+  const forecast = sumLines(workingMonthLines(baseline.rows, [], '2026-11'), 'sale');
+  const still = sumLines(workingMonthLines(baseline.rows, shown, '2026-11'), 'sale');
+  assert.equal(still, forecast);
+});
+
 test('a tombstone stops the same source id from coming back', () => {
   const source = [{ sourceRowId: 'sheet:3:retainer', id: 'source_sheet_3', layer: 'detail', kind: 'retainer', party: 'Example', amountMinor: 100, deletedAt: null }];
   const shown = presentDetails([], source);
@@ -156,5 +218,49 @@ test('the file store saves a client line without adding a forecast row, and a sh
   } finally {
     if (previous == null) delete process.env.DASHBOARD_SESSION_SECRET;
     else process.env.DASHBOARD_SESSION_SECRET = previous;
+  }
+});
+
+test('a signed-in read shows stored snapshot rows when no source file is configured', async () => {
+  const env = {
+    DASHBOARD_SESSION_SECRET: 'session-secret-for-test',
+    NODE_ENV: 'test',
+  };
+  const previous = process.env.DASHBOARD_SESSION_SECRET;
+  const previousSource = process.env.INCOME_SOURCE_SNAPSHOT;
+  process.env.DASHBOARD_SESSION_SECRET = env.DASHBOARD_SESSION_SECRET;
+  delete process.env.INCOME_SOURCE_SNAPSHOT;
+  const admin = signSession({ role: 'admin', areas: ['toki'] }, env);
+  const cookie = `${cookieName()}=${admin}`;
+  try {
+    const listed = await incomeDetailGet(new Request('http://localhost/api/cockpit/income-detail', { headers: { cookie } }), {
+      env,
+      openAppStore: () => ({
+        ok: true,
+        status: { backend: 'supabase', shared: true },
+        store: {
+          async listIncomeDetails() {
+            return [
+              { id: 'snap_1', sourceRowId: 'retainer:4', source: 'snapshot', layer: 'detail', kind: 'retainer', party: 'Stored Co', amountMinor: 0, contractEndUnknown: true, comment: '2 of 6', observedMonth: '2026-11', deletedAt: null },
+              { id: 'manual_1', source: 'manual', layer: 'detail', kind: 'project', party: 'Manual Co', amountMinor: 100, contractEndDate: '2027-01-31', firstPaymentMonth: '2026-11', deletedAt: null },
+            ];
+          },
+          listPlans() { throw new Error('plans'); },
+        },
+      }),
+    });
+    assert.equal(listed.status, 200);
+    const body = await listed.json();
+    assert.equal(body.stored, true);
+    assert.equal(body.source.error, 'income_source_not_configured');
+    assert.equal(body.source.ok, false);
+    assert.deepEqual(body.records.map((row) => row.party), ['Stored Co', 'Manual Co']);
+    assert.equal(body.records[0].amountMinor, 0);
+    assert.equal(JSON.stringify(body).includes('unavailable'), false);
+  } finally {
+    if (previous == null) delete process.env.DASHBOARD_SESSION_SECRET;
+    else process.env.DASHBOARD_SESSION_SECRET = previous;
+    if (previousSource == null) delete process.env.INCOME_SOURCE_SNAPSHOT;
+    else process.env.INCOME_SOURCE_SNAPSHOT = previousSource;
   }
 });
