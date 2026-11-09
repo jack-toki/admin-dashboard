@@ -1,10 +1,20 @@
 'use client';
 
+import { useEffect } from 'react';
+
 export function DetailDrawer({ title, onClose, children }) {
+  useEffect(() => {
+    const root = document.querySelector('.jrl-root');
+    if (!root) return undefined;
+    if (title) root.dataset.panel = 'open';
+    else delete root.dataset.panel;
+    return () => { delete root.dataset.panel; };
+  }, [title]);
+
   if (!title) return null;
   return (
-    <div className="drawer-back" role="presentation" onClick={onClose}>
-      <aside className="drawer" role="dialog" aria-modal="true" aria-label={title} onClick={(event) => event.stopPropagation()}>
+    <div className="drawer-back">
+      <aside className="drawer card" role="dialog" aria-modal="false" aria-label={title}>
         <header className="drawer-head">
           <h2>{title}</h2>
           <button type="button" className="btn btn-ghost" onClick={onClose}>Close</button>

@@ -251,12 +251,12 @@ function niceMax(minor) {
 }
 
 function ChartLegend({ name, series, hidden, setHidden, ready = {} }) {
-  const shown = series.filter((item) => ready[item.id] !== false && item.id !== 'actual' && item.id !== 'unallocated');
+  const shown = series.filter((item) => ready[item.id] !== false && item.id !== 'unallocated');
   return (
     <span className="year-legend" role="group" aria-label={`${name} series`}>
       {shown.map((item) => (
         <button key={item.id} type="button" className="chart-key" aria-pressed={!hidden[item.id]} onClick={() => setHidden((current) => ({ ...current, [item.id]: !current[item.id] }))}>
-          <i style={{ background: item.color }} />
+          <i className={`swatch-${item.swatch || item.id}`} style={item.swatch ? undefined : { background: item.color }} />
           {item.label}
         </button>
       ))}
@@ -280,15 +280,11 @@ export function YearColumns({ name, months, selectedId, onOpen, format, tabs = n
   const [showAverage, setShowAverage] = useState(true);
   const [focusId, setFocusId] = useState('');
   const legend = [
-    ...(months[0]?.segments || []).map((item) => ({ id: item.id, label: item.label, color: item.color })),
-    { id: 'actual', label: 'Actual', color: 'var(--series-actual)' },
+    { id: 'retainer', label: 'Retainer (forecast)', swatch: 'retainer' },
+    { id: 'project', label: 'Project (forecast)', swatch: 'project' },
+    { id: 'actual', label: 'Actual received', swatch: 'actual' },
   ];
-  const ready = {
-    actual: months.some((month) => month.actual != null && Number.isFinite(month.actual)),
-  };
-  for (const item of months[0]?.segments || []) {
-    ready[item.id] = months.some((month) => month.segments.some((segment) => segment.id === item.id && segment.value != null && Number.isFinite(segment.value)));
-  }
+  const ready = { retainer: true, project: true, actual: true };
   const knownTotals = months.map((month) => month.total).filter((value) => value != null && Number.isFinite(value));
   const average = knownTotals.length ? Math.round(knownTotals.reduce((sum, value) => sum + value, 0) / knownTotals.length) : null;
   const visible = new Set(legend.map((item) => item.id).filter((id) => ready[id] !== false && !hidden[id]));
@@ -317,11 +313,20 @@ export function YearColumns({ name, months, selectedId, onOpen, format, tabs = n
       <div className="chart-well">
         <span className="year-legend">
           <ChartLegend name={name} series={legend} hidden={hidden} setHidden={setHidden} ready={ready} />
-          <button type="button" className="chart-key" aria-pressed={showAverage} title="Average of known months. Missing months are left out. A stored zero is included." onClick={() => setShowAverage((current) => !current)}>
+          <button type="button" className="chart-key" aria-pressed={showAverage} title="Average of known forecast months. Missing months are left out. A stored zero is included." onClick={() => setShowAverage((current) => !current)}>
             <i className="avg-swatch" />
             Average
           </button>
         </span>
+        {focusId && active ? (
+          <div className="col-tip" role="tooltip">
+            <b>{active.label}</b>
+            <span>Retainer (forecast) {moneyText(active.segments?.find((item) => item.id === 'retainer')?.value, format)}</span>
+            <span>Project (forecast) {moneyText(active.segments?.find((item) => item.id === 'project')?.value, format)}</span>
+            <span>Actual received {moneyText(active.actual, format)}</span>
+            <span>Average {average == null ? '—' : moneyText(average, format)}</span>
+          </div>
+        ) : null}
       <div className="col-chart">
         <div className="col-axis" aria-hidden="true">
           <span>{axisText(max)}</span>
@@ -339,7 +344,8 @@ export function YearColumns({ name, months, selectedId, onOpen, format, tabs = n
               data-index={index}
               data-chart-point={month.id}
               aria-pressed={month.id === selectedId}
-              aria-label={`${month.label}. Income ${moneyText(month.total, format)}. ${month.lines.map((line) => linePhrase(line, format)).join('. ')}. Opens this month.`}
+              aria-label={`${month.label}. Retainer (forecast) ${moneyText(month.segments?.find((item) => item.id === 'retainer')?.value, format)}. Project (forecast) ${moneyText(month.segments?.find((item) => item.id === 'project')?.value, format)}. Actual received ${moneyText(month.actual, format)}. Average ${moneyText(average, format)}. Opens this month.`}
+              title=""
               onClick={() => onOpen?.(month.id)}
               onFocus={() => setFocusId(month.id)}
               onBlur={() => setFocusId('')}
@@ -373,7 +379,7 @@ export function YearColumns({ name, months, selectedId, onOpen, format, tabs = n
       </div>
       <div className="chart-readout" role="status" aria-live="polite">
         <div><span>{active?.label || 'Month'}</span><b>{moneyText(active?.total, format)}</b></div>
-        <div><span>Actual</span>{active?.actual == null ? <em className="miss-pill" title="Missing information, not zero.">Missing</em> : <b>{moneyText(active.actual, format)}</b>}</div>
+        <div><span>Actual received</span>{active?.actual == null ? <em className="miss-pill" title="Missing information, not zero.">Missing</em> : <b>{moneyText(active.actual, format)}</b>}</div>
         <div><span>Average</span><b>{average == null ? '—' : moneyText(average, format)}</b></div>
         {shownLines.length > 0 && (
           <ul>
