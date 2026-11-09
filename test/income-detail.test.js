@@ -20,13 +20,13 @@ const acme = {
 };
 
 test('Acme November is scheduled 2 of 6 and an end date a month later changes the span', () => {
-  assert.equal(scheduleFor(acme, '2026-11').label, 'Scheduled 2 of 6');
+  assert.equal(scheduleFor(acme, '2026-11').label, 'Payment 2 of 6');
   assert.equal(scheduleFor(acme, '2026-11').received, false);
   assert.equal(scheduleFor(acme, '2026-09').label, 'No payment this month');
   assert.equal(scheduleFor(acme, '2027-04').state, 'outside');
-  assert.equal(scheduleFor({ ...acme, contractEndDate: '2027-04-01', totalPayments: null }, '2027-04').label, 'Scheduled 7 of 7');
+  assert.equal(scheduleFor({ ...acme, contractEndDate: '2027-04-01', totalPayments: null }, '2027-04').label, 'Payment 7 of 7');
   assert.equal(scheduleFor({ ...acme, contractEndDate: '2027-02-28', totalPayments: null }, '2027-02').position, 5);
-  assert.equal(scheduleFor({ firstPaymentMonth: '2026-12', contractEndDate: '2027-01-01' }, '2027-01').label, 'Scheduled 2 of 2');
+  assert.equal(scheduleFor({ firstPaymentMonth: '2026-12', contractEndDate: '2027-01-01' }, '2027-01').label, 'Payment 2 of 2');
   assert.equal(scheduleFor({ firstPaymentMonth: null, contractEndDate: null, comment: '2 of 6' }, '2026-11').state, 'unknown');
 });
 
@@ -131,7 +131,7 @@ test('stored snapshot rows stay visible without a source file and do not multipl
   const noted = scheduleFor(unknown, '2026-11');
   assert.equal(noted.state, 'unknown');
   assert.equal(noted.received, false);
-  assert.equal(noted.label, 'Noted 3 of 6 · schedule unknown');
+  assert.equal(noted.label, 'Note says 3 of 6. Payment number unknown');
   assert.equal(validateIncomeDetail(unknown).record.firstPaymentMonth, null);
   assert.equal(validateIncomeDetail(unknown).record.contractEndDate, null);
   assert.equal(validateIncomeDetail(unknown).record.totalPayments, null);

@@ -814,6 +814,9 @@ button.quick-card { cursor: pointer; }
   .drawer { border-radius: 0; }
 }
 .click-row { cursor: pointer; }
+.auto-ranges { display: flex; flex-wrap: wrap; gap: 6px; }
+.auto-ranges button { border: 0; background: var(--control); color: var(--ink); font: inherit; font-size: 13px; min-height: 34px; padding: 0 12px; border-radius: 999px; cursor: pointer; }
+.auto-ranges button:hover, .auto-ranges button[aria-pressed="true"] { background: var(--orange); color: #fff; }
 .auto-switch { display: inline-flex; gap: 4px; background: var(--control); border-radius: 999px; padding: 4px; }
 .auto-switch button[aria-pressed="true"] { background: var(--control-on); color: var(--control-ink, #fff); border-radius: 999px; }
 .auto-switch button { border: 0; background: transparent; color: var(--ink); font: inherit; min-height: 36px; padding: 0 14px; cursor: pointer; border-radius: 999px; }
@@ -965,6 +968,31 @@ button.quick-card { padding: 18px 18px 16px; }
 .forecast-table { width: 100%; border-collapse: collapse; }
 .forecast-table th, .forecast-table td { text-align: left; padding: 6px 8px; white-space: nowrap; }
 .forecast-table input { width: 76px; font: inherit; color: var(--ink); background: var(--control); border: 0; border-radius: 8px; min-height: 32px; padding: 0 6px; }
-.chart-card[data-chart="forecast-plan"] .chart-axis { font-size: unset; }
+.forecast-stack .chart-key i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; }
+.fs-plot { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; min-height: 220px; }
+.fs-y { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; color: var(--ink); font-size: 12px; line-height: 1; padding-bottom: 22px; }
+.fs-cols { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; align-items: end; min-width: 0; }
+.fs-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; height: 100%; }
+.fs-track { position: relative; height: 180px; }
+.fs-seg { position: absolute; left: 8%; right: 8%; width: auto; min-height: 2px; border: 0; padding: 0; border-radius: 3px 3px 0 0; cursor: pointer; }
+.fs-x { height: 16px; font-size: 12px; line-height: 16px; text-align: center; color: var(--ink); white-space: nowrap; }
+.forecast-stack .chart-key i[data-seg="actual-retainer"], .fs-seg[data-seg="actual-retainer"] { background: #1f4b99; }
+.forecast-stack .chart-key i[data-seg="actual-project"], .fs-seg[data-seg="actual-project"] { background: #9db7e4; }
+.forecast-stack .chart-key i[data-seg="potential-75"], .fs-seg[data-seg="potential-75"] { background: #9a3412; }
+.forecast-stack .chart-key i[data-seg="potential-50"], .fs-seg[data-seg="potential-50"] { background: #c2410c; }
+.forecast-stack .chart-key i[data-seg="potential-25"], .fs-seg[data-seg="potential-25"] { background: #ea580c; }
+.forecast-stack .chart-key i[data-seg="potential-10"], .fs-seg[data-seg="potential-10"] { background: #fdba74; }
+.jrl-root[data-theme="dark"] .forecast-stack .chart-key i[data-seg="actual-retainer"],
+.jrl-root[data-theme="dark"] .fs-seg[data-seg="actual-retainer"] { background: #93c5fd; }
+.jrl-root[data-theme="dark"] .forecast-stack .chart-key i[data-seg="actual-project"],
+.jrl-root[data-theme="dark"] .fs-seg[data-seg="actual-project"] { background: #1d4ed8; }
+.jrl-root[data-theme="dark"] .forecast-stack .chart-key i[data-seg="potential-75"],
+.jrl-root[data-theme="dark"] .fs-seg[data-seg="potential-75"] { background: #7c2d12; }
+.jrl-root[data-theme="dark"] .forecast-stack .chart-key i[data-seg="potential-50"],
+.jrl-root[data-theme="dark"] .fs-seg[data-seg="potential-50"] { background: #c2410c; }
+.jrl-root[data-theme="dark"] .forecast-stack .chart-key i[data-seg="potential-25"],
+.jrl-root[data-theme="dark"] .fs-seg[data-seg="potential-25"] { background: #fb923c; }
+.jrl-root[data-theme="dark"] .forecast-stack .chart-key i[data-seg="potential-10"],
+.jrl-root[data-theme="dark"] .fs-seg[data-seg="potential-10"] { background: #fed7aa; }
 .chart-axis { fill: var(--ink); }
 .chart-grid { stroke: var(--hair); stroke-width: .5; }

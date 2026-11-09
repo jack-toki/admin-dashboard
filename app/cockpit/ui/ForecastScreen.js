@@ -1,97 +1,90 @@
 'use client';
 
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { CursorTooltip, cursorPoint } from './CursorTooltip';
-import { svgAxisFont } from '../../../lib/cockpit/placeTooltip';
 import { formatPounds } from '../../../lib/money';
-import { pipelineInputEdit, pipelineView } from '../../../lib/forecast/pipelinePlan';
+import { pipelineInputEdit, pipelineStack, pipelineView } from '../../../lib/forecast/pipelinePlan';
 
 function money(minor) {
   if (minor == null || !Number.isFinite(Number(minor))) return '—';
   return formatPounds(Math.round(Number(minor)));
 }
 
-function PlanChart({ points, series }) {
+function compactPounds(minor) {
+  const pounds = Math.abs(minor) / 100;
+  const compact = pounds >= 1000 ? `${Math.round((pounds / 1000) * 10) / 10}k` : String(Math.round(pounds));
+  return `${minor < 0 ? '-' : ''}£${compact}`;
+}
+
+function PlanChart({ stack }) {
   const [hidden, setHidden] = useState({});
   const [tip, setTip] = useState(null);
   const tipId = useId();
-  const svgRef = useRef(null);
-  const width = 720;
-  const height = 200;
-  const [axisFont, setAxisFont] = useState(12);
-  useLayoutEffect(() => {
-    const svg = svgRef.current;
-    if (!svg) return undefined;
-    const fit = () => {
-      const box = svg.getBoundingClientRect();
-      setAxisFont(svgAxisFont(12, width, box.width));
-    };
-    fit();
-    const observer = new ResizeObserver(fit);
-    observer.observe(svg);
-    return () => observer.disconnect();
-  }, [width]);
-  const visible = series.filter((item) => !hidden[item.id]);
-  const values = visible.flatMap((item) => item.values.map((point) => point.value)).filter((value) => value != null && Number.isFinite(value));
-  const max = Math.max(1, ...values.map((value) => Math.abs(value)));
-  const padL = 72;
-  const padR = 36;
-  const padT = 16;
-  const padB = 36;
+  const months = stack?.months || [];
+  const keys = stack?.segments || [];
+  const visible = (column) => column.segments.filter((segment) => !hidden[segment.id] && segment.minor > 0);
+  const max = Math.max(1, ...months.map((column) => visible(column).reduce((sum, segment) => sum + segment.minor, 0)));
 
-  function show(point, event) {
-    const lines = visible.map((item) => {
-      const value = item.values.find((entry) => entry.id === point.id);
-      return `${item.label}: ${value?.value == null ? '—' : formatPounds(Math.round(value.value * 100))}`;
-    });
-    setTip({ id: point.id, ...cursorPoint(event), text: `${point.label}\n${lines.join('\n')}` });
+  function show(column, segment, event) {
+    const clients = segment.clients.length
+      ? segment.clients.map((client) => `${client.name} · ${formatPounds(client.minor)} · ${client.type || 'Type not stored'}`)
+      : ['No client lines'];
+    const text = [
+      column.label,
+      segment.label,
+      formatPounds(segment.minor),
+      ...clients,
+      `Month actual ${formatPounds(column.actual)}`,
+      `Month potential ${formatPounds(column.potential)}`,
+    ].join('\n');
+    setTip({ id: `${column.id}:${segment.id}`, ...cursorPoint(event), text });
   }
 
   return (
-    <figure className="chart-card" data-chart="forecast-plan">
-      <div className="cl" role="group" aria-label="Forecast series">
-        {series.map((item) => (
-          <button key={item.id} type="button" className="chart-key" aria-pressed={!hidden[item.id]} onClick={() => setHidden((current) => ({ ...current, [item.id]: !current[item.id] }))}>
-            <i style={{ background: item.kind === 'forecast' ? 'var(--orange)' : '#171717', opacity: item.kind === 'forecast' ? 0.6 : 1 }} />
-            {item.label}
+    <figure className="chart-card forecast-stack" data-chart="forecast-plan">
+      <div className="cl" role="group" aria-label="Forecast segments">
+        {keys.map((item) => (
+          <button key={item.id} type="button" className="chart-key" aria-pressed={!hidden[item.id]} title={item.sheet || item.label} onClick={() => setHidden((current) => ({ ...current, [item.id]: !current[item.id] }))}>
+            <i data-seg={item.id} />
+            {item.label}{item.sheet && !item.label.includes(item.sheet) ? ` · ${item.sheet}` : ''}
           </button>
         ))}
       </div>
-      <div className="chart-plot" onMouseLeave={() => setTip(null)}>
-        <svg ref={svgRef} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Active against scenario lines">
-          <text x="4" y="12" className="chart-axis" style={{ fontSize: axisFont }} fontSize={axisFont}>£</text>
-          {[0, 0.5, 1].map((step) => {
-            const y = padT + (1 - step) * (height - padT - padB);
-            const pounds = max * step;
-            const abs = Math.abs(pounds);
-            const compact = abs >= 1000 ? `${Math.round((abs / 1000) * 10) / 10}k` : String(Math.round(abs));
-            return <g key={step}><line className="chart-grid" x1={padL} x2={width - padR} y1={y} y2={y} /><text className="chart-axis" style={{ fontSize: axisFont }} fontSize={axisFont} x={padL - 8} y={y + 4} textAnchor="end">{`${pounds < 0 ? '-' : ''}£${compact}`}</text></g>;
-          })}
-          {visible.map((item) => {
-            const coords = points.map((point, index) => {
-              const value = item.values.find((entry) => entry.id === point.id);
-              if (value?.value == null || !Number.isFinite(value.value)) return null;
-              const x = padL + (index * (width - padL - padR)) / Math.max(points.length - 1, 1);
-              const y = padT + (1 - Math.abs(value.value) / max) * (height - padT - padB);
-              return `${x},${y}`;
-            }).filter(Boolean);
-            if (coords.length < 2) return null;
-            return <polyline key={item.id} data-kind={item.kind || 'history'} fill="none" stroke={item.kind === 'forecast' ? 'var(--orange)' : '#171717'} strokeWidth="1.6" opacity={item.kind === 'forecast' ? 0.55 : 1} points={coords.join(' ')} />;
-          })}
-          {points.map((point, index) => {
-            const x = padL + (index * (width - padL - padR)) / Math.max(points.length - 1, 1);
-            const slot = (width - padL - padR) / Math.max(points.length, 1);
-            return (
-              <g key={point.id}>
-                <text className="chart-axis" style={{ fontSize: axisFont }} fontSize={axisFont} x={x} y={height - 14} textAnchor="middle">{point.label}</text>
-                <rect className="chart-hit" x={x - slot / 2} y={padT} width={slot} height={height - padT - padB} fill="transparent" onMouseEnter={(event) => show(point, event)} onMouseMove={(event) => show(point, event)} />
-              </g>
-            );
-          })}
-        </svg>
+      <div className="fs-plot" onMouseLeave={() => setTip(null)}>
+        <div className="fs-y" aria-hidden="true">
+          <span>{compactPounds(max)}</span>
+          <span>{compactPounds(max / 2)}</span>
+          <span>£0</span>
+        </div>
+        <div className="fs-cols" role="img" aria-label="Stacked actual and potential by month">
+          {months.map((column) => (
+            <div key={column.id} className="fs-col">
+              <div className="fs-track">
+                {visible(column).reduce((state, segment) => {
+                  const height = (segment.minor / max) * 100;
+                  state.nodes.push(
+                    <button
+                      key={segment.id}
+                      type="button"
+                      className="fs-seg"
+                      data-seg={segment.id}
+                      aria-label={`${column.label}. ${segment.label}. ${formatPounds(segment.minor)}`}
+                      style={{ bottom: `${state.bottom}%`, height: `${height}%` }}
+                      onMouseEnter={(event) => show(column, segment, event)}
+                      onMouseMove={(event) => show(column, segment, event)}
+                    />,
+                  );
+                  state.bottom += height;
+                  return state;
+                }, { nodes: [], bottom: 0 }).nodes}
+              </div>
+              <span className="fs-x">{column.label}</span>
+            </div>
+          ))}
+        </div>
         {tip ? <CursorTooltip id={tipId} text={tip.text} cursor={tip} className="chart-tip" /> : null}
       </div>
-      <p className="caveat">Pounds by month. Active is the booked row. Orange lines are the Sheet’s percentage rows.</p>
+      <p className="caveat">Actual is the Retainers and Projects sections. Potential is the 75%, 50%, 25%, and 10% sections, in that order above the actual. A line has no probability of its own. Hosting, Backburner, and the Active formula are not drawn.</p>
     </figure>
   );
 }
@@ -149,13 +142,13 @@ export function ForecastScreen() {
     <section className="forecast-plan" aria-label="Forecast">
       <header className="toki-section-head">
         <h2>Forecast</h2>
-        <p>{plan.tab}. Range {plan.range}. Actuals are the Active row. Scenarios use the Sheet’s own percentage labels.</p>
+        <p>{plan.tab}. Range {plan.range}. Bars use the Retainers, Projects, and percentage sections. Probability is the section header, not a field on each line.</p>
       </header>
       <div className="ov-tiles forecast-tiles">
         {view.tiles.map((tile) => <div key={tile.label} className="ov-tile" role="group"><span>{tile.label}</span><b className="num">{money(tile.minor)}</b></div>)}
       </div>
       <div className="panel glass">
-        <PlanChart points={view.points} series={view.series} />
+        <PlanChart stack={pipelineStack(plan)} />
       </div>
       {note ? <p className="caveat">{note}</p> : null}
       <div className="ledger glass ledger-scroll">

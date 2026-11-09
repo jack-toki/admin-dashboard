@@ -295,10 +295,29 @@ function linePhrase(line, format) {
   return `${kind} · ${line.name} · ${moneyText(line.minor, format)}`;
 }
 
+function yearTip(month, format, average) {
+  const retainer = month.segments?.find((item) => item.id === 'retainer');
+  const project = month.segments?.find((item) => item.id === 'project');
+  const lines = (month.lines || []).map((line) => {
+    const type = line.type === 'retainer' ? 'Retainer' : line.type === 'project' ? 'Project' : 'Type not stored';
+    return `${line.name} · ${moneyText(line.minor, format)} · ${type}`;
+  });
+  return [
+    month.label,
+    `Retainer (forecast) ${moneyText(retainer?.value, format)}`,
+    `Project (forecast) ${moneyText(project?.value, format)}`,
+    `Actual received ${moneyText(month.actual, format)}`,
+    `Average ${average == null ? '—' : moneyText(average, format)}`,
+    ...lines,
+  ].join('\n');
+}
+
 export function YearColumns({ name, months, selectedId, onOpen, format, tabs = null, subtitle = '' }) {
   const [hidden, setHidden] = useState({});
   const [showAverage, setShowAverage] = useState(true);
   const [focusId, setFocusId] = useState('');
+  const [tip, setTip] = useState(null);
+  const tipId = useId();
   const legend = [
     { id: 'retainer', label: 'Retainer (forecast)', swatch: 'retainer' },
     { id: 'project', label: 'Project (forecast)', swatch: 'project' },
@@ -338,15 +357,7 @@ export function YearColumns({ name, months, selectedId, onOpen, format, tabs = n
             Average
           </button>
         </span>
-        {focusId && active ? (
-          <div className="col-tip" role="tooltip">
-            <b>{active.label}</b>
-            <span>Retainer (forecast) {moneyText(active.segments?.find((item) => item.id === 'retainer')?.value, format)}</span>
-            <span>Project (forecast) {moneyText(active.segments?.find((item) => item.id === 'project')?.value, format)}</span>
-            <span>Actual received {moneyText(active.actual, format)}</span>
-            <span>Average {average == null ? '—' : moneyText(average, format)}</span>
-          </div>
-        ) : null}
+        {tip ? <CursorTooltip id={tipId} text={tip.text} cursor={tip} className="chart-tip" /> : null}
       <div className="col-chart">
         <div className="col-axis" aria-hidden="true">
           <span>{axisText(max)}</span>
@@ -368,10 +379,11 @@ export function YearColumns({ name, months, selectedId, onOpen, format, tabs = n
               title=""
               onClick={() => onOpen?.(month.id)}
               onFocus={() => setFocusId(month.id)}
-              onBlur={() => setFocusId('')}
-              onMouseEnter={() => setFocusId(month.id)}
-              onMouseLeave={(event) => { if (event.currentTarget !== document.activeElement) setFocusId(''); }}
-              onPointerDown={() => setFocusId(month.id)}
+              onBlur={() => { setFocusId(''); setTip(null); }}
+              onMouseEnter={(event) => { setFocusId(month.id); setTip({ id: month.id, ...cursorPoint(event), text: yearTip(month, format, average) }); }}
+              onMouseMove={(event) => setTip({ id: month.id, ...cursorPoint(event), text: yearTip(month, format, average) })}
+              onMouseLeave={(event) => { if (event.currentTarget !== document.activeElement) { setFocusId(''); setTip(null); } }}
+              onPointerDown={(event) => { setFocusId(month.id); setTip({ id: month.id, ...cursorPoint(event), text: yearTip(month, format, average) }); }}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();

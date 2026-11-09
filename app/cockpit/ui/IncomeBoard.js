@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { formatPounds } from '../../../lib/money';
 import { reconcileKind, scheduleFor, shownInMonth } from '../../../lib/planning/incomeDetail';
 
@@ -73,27 +73,48 @@ export function IncomeBoard({ month, records, stored, baselineRetainer, baseline
           {stored && <button type="button" className="btn" onClick={() => start(nextKind)}>Add</button>}
         </header>
         <table>
-          <thead><tr><th><span className="sr">Select</span></th><th>Company</th><th>Amount</th><th>Schedule</th><th></th></tr></thead>
+          <thead><tr><th><span className="sr">Select</span></th><th>Company</th><th>Amount</th><th title="Which payment this month is, counted from the first payment month through the contract end. It is not the contract end date.">Payment number</th><th>Contract end</th><th></th></tr></thead>
           <tbody>
             {visible.map((row) => {
               const schedule = scheduleFor(row, month);
               const tone = row.amountMinor == null || schedule.state === 'unknown' ? 'miss' : schedule.state === 'scheduled' ? 'ok' : 'warn';
+              const open = editing === row.id;
               return (
-                <tr key={row.id} className="click-row" onClick={() => onOpen?.(row)}>
+                <Fragment key={row.id}>
+                <tr className="click-row" onClick={() => { if (!open) onOpen?.(row); }}>
                   <td><input type="checkbox" aria-label={`Select ${row.party}`} onClick={(event) => event.stopPropagation()} /></td>
                   <td><strong>{row.party}</strong></td>
                   <td>{row.amountMinor == null ? <span className="status-dot miss">No data</span> : formatPounds(row.amountMinor)}</td>
-                  <td><span className={`status-dot ${tone}`}>{schedule.state === 'unknown' ? 'No data' : schedule.label}</span>{row.contractEndDate ? ` · ends ${row.contractEndDate}` : ''}</td>
+                  <td><span className={`status-dot ${tone}`}>{schedule.label}</span></td>
+                  <td>{row.contractEndUnknown ? 'Unknown' : (row.contractEndDate || '—')}</td>
                   <td>{stored && (
                     <div className="income-row-actions">
-                      <button type="button" onClick={() => start(nextKind, row)}>Edit</button>
-                      <button type="button" onClick={() => onRemove(row.id)}>Delete</button>
+                      <button type="button" onClick={(event) => { event.stopPropagation(); start(nextKind, row); }}>Edit</button>
+                      <button type="button" onClick={(event) => { event.stopPropagation(); onRemove(row.id); }}>Delete</button>
                     </div>
                   )}</td>
                 </tr>
+                {open && (
+                  <tr className="income-edit-row">
+                    <td colSpan="6">
+                      <form className="income-form" onSubmit={save}>
+                        <label>Company<input aria-label="Company" value={draft.party} onChange={(event) => setDraft({ ...draft, party: event.target.value })} /></label>
+                        <label>Amount<input aria-label="Amount in pounds" inputMode="decimal" value={draft.amount} onChange={(event) => setDraft({ ...draft, amount: event.target.value })} /></label>
+                        <label>Services<input aria-label="Services" value={draft.services || ''} onChange={(event) => setDraft({ ...draft, services: event.target.value })} /></label>
+                        <label>First payment<input aria-label="First payment month" type="month" value={draft.firstPaymentMonth} onChange={(event) => setDraft({ ...draft, firstPaymentMonth: event.target.value })} /></label>
+                        <label>Contract end<input aria-label="Contract end date" type="date" value={draft.contractEndDate || ''} onChange={(event) => setDraft({ ...draft, contractEndDate: event.target.value, contractEndUnknown: false })} /></label>
+                        <div className="income-row-actions">
+                          <button type="submit">Save</button>
+                          <button type="button" onClick={() => setEditing('')}>Cancel</button>
+                        </div>
+                      </form>
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               );
             })}
-            {!visible.length && <tr><td colSpan="5" className="income-empty">No {title.toLowerCase()} this month.</td></tr>}
+            {!visible.length && <tr><td colSpan="6" className="income-empty">No {title.toLowerCase()} this month.</td></tr>}
           </tbody>
         </table>
       </section>
@@ -105,10 +126,10 @@ export function IncomeBoard({ month, records, stored, baselineRetainer, baseline
       {!stored && <p className="income-gap" role="status">Client lines are not saved on this server yet. The forecast is unchanged.</p>}
       <div className="table-tools">
         <input aria-label="Search clients" placeholder="Search" value={query} onChange={(event) => setQuery(event.target.value)} />
-        <select aria-label="Filter schedule" value={scheduleFilter} onChange={(event) => setScheduleFilter(event.target.value)}>
+        <select aria-label="Filter payment number" value={scheduleFilter} onChange={(event) => setScheduleFilter(event.target.value)}>
           <option value="all">All</option>
-          <option value="scheduled">Scheduled</option>
-          <option value="missing">No data</option>
+          <option value="scheduled">Has a payment this month</option>
+          <option value="missing">Payment number unknown</option>
         </select>
       </div>
       <div className="income-tabs" role="tablist" aria-label="Income or costs">
@@ -150,7 +171,7 @@ export function IncomeBoard({ month, records, stored, baselineRetainer, baseline
         </section>
         </div>
       )}
-      {stored && editing && (
+      {stored && editing === 'new' && (
         <form className="income-form" onSubmit={save}>
           <label>Company<input aria-label="Company" value={draft.party} onChange={(event) => setDraft({ ...draft, party: event.target.value })} /></label>
           <label>Amount<input aria-label="Amount in pounds" inputMode="decimal" value={draft.amount} onChange={(event) => setDraft({ ...draft, amount: event.target.value })} /></label>

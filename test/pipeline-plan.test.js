@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { parsePipelinePlan, pipelineView, preparePipelineWrite, pipelineInputEdit } = require('../lib/forecast/pipelinePlan');
+const { parsePipelinePlan, pipelineView, pipelineStack, preparePipelineWrite, pipelineInputEdit } = require('../lib/forecast/pipelinePlan');
 
 const values = [
   [],
@@ -66,6 +66,45 @@ test('the pipeline plan keeps the Sheet labels and leaves formulas read-only', (
   assert.equal(total.cells[1].input, false);
   assert.equal(view.series[1].values[1].value, 4000);
   assert.equal(view.series[1].values[0].value, 0);
+});
+
+test('the forecast stack uses section headers for actual and potential', () => {
+  const values = [
+    [],
+    ['', 'Source', 'What We Are Doing', 'TOTAL', 'Dec-26', 'Jan 26'],
+    ['Retainers', '', '', '', '', ''],
+    ['Acme', 'Acme', 'Support', 1000, 600, 400],
+    ['Projects', '', '', '', '', ''],
+    ['Harbour', 'Harbour', 'Film', 500, 500, ''],
+    ['75% High Side - Waiting for approval', '', '', 2000, '', ''],
+    ['Like Zero', 'ClickUp', 'Build', 2000, 2000, ''],
+    ['10% Low Side - Enquiry', '', '', 100, '', ''],
+    ['Enquiry Co', '', '', 100, '', 100],
+  ];
+  const plan = parsePipelinePlan(values, values.map(() => []));
+  const stack = pipelineStack(plan);
+  assert.match(stack.tierField, /section header/);
+  assert.deepEqual(stack.months.map((month) => month.label), ['Dec-26', 'Jan 26']);
+  const december = stack.months[0];
+  assert.deepEqual(december.segments.map((segment) => segment.id), [
+    'actual-retainer', 'actual-project', 'potential-75', 'potential-50', 'potential-25', 'potential-10',
+  ]);
+  assert.equal(december.segments[0].clients[0].name, 'Acme');
+  assert.equal(december.segments[0].clients[0].type, 'Retainer');
+  assert.equal(december.segments[1].clients[0].type, 'Project');
+  assert.equal(december.segments[2].clients[0].name, 'Like Zero');
+  assert.equal(december.segments[2].clients[0].type, null);
+  assert.equal(december.segments[2].minor, 200000);
+  assert.equal(december.actual, 110000);
+  assert.equal(december.potential, 200000);
+  const january = stack.months[1];
+  assert.equal(january.segments.find((segment) => segment.id === 'potential-10').clients[0].name, 'Enquiry Co');
+  assert.equal(january.segments.find((segment) => segment.id === 'potential-75').minor, 0);
+  const screen = fs.readFileSync(path.join(__dirname, '../app/cockpit/ui/ForecastScreen.js'), 'utf8');
+  assert.match(screen, /pipelineStack/);
+  assert.match(screen, /fs-seg/);
+  assert.match(screen, /CursorTooltip/);
+  assert.equal(screen.includes('<polyline'), false);
 });
 
 test('the overview drops the duplicate Toki tiles and the nav says Revenue Split', () => {
