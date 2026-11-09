@@ -127,7 +127,7 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
   const autoTasks = deriveAutoTasks({
     period: month,
     cells: (baseline?.rows || []).flatMap((row) => Object.entries(row.cells || {}).map(([key, cell]) => ({
-      label: row.label, kind: row.kind, month: key, enteredMinor: cell.blank ? null : cell.minor, amountMinor: cell.blank ? null : cell.minor, nullState: cell.blank ? 'blank' : 'amount',
+      label: row.label, kind: row.kind, rowNumber: row.rowNumber, month: key, enteredMinor: cell.blank ? null : cell.minor, amountMinor: cell.blank ? null : cell.minor, nullState: cell.blank ? 'blank' : 'amount',
     }))),
     details,
     entries: jrlEntries,

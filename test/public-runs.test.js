@@ -6,9 +6,9 @@ const { GET } = require('../app/api/cockpit/automations/route');
 
 test('run posts are counted without dedupe and the estimate stays labelled', async () => {
   const summary = summariseRuns([
-    { account: 'aa-surveys', zap_id: '9', zap_title: 'One', ts: '2026-11-08T12:00:00Z', counts: { secret: 'hide' } },
-    { account: 'aa-surveys', zap_id: '9', zap_title: 'One', ts: '2026-11-08T13:00:00Z', counts: { secret: 'hide' } },
-    { account: 'jack', zap_id: '4', zap_title: 'Own', ts: '2026-11-01T12:00:00Z', counts: {} },
+    { account: 'aa-surveys', zap_id: '9', zap_title: 'Send invoice', ts: '2026-11-08T12:00:00Z', counts: { secret: 'hide' } },
+    { account: 'aa-surveys', zap_id: '9', zap_title: 'Send invoice', ts: '2026-11-08T13:00:00Z', counts: { secret: 'hide' } },
+    { account: 'jack', zap_id: '4', zap_title: 'Send email', ts: '2026-11-01T12:00:00Z', counts: {} },
   ]);
   assert.equal(summary.deduped, false);
   assert.equal(summary.posts, 3);
@@ -18,7 +18,9 @@ test('run posts are counted without dedupe and the estimate stays labelled', asy
   assert.equal(summary.accountRows.find((row) => row.logAccount === 'jack').name, 'jack');
   assert.equal(summary.reportingZapIds, 2);
   assert.equal(summary.estimate.measured, false);
-  assert.match(summary.estimate.label, /Estimated/);
+  assert.equal(summary.estimate.basis, 'per_zap');
+  assert.equal(summary.estimate.value, 13);
+  assert.doesNotMatch(summary.estimate.label, /per logged post/);
   assert.equal(summary.registry.jackReportingInExport, 0);
   assert.equal(summary.registry.jackOwnOn, 43);
   assert.match(summary.registry.note, /not a failure/);
@@ -40,6 +42,11 @@ test('run posts are counted without dedupe and the estimate stays labelled', asy
   assert.equal(named.accountRows.find((row) => row.logAccount === 'house-to-home').name, 'House to Home Surveys');
   assert.equal(named.reportingZapIds, 2);
   assert.equal(named.postsWithoutZapId, 1);
+  assert.equal(named.estimate.value, 12);
+  const rated = summariseRuns([
+    { account: 'Northwind', zap_id: 'invoice', zap_title: 'Send invoice', ts: '2026-11-08T12:00:00Z' },
+  ], undefined, {}, [{ id: 'zap:invoice', minutesPerRun: 9 }, { id: 'client:Northwind', hourlyRateMinor: 6000 }]);
+  assert.equal(rated.estimate.value, 9);
   assert.equal(identifyRunAccount('Interim Digital', { ACCOUNTS: '{}' }).ingestSlug, null);
 
   const previous = process.env.DASHBOARD_SESSION_SECRET;
