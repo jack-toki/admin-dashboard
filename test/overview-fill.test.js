@@ -94,6 +94,8 @@ test('overview loads JRL and Automations on mount and paints client bars', () =>
   assert.match(screen, /spark empty ov-spark/);
   assert.match(css, /\.overview-card \.ov-client i\[data-state="value"\] \{ background: #171717; \}/);
   assert.match(css, /\.overview-card \.ov-spark \{ flex: 0 0 132px; height: 132px;/);
-  assert.match(css, /\.ov-tile \{[^}]*height: 72px;/);
+  assert.match(css, /\.ov-tile \{[^}]*height: 64px;/);
+  assert.match(css, /\.overview-card \.ov-income \.ov-plot \{[^}]*min-height: 148px/);
+  assert.match(css, /@container \(max-width: 30px\)/);
   assert.equal(/\.ov-tile \{[^}]*aspect-ratio/.test(css), false);
 });
