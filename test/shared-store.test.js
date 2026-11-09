@@ -60,8 +60,21 @@ test('the shared store persists income and pots over the cockpit HTTP contract',
       const body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : null;
       const tableRows = rows[table] || [];
       if (req.method === 'GET') {
+        const found = tableRows.filter((row) => {
+          for (const [key, value] of url.searchParams.entries()) {
+            if (['select', 'limit', 'on_conflict', 'order'].includes(key)) continue;
+            const dot = String(value).indexOf('.');
+            if (dot < 0) continue;
+            const op = value.slice(0, dot);
+            const raw = value.slice(dot + 1);
+            if (op === 'eq' && (raw === 'true' || raw === 'false') && typeof row[key] === 'boolean') return false;
+            if (op === 'eq' && String(row[key]) !== raw) return false;
+            if (op === 'is' && raw === 'null' && row[key] != null) return false;
+          }
+          return true;
+        });
         res.writeHead(200, { 'content-type': 'application/json' });
-        res.end(JSON.stringify(tableRows));
+        res.end(JSON.stringify(found));
         return;
       }
       if (req.method === 'POST') {
