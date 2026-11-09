@@ -32,7 +32,7 @@ function showMoney(minor) {
   return formatPounds(minor);
 }
 
-export function TokiScreen({ example, baseline, actuals, evidence, plan, planNote, onSave, onRemove, formError, forecastError, section = 'toki', onSection, details = [], detailStored = false, onSaveDetail, onRemoveDetail, outstanding = [], outstandingStored = false, onAddOutstanding, onCompleteOutstanding, jrlEntries = [], automationPosts = null, dismissals = [], potsUpdated = true, onDismissAuto }) {
+export function TokiScreen({ example, baseline, actuals, evidence, plan, planNote, onSave, onRemove, formError, forecastError, section = 'toki', onSection, details = [], detailStored = false, onSaveDetail, onRemoveDetail, outstanding = [], outstandingStored = false, onAddOutstanding, onCompleteOutstanding, jrlEntries = [], automationPosts = null, dismissals = [], potsUpdated = true, onDismissAuto, focus = null, onFocusApplied }) {
   const [month, setMonth] = useState('2026-01');
   const [board, setBoard] = useState('year');
   const [editAll, setEditAll] = useState(false);
@@ -46,6 +46,14 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
   const [quick, setQuick] = useState(null);
   const [todoTitle, setTodoTitle] = useState('');
   const monthStripRef = useRef(null);
+  useEffect(() => {
+    if (!focus || focus.area !== 'toki') return;
+    if (focus.month) setMonth(focus.month);
+    if (focus.board) setBoard(focus.board);
+    if (focus.quick) { setQuick(focus.quick); setDetail(null); }
+    else if (focus.detail) setDetail(focus.detail);
+    onFocusApplied?.();
+  }, [focus]);
 
   const page = section === 'sources' || section === 'plan' ? 'sources' : 'toki';
 
@@ -520,7 +528,7 @@ function runFields(row) {
   ];
 }
 
-export function AutomationsScreen({ board, error }) {
+export function AutomationsScreen({ board, error, focus = null, onFocusApplied }) {
   const [view, setView] = useState('cards');
   const [detail, setDetail] = useState(null);
   const [settings, setSettings] = useState(false);
@@ -539,6 +547,11 @@ export function AutomationsScreen({ board, error }) {
     }).catch(() => {});
     return () => { cancel = true; };
   }, []);
+  useEffect(() => {
+    if (!focus || focus.area !== 'automations') return;
+    if (focus.detail) setDetail(focus.detail);
+    onFocusApplied?.();
+  }, [focus]);
   const rows = board?.accountRows || [];
   const zaps = board?.zapRows || [];
   const ready = board?.posts != null;
