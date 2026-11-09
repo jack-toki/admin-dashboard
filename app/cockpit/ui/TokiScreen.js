@@ -579,11 +579,11 @@ export function AutomationsScreen({ board, error }) {
         </div>
       </div>
       <div className="kpi-row">
-        <Tile icon="posts" label="Posts this month" value={ready ? String(board.posts) : '—'} />
-        <Tile icon="zap" label="Active Zaps" value={ready ? String(zaps.length || board.reportingZapIds || 0) : '—'} />
-        <Tile icon="cost" label="Failures" value="—" />
-        <Tile icon="year" label="Time saved" value={ready ? `${totalHours.toFixed(1)} h` : '—'} />
-        <Tile icon="value" label="£ saved" value={ready ? `£${totalPounds.toLocaleString('en-GB')}` : '—'} onOpen={() => setDetail({ title: '£ saved', fields: pricedZaps.map((zap) => ({ label: zap.title, value: `£${zap.pounds} · ${zap.formula}` })) })} />
+        <Tile icon="posts" label="Posts this month" value={ready ? String(board.posts) : '—'} note="This month" />
+        <Tile icon="zap" label="Active Zaps" value={ready ? String(zaps.length || board.reportingZapIds || 0) : '—'} note="This month" />
+        <Tile icon="cost" label="Failures" value="—" note="This month" />
+        <Tile icon="year" label="Time saved" value={ready ? `${totalHours.toFixed(1)} h` : '—'} note="This month" />
+        <Tile icon="value" label="£ saved" value={ready ? `£${totalPounds.toLocaleString('en-GB')}` : '—'} note="This month" onOpen={() => setDetail({ title: '£ saved', fields: pricedZaps.map((zap) => ({ label: zap.title, value: `£${zap.pounds} · ${zap.formula}` })) })} />
       </div>
       {view === 'cards' && (
         <div className="auto-cards bento-span">
@@ -725,7 +725,7 @@ function StatIcon({ name }) {
     posts: 'M6 7h12v10H6zM8 11h8M8 14h5',
     accounts: 'M8 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM4 19c0-2.5 1.8-4 4-4s4 1.5 4 4',
     zap: 'M13 3L5 14h7l-1 7 8-11h-7l1-7z',
-    value: 'M12 3v18M16 7H9.5a2.5 2.5 0 0 0 0 5H14a2.5 2.5 0 0 1 0 5H7',
+    value: 'M18 7c0-5.333-8-5.333-8 0M10 7v14M6 21h12M6 13h10',
     net: 'M4 12h16M12 4v16',
     chase: 'M4 16V8l8-4 8 4v8l-8 4-8-4z',
     savings: 'M5 10h14v8H5zM8 10V8a4 4 0 0 1 8 0v2',
