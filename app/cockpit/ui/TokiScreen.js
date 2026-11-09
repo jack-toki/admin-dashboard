@@ -6,7 +6,7 @@ import { TOKI_VIEWS } from '../../../lib/nav/sidebar';
 import { HorizontalBars, YearColumns } from './charts';
 import { IncomeBoard } from './IncomeBoard';
 import { DetailDrawer, DetailFields } from './DetailDrawer';
-import { INITIAL_TOKI_MONTH, deriveAutoTasks, forecastCellsFromRows, openOutstandingItems } from '../../../lib/planning/autoTasks';
+import { currentTokiMonth, deriveAutoTasks, forecastCellsFromRows, openOutstandingItems } from '../../../lib/planning/autoTasks';
 import { priceZaps, savingsFromZaps } from '../../../lib/automations/savings';
 
 const MONTHS = [
@@ -33,7 +33,7 @@ function showMoney(minor) {
 }
 
 export function TokiScreen({ example, baseline, actuals, evidence, plan, planNote, onSave, onRemove, formError, forecastError, section = 'toki', onSection, details = [], detailStored = false, onSaveDetail, onRemoveDetail, outstanding = [], outstandingStored = false, onAddOutstanding, onCompleteOutstanding, jrlEntries = [], automationPosts = null, dismissals = [], potsUpdated = true, onDismissAuto, focus = null, onFocusApplied }) {
-  const [month, setMonth] = useState(INITIAL_TOKI_MONTH);
+  const [month, setMonth] = useState(() => currentTokiMonth());
   const [board, setBoard] = useState('year');
   const [editAll, setEditAll] = useState(false);
   const [editingKey, setEditingKey] = useState('');

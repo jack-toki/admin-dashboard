@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { CursorTooltip, cursorPoint } from './CursorTooltip';
+import { svgAxisFont } from '../../../lib/cockpit/placeTooltip';
 import { formatPounds } from '../../../lib/money';
 import { pipelineInputEdit, pipelineView } from '../../../lib/forecast/pipelinePlan';
 
@@ -13,27 +15,36 @@ function PlanChart({ points, series }) {
   const [hidden, setHidden] = useState({});
   const [tip, setTip] = useState(null);
   const tipId = useId();
+  const svgRef = useRef(null);
+  const width = 720;
+  const height = 200;
+  const [axisFont, setAxisFont] = useState(12);
+  useLayoutEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return undefined;
+    const fit = () => {
+      const box = svg.getBoundingClientRect();
+      setAxisFont(svgAxisFont(12, width, box.width));
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(svg);
+    return () => observer.disconnect();
+  }, [width]);
   const visible = series.filter((item) => !hidden[item.id]);
   const values = visible.flatMap((item) => item.values.map((point) => point.value)).filter((value) => value != null && Number.isFinite(value));
   const max = Math.max(1, ...values.map((value) => Math.abs(value)));
-  const width = 720;
-  const height = 200;
   const padL = 72;
   const padR = 36;
   const padT = 16;
   const padB = 36;
 
   function show(point, event) {
-    const host = event.currentTarget.ownerSVGElement?.parentElement;
-    const box = host?.getBoundingClientRect();
     const lines = visible.map((item) => {
       const value = item.values.find((entry) => entry.id === point.id);
       return `${item.label}: ${value?.value == null ? '—' : formatPounds(Math.round(value.value * 100))}`;
     });
-    const localX = box ? event.clientX - box.left : 0;
-    const x = box ? (localX < box.width * 0.62 ? box.width - 248 : 8) : 12;
-    const y = 8;
-    setTip({ id: point.id, x, y, text: `${point.label}\n${lines.join('\n')}` });
+    setTip({ id: point.id, ...cursorPoint(event), text: `${point.label}\n${lines.join('\n')}` });
   }
 
   return (
@@ -47,14 +58,14 @@ function PlanChart({ points, series }) {
         ))}
       </div>
       <div className="chart-plot" onMouseLeave={() => setTip(null)}>
-        <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Active against scenario lines">
-          <text x="4" y="12" className="chart-axis" fontSize="11">£</text>
+        <svg ref={svgRef} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Active against scenario lines">
+          <text x="4" y="12" className="chart-axis" style={{ fontSize: axisFont }} fontSize={axisFont}>£</text>
           {[0, 0.5, 1].map((step) => {
             const y = padT + (1 - step) * (height - padT - padB);
             const pounds = max * step;
             const abs = Math.abs(pounds);
             const compact = abs >= 1000 ? `${Math.round((abs / 1000) * 10) / 10}k` : String(Math.round(abs));
-            return <g key={step}><line className="chart-grid" x1={padL} x2={width - padR} y1={y} y2={y} /><text className="chart-axis" fontSize="11" x={padL - 8} y={y + 4} textAnchor="end">{`${pounds < 0 ? '-' : ''}£${compact}`}</text></g>;
+            return <g key={step}><line className="chart-grid" x1={padL} x2={width - padR} y1={y} y2={y} /><text className="chart-axis" style={{ fontSize: axisFont }} fontSize={axisFont} x={padL - 8} y={y + 4} textAnchor="end">{`${pounds < 0 ? '-' : ''}£${compact}`}</text></g>;
           })}
           {visible.map((item) => {
             const coords = points.map((point, index) => {
@@ -72,13 +83,13 @@ function PlanChart({ points, series }) {
             const slot = (width - padL - padR) / Math.max(points.length, 1);
             return (
               <g key={point.id}>
-                <text className="chart-axis" fontSize="11" x={x} y={height - 16} textAnchor="middle">{point.label}</text>
+                <text className="chart-axis" style={{ fontSize: axisFont }} fontSize={axisFont} x={x} y={height - 14} textAnchor="middle">{point.label}</text>
                 <rect className="chart-hit" x={x - slot / 2} y={padT} width={slot} height={height - padT - padB} fill="transparent" onMouseEnter={(event) => show(point, event)} onMouseMove={(event) => show(point, event)} />
               </g>
             );
           })}
         </svg>
-        {tip ? <div id={tipId} role="tooltip" className="chart-tip" style={{ left: tip.x, top: tip.y }}>{tip.text}</div> : null}
+        {tip ? <CursorTooltip id={tipId} text={tip.text} cursor={tip} className="chart-tip" /> : null}
       </div>
       <p className="caveat">Pounds by month. Active is the booked row. Orange lines are the Sheet’s percentage rows.</p>
     </figure>

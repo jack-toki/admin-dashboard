@@ -1,5 +1,6 @@
 'use client';
 import { useId, useState } from 'react';
+import { CursorTooltip, cursorPoint } from './CursorTooltip';
 import { axisFrame, historyTickLabel, pointFraction } from '../../../lib/jrl/chartRange';
 
 export function InteractiveSeriesChart({
@@ -34,15 +35,6 @@ export function InteractiveSeriesChart({
     return historyTickLabel(point.label, gap);
   };
 
-  function place(event) {
-    const host = event.currentTarget?.ownerSVGElement?.parentElement || event.currentTarget;
-    const box = host?.getBoundingClientRect?.();
-    if (!box) return { x: 12, y: 12 };
-    const x = Math.min(Math.max(8, event.clientX - box.left + 14), Math.max(8, box.width - 220));
-    const y = Math.min(Math.max(8, event.clientY - box.top - 28), Math.max(8, box.height - 72));
-    return { x, y };
-  }
-
   function show(point, event) {
     const lines = visible.map((item) => {
       const value = item.values.find((entry) => entry.id === point.id);
@@ -51,7 +43,7 @@ export function InteractiveSeriesChart({
     });
     setTip({
       id: point.id,
-      ...place(event),
+      ...cursorPoint(event),
       text: `${point.label || 'Point'}\n${lines.join('\n')}`,
     });
   }
@@ -137,7 +129,7 @@ export function InteractiveSeriesChart({
             );
           })}
         </svg>
-        {tip && <div id={tipId} role="tooltip" className="chart-tip" style={{ left: tip.x, top: tip.y }}>{tip.text}</div>}
+        {tip && <CursorTooltip id={tipId} text={tip.text} cursor={tip} className="chart-tip" />}
       </div>
       {caption && <p className="caveat">{caption}</p>}
       {showTable && <div className="ledger-scroll">
