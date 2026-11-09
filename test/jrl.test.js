@@ -9,6 +9,8 @@ const { monthsToTarget, monthlyForTarget, personalMonthlyPlan } = require('../li
 const { advise } = require('../lib/jrl/afford');
 const { filterConversations, pageConversations, confirmDelete } = require('../lib/jrl/sora');
 const { createJrlReader, jrlAuthGap } = require('../lib/jrl/reader');
+const { classifyAnonKey, describeJrlProject, sealJrlSession, openJrlSession, signInJrlPassword, JRL_COOKIE, safeCockpitReturn } = require('../lib/jrl/session');
+const { jrlGet } = require('../lib/jrl/http');
 const { exampleEntries, exampleTargets } = require('../lib/jrl/example');
 const { jrlWrite } = require('../lib/jrl/http');
 const { signSession, cookieName } = require('../lib/auth');
@@ -135,7 +137,88 @@ test('owner boundary SQL is prepared offline and does not open the ledger to ano
   assert.match(sql, /NOT APPLIED/);
   assert.match(sql, /security_invoker = on/);
   assert.match(sql, /jrl_is_owner/);
-  assert.match(sql, /revoke all on table public\.%I from anon, public/);
+  assert.match(sql, /revoke all on table public\.%I from public, anon, authenticated/);
   assert.equal(/create policy[\s\S]*to anon/i.test(sql), false);
   assert.equal(/enable signup|signups enabled/i.test(sql), false);
+});
+
+function fakeJwt(payload) {
+  return `eyJhbGciOiJub25lIn0.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.sig`;
+}
+
+test('a legacy anon JWT is accepted and a service role key is refused', async () => {
+  const anon = fakeJwt({ role: 'anon', ref: 'uxkpqmyzxtjmmixlycio' });
+  const service = fakeJwt({ role: 'service_role', ref: 'uxkpqmyzxtjmmixlycio' });
+  assert.equal(classifyAnonKey(anon).format, 'legacy_jwt');
+  assert.equal(classifyAnonKey(anon).accepted, true);
+  assert.equal(classifyAnonKey(service).accepted, false);
+  assert.equal(classifyAnonKey('sb_publishable_example').accepted, true);
+  assert.equal(classifyAnonKey('sb_publishable_example').format, 'publishable');
+  const env = {
+    JRL_SUPABASE_URL: 'https://uxkpqmyzxtjmmixlycio.supabase.co',
+    JRL_SUPABASE_ANON_KEY: anon,
+    DASHBOARD_SESSION_SECRET: 'session-secret-for-test',
+    NODE_ENV: 'test',
+  };
+  const project = describeJrlProject(env);
+  assert.equal(project.configured, true);
+  assert.equal(project.publishableKeyRequired, false);
+  assert.equal(project.projectRefMatches, true);
+  assert.equal(describeJrlProject({ ...env, JRL_SUPABASE_URL: 'https://hcjybjpimqzsueyslxvl.supabase.co' }).configured, false);
+  assert.equal(describeJrlProject({ ...env, JRL_SUPABASE_ANON_KEY: service }).keyAccepted, false);
+  const gap = jrlAuthGap(env);
+  assert.equal(gap.keyFormat, 'legacy_jwt');
+  assert.equal(gap.publishableKeyRequired, false);
+  assert.equal(JSON.stringify(gap).includes(anon), false);
+  assert.equal(safeCockpitReturn('https://evil.example/cockpit'), '/cockpit');
+  assert.equal(safeCockpitReturn('/cockpit#jrl'), '/cockpit#jrl');
+
+  let seen = null;
+  const signed = await signInJrlPassword({
+    email: 'person@example.com',
+    password: 'secret-password',
+    env,
+    fetchImpl: async (url, init) => {
+      seen = { url, init };
+      return { ok: true, json: async () => ({ access_token: 'user-access', refresh_token: 'user-refresh', expires_in: 3600 }) };
+    },
+  });
+  assert.equal(signed.ok, true);
+  assert.equal(seen.url, 'https://uxkpqmyzxtjmmixlycio.supabase.co/auth/v1/token?grant_type=password');
+  assert.equal(seen.init.headers.apikey, anon);
+  assert.equal(seen.init.headers.Authorization, `Bearer ${anon}`);
+  assert.equal(JSON.stringify(seen).includes('service_role'), false);
+  const opened = openJrlSession(sealJrlSession(signed.session, env), env);
+  assert.equal(opened.accessToken, 'user-access');
+
+  const previousSecret = process.env.DASHBOARD_SESSION_SECRET;
+  process.env.DASHBOARD_SESSION_SECRET = env.DASHBOARD_SESSION_SECRET;
+  try {
+    const cockpit = signSession({ role: 'admin', areas: ['jrl', 'toki', 'automations'] }, env);
+    const sealed = sealJrlSession({ accessToken: 'user-access', refreshToken: 'user-refresh', expiresAt: Date.now() + 3_600_000 }, env);
+    let calls = 0;
+    const res = await jrlGet(new Request('http://localhost/api/cockpit/jrl', {
+      headers: { cookie: `${cookieName()}=${cockpit}; ${JRL_COOKIE}=${encodeURIComponent(sealed)}` },
+    }), {
+      env,
+      fetchImpl: async (url, init) => {
+        calls += 1;
+        assert.equal(url, 'https://uxkpqmyzxtjmmixlycio.supabase.co/rest/v1/monthly_finance?select=*');
+        assert.equal(init.headers.Authorization, 'Bearer user-access');
+        assert.equal(init.headers.apikey, anon);
+        return { ok: true, json: async () => [{ period: '2026-10-01', tax_in: 1, savings_in: 2, hl_in: 3, savings_out: 0, hl_value: null }] };
+      },
+    });
+    const body = await res.json();
+    assert.equal(calls, 1);
+    assert.equal(body.auth.supabaseUser, true);
+    assert.equal(body.entries.length, 1);
+    assert.equal(body.entries[0].hl_value, null);
+    assert.equal(body.balances, null);
+    assert.equal(JSON.stringify(body).includes(anon), false);
+    assert.equal(JSON.stringify(body).includes('user-access'), false);
+  } finally {
+    if (previousSecret == null) delete process.env.DASHBOARD_SESSION_SECRET;
+    else process.env.DASHBOARD_SESSION_SECRET = previousSecret;
+  }
 });

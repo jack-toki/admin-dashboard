@@ -1,6 +1,5 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { exampleConversations, exampleEntries, examplePurchases, exampleTargets, JRL_EXAMPLE_BANNER } from '../../../lib/jrl/example';
 import { deriveLedger, ENTRY_FIELDS } from '../../../lib/jrl/finance';
 import { monthWindow } from '../../../lib/jrl/months';
 import { personalMonthlyPlan } from '../../../lib/jrl/targets';
@@ -9,6 +8,10 @@ import { afford } from '../../../vendor/jrl-finance/code/lib/afford.ts';
 import { monthsToTarget, projectPath } from '../../../vendor/jrl-finance/code/lib/targets.ts';
 import { confirmDelete, dayGroup, filterConversations, pageConversations } from '../../../lib/jrl/sora';
 import { ComparisonBars, InteractiveSeriesChart } from './charts';
+import { PotCard } from './PotCard';
+import { Tile } from './TokiScreen';
+import { DetailDrawer, DetailFields } from './DetailDrawer';
+import { blankPotRecord, latestPortfolioValue } from '../../../lib/jrl/pots';
 import '../jrl.css';
 
 const LINKS = [
@@ -29,7 +32,6 @@ const EMPTY = {
 export default function JrlScreen({ gate }) {
   const [section, setSection] = useState('overview');
   const [theme, setTheme] = useState('');
-  const [example, setExample] = useState(false);
   const [entries, setEntries] = useState([]);
   const [targets, setTargets] = useState([]);
   const [purchases, setPurchases] = useState([]);
@@ -45,6 +47,8 @@ export default function JrlScreen({ gate }) {
   const [budget, setBudget] = useState('');
   const [floor, setFloor] = useState('500');
   const [savingsFirst, setSavingsFirst] = useState('0');
+  const [potRecord, setPotRecord] = useState(blankPotRecord);
+  const [potStored, setPotStored] = useState(false);
   const window = useMemo(() => monthWindow(new Date('2026-11-08T12:00:00Z')), []);
 
   useEffect(() => {
@@ -67,24 +71,40 @@ export default function JrlScreen({ gate }) {
   }, [period, entries]);
 
   useEffect(() => {
-    if (!example) {
-      setEntries([]);
-      setTargets([]);
-      setPurchases([]);
-      setConversations([]);
-      return;
-    }
-    setEntries(exampleEntries());
-    setTargets(exampleTargets());
-    setPurchases(examplePurchases());
-    setConversations(exampleConversations());
-  }, [example]);
+    setEntries(Array.isArray(gate?.body?.entries) ? gate.body.entries : []);
+    setTargets([]);
+    setPurchases([]);
+    setConversations([]);
+  }, [gate]);
 
   function onTheme() {
     const next = theme === 'dark' ? 'light' : 'dark';
     setTheme(next);
     window.localStorage.setItem('jrl-theme', next);
     window.dispatchEvent(new Event('jrl-theme'));
+  }
+
+  useEffect(() => {
+    let cancel = false;
+    fetch('/api/cockpit/jrl/pots').then(async (res) => {
+      if (!res.ok || cancel) return;
+      const body = await res.json();
+      if (body.record) setPotRecord({ ...blankPotRecord(), ...body.record });
+      setPotStored(body.stored === true);
+    }).catch(() => {});
+    return () => { cancel = true; };
+  }, []);
+
+  async function onPots(next) {
+    const res = await fetch('/api/cockpit/jrl/pots', {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(next),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || !body.record) return false;
+    setPotRecord({ ...blankPotRecord(), ...body.record });
+    return true;
   }
 
   const ledger = useMemo(() => deriveLedger(entries), [entries]);
@@ -100,9 +120,11 @@ export default function JrlScreen({ gate }) {
       body: JSON.stringify({ period, ...form }),
     });
     const body = await res.json();
-    setSaveNote(body.error === 'supabase_user_required'
-      ? 'Not saved. This password is not the Supabase user session, so the personal ledger was not written.'
-      : 'Not saved.');
+    setSaveNote(body.saved
+      ? 'Saved with the JRL session. The cockpit password was not used.'
+      : body.error === 'supabase_user_required'
+        ? 'Not saved. Sign in with the JRL account. This cockpit password does not write the ledger.'
+        : 'Not saved. The ledger was left unchanged.');
   }
 
   if (blocked) {
@@ -113,30 +135,49 @@ export default function JrlScreen({ gate }) {
 
   return (
     <>
-          <div className="head-actions">
-            <button type="button" className="toggle glass" onClick={() => setExample((value) => !value)}>{example ? 'Hide example data' : 'Show example data'}</button>
-          </div>
           <div className="tgt-modes" role="tablist" aria-label="JRL pages">
             {LINKS.map(([id, label]) => (
               <button key={id} type="button" className={section === id ? 'tgt-mode on' : 'tgt-mode'} onClick={() => setSection(id)}>{label}</button>
             ))}
           </div>
-          {example ? <p className="caveat">{JRL_EXAMPLE_BANNER}</p> : (
-            <div className="nudge glass">
+          {auth?.pinRequired ? (
+            <form className="panel glass" onSubmit={async (event) => {
+              event.preventDefault();
+              const input = event.currentTarget.elements.pin;
+              const res = await fetch('/api/cockpit/jrl/pin', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pin: input.value }) });
+              if (res.ok) window.location.assign('/cockpit#jrl');
+              else setSaveNote('That PIN was not accepted.');
+            }}>
+              <h2>JRL PIN</h2>
+              <p className="sub">This cockpit sign-in is enough. Enter the PIN you set. There is no separate JRL login.</p>
+              <label className="entry-row"><span>PIN</span><span className="entry-input"><input name="pin" aria-label="JRL PIN" inputMode="numeric" autoComplete="off" /></span></label>
+              {saveNote ? <p className="entry-err">{saveNote}</p> : null}
+              <button className="btn" type="submit">Open JRL</button>
+            </form>
+          ) : (
+          <div className="nudge glass">
               <span className="nudge-dot" />
-              <span>{auth?.note || 'Personal balances stay empty until the separate Supabase sign-in exists.'}</span>
-              <a className="nudge-btn" href={auth?.handoff || 'https://jrl-finance.vercel.app/login'}>JRL sign-in</a>
+              <span>{auth?.supabaseUser ? `Opened from this cockpit sign-in. The ledger session expires ${auth.expiresAt ? new Date(auth.expiresAt).toLocaleString('en-GB') : 'on its own'}.` : 'Nothing is loaded from the ledger yet. A gap stays empty. No email code is requested.'}</span>
+              {auth?.supabaseUser ? <button type="button" className="nudge-btn" onClick={async () => { await fetch('/api/cockpit/jrl/session', { method: 'DELETE', headers: { 'x-cockpit-link': '1' } }); window.location.assign('/cockpit#jrl'); }}>Clear stored connection</button> : null}
+          </div>
+          )}
+          {!auth?.pinRequired && section === 'overview' && !auth?.supabaseUser && (
+            <section className="panel glass"><h2>Nothing here yet</h2><p className="sub">Pots and the ledger appear when the stored connection can read them. Missing months stay blank.</p></section>
+          )}
+          {!auth?.pinRequired && section === 'overview' && (
+            <div className="bento">
+              <PotCard record={potRecord} ledger={ledger} portfolioAvailable={Boolean(latestPortfolioValue(ledger))} onChange={onPots} editable={potStored} />
+              {auth?.supabaseUser && <Overview ledger={ledger} targets={targets} />}
             </div>
           )}
-          {section === 'overview' && <Overview ledger={ledger} targets={targets} />}
-          {section === 'month' && (
+          {auth?.supabaseUser && section === 'month' && (
             <MonthForm form={form} setForm={setForm} period={period} setPeriod={setPeriod} options={window.options} ledger={ledger} onSave={onSave} note={saveNote} />
           )}
-          {section === 'targets' && <Targets ledger={ledger} targets={targets} />}
-          {section === 'spending' && (
+          {auth?.supabaseUser && section === 'targets' && <Targets ledger={ledger} targets={targets} />}
+          {auth?.supabaseUser && section === 'spending' && (
             <Spending purchases={purchases} targets={targets} savings={latest?.savings_total || 0} price={price} setPrice={setPrice} budget={budget} setBudget={setBudget} floor={floor} setFloor={setFloor} savingsFirst={savingsFirst} setSavingsFirst={setSavingsFirst} />
           )}
-          {section === 'sora' && (
+          {auth?.supabaseUser && section === 'sora' && (
             <Sora rows={paged.page} filter={filter} setFilter={(value) => { setFilter(value); setCursor(null); }} next={paged.next} onMore={() => setCursor(paged.next)} openId={openId} setOpenId={setOpenId} confirmId={confirmId} setConfirmId={setConfirmId} onDelete={(id) => { if (confirmDelete(true).ok) setConversations((rows) => rows.filter((row) => row.id !== id)); }} />
           )}
     </>
@@ -151,6 +192,7 @@ function money(value) {
 
 function Overview({ ledger, targets }) {
   const [focus, setFocus] = useState(null);
+  const [detail, setDetail] = useState(null);
   const latest = ledger.at(-1);
   if (!latest) return <div className="panel glass"><h2>{EMPTY.overview}</h2><p className="sub">Five totals, targets, and the ledger appear when a Supabase user session can read them. Nothing here is filled with a made-up balance.</p></div>;
   const previous = ledger.at(-2);
@@ -169,18 +211,16 @@ function Overview({ ledger, targets }) {
   })), BENCHMARK_RATE);
   perf.earningsThisMonth = latest.hl_value == null ? null : latest.earned;
   const chartValue = latest.hl_chart_value;
+  const icons = { 'Net total': 'net', 'Chase balance': 'chase', 'Savings pot': 'savings', 'Tax pot': 'tax', 'HargLans ISA': 'isa' };
   return (
-    <>
-      <div className="stats">
-        {cards.map(([label, value, hero]) => (
-          <article key={label} className={hero ? 'card glass hero' : 'card glass'}>
-            <div className="k">{label}</div>
-            <div className="v num">{money(value)}</div>
-            {previous ? <span className="chip">{money(value - (label === 'Net total' ? previous.net_total : label === 'Chase balance' ? previous.chase_total : label === 'Savings pot' ? previous.savings_total : label === 'Tax pot' ? previous.tax_total : previous.hl_contributed))}</span> : null}
-          </article>
-        ))}
+    <div className="bento-contents">
+      <div className="bento-stats">
+        {cards.map(([label, value, hero]) => {
+          const before = !previous ? null : label === 'Net total' ? previous.net_total : label === 'Chase balance' ? previous.chase_total : label === 'Savings pot' ? previous.savings_total : label === 'Tax pot' ? previous.tax_total : previous.hl_contributed;
+          return <Tile key={label} icon={icons[label]} highlight={hero} label={label} value={money(value)} delta={before == null ? null : money(value - before)} onOpen={() => setDetail({ title: label, fields: [{ label: 'Amount', value: money(value) }, { label: 'Previous month', value: before == null ? 'No prior month' : money(before) }] })} />;
+        })}
       </div>
-      <p className="caveat">HargLans ISA on the card is contributions, not the portfolio value. Net is Chase plus contributions. Gain is not added into that headline.</p>
+      <p className="caveat section-wide">HargLans ISA on the card is contributions, not the portfolio value. Net is Chase plus contributions. Gain is not added into that headline.</p>
       {targets.length > 0 && (
         <div className="tstrip">
           {targets.map((target) => {
@@ -199,15 +239,15 @@ function Overview({ ledger, targets }) {
         <section className="panel glass">
           <h2>Allocation</h2>
           <p className="sub">Savings, tax, and contributions. Market gain stays out.</p>
-          <Allocation row={latest} />
+          <Allocation row={latest} onOpen={(item) => setDetail({ title: item.label, fields: [{ label: 'Amount', value: money(item.value) }, { label: 'Note', value: item.status }] })} />
         </section>
         <section className="panel glass">
           <h2>Growth</h2>
-          <Growth ledger={ledger} selectedId={focus || latest.period} onSelect={setFocus} />
+          <Growth ledger={ledger} selectedId={focus || latest.period} onSelect={(id) => { setFocus(id); const row = ledger.find((item) => item.period === id); setDetail({ title: id, fields: row ? ledgerFields(row) : [] }); }} />
           <p id="jrl-month-detail" aria-live="polite">Selected month {focus || latest.period}. Earnings stay unknown when that month has no fresh reading.</p>
         </section>
       </div>
-      <section className="panel glass gap">
+      <section className="panel glass gap section-wide">
         <h2>HargLans ISA</h2>
         <div className="perf">
           <div className="mini"><div className="k">{latest.hl_carried ? 'Value carried forward' : 'Portfolio value'}</div><div className="v">{money(chartValue)}</div></div>
@@ -219,14 +259,15 @@ function Overview({ ledger, targets }) {
           <div key={row.years} className="prow"><span className="yr">{row.years}y</span><span className="bar"><i style={{ width: '100%' }} /></span><span className="amt">{money(row.value)}</span></div>
         ))}
       </section>
-      <section className="ledger glass gap">
+      <section className="ledger glass gap bento-table">
         <div className="ledger-head"><h2>Ledger</h2></div>
         <div className="ledger-scroll">
           <table>
-            <thead><tr><th>Month</th><th>Savings</th><th>Tax</th><th>Chase</th><th>HargLans ISA</th><th>ISA value</th><th>Gain</th></tr></thead>
+            <thead><tr><th><span className="sr">Select</span></th><th>Month</th><th>Savings</th><th>Tax</th><th>Chase</th><th>HargLans ISA</th><th>ISA value</th><th>Gain</th></tr></thead>
             <tbody>
               {[...ledger].reverse().map((row, index) => (
-                <tr key={row.period} className={index === 0 ? 'latest' : undefined}>
+                <tr key={row.period} className={index === 0 ? 'latest click-row' : 'click-row'} onClick={() => setDetail({ title: row.period, fields: ledgerFields(row) })}>
+                  <td><input type="checkbox" aria-label={`Select ${row.period}`} onClick={(event) => event.stopPropagation()} /></td>
                   <td>{row.period}</td>
                   <td>{money(row.savings_total)}</td>
                   <td>{money(row.tax_total)}</td>
@@ -240,14 +281,30 @@ function Overview({ ledger, targets }) {
           </table>
         </div>
       </section>
-    </>
+      <DetailDrawer title={detail?.title || ''} onClose={() => setDetail(null)}>
+        {detail && <DetailFields fields={detail.fields} />}
+      </DetailDrawer>
+    </div>
   );
 }
 
-function Allocation({ row }) {
+function ledgerFields(row) {
+  return [
+    { label: 'Month', value: row.period },
+    { label: 'Savings', value: money(row.savings_total) },
+    { label: 'Tax', value: money(row.tax_total) },
+    { label: 'Chase', value: money(row.chase_total) },
+    { label: 'HargLans contributions', value: money(row.hl_contributed) },
+    { label: 'ISA value', value: row.hl_value == null ? 'Missing' : money(row.hl_value) },
+    { label: 'Gain', value: row.gain == null ? 'Missing' : money(row.gain) },
+  ];
+}
+
+function Allocation({ row, onOpen }) {
   return (
     <ComparisonBars
       name="allocation"
+      onOpen={onOpen}
       format={money}
       caption="Savings, tax, and contributions. Portfolio value is not in this comparison."
       items={[
@@ -268,7 +325,7 @@ function Growth({ ledger, selectedId, onSelect }) {
       selectedId={selectedId}
       onSelect={onSelect}
       format={money}
-      caption="Example data. Chase and contributions come from the flows. A carried portfolio value is not a new gain."
+      caption="Chase and contributions come from the saved flows. A carried portfolio value is not a new gain."
       series={[
         { id: 'chase', label: 'Chase', color: 'var(--ink)', values: ledger.map((row) => ({ id: row.period, value: row.chase_total, status: 'Derived from savings plus tax.' })) },
         { id: 'contrib', label: 'Contributions', color: 'var(--c1)', values: ledger.map((row) => ({ id: row.period, value: row.hl_contributed, status: 'Contributions, not market value.' })) },
