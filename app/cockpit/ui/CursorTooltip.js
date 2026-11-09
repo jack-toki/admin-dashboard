@@ -31,11 +31,13 @@ export function TooltipPortal({ cursor, className, id, role = 'tooltip', childre
     return undefined;
   }, [cursor]);
   if (typeof document === 'undefined') return null;
+  const host = document.querySelector('.jrl-root');
+  if (!host) return null;
   return createPortal(
     <div ref={tipRef} id={id} role={role} className={`cursor-tip ${className || ''}`} style={{ left: pos.left, top: pos.top }}>
       {children}
     </div>,
-    document.body,
+    host,
   );
 }
 

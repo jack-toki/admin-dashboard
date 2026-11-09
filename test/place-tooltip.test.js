@@ -60,5 +60,41 @@ test('a tip taller than its host still follows the cursor', () => {
   assert.match(css, /\.cursor-tip \{[^}]*position: fixed/);
   const helper = fs.readFileSync(path.join(__dirname, '../app/cockpit/ui/CursorTooltip.js'), 'utf8');
   assert.match(helper, /createPortal/);
-  assert.match(helper, /document\.body/);
+  assert.match(helper, /\.jrl-root/);
+});
+
+function themeBlock(css, selector) {
+  const start = css.indexOf(selector);
+  assert.ok(start >= 0, selector);
+  const open = css.indexOf('{', start);
+  const close = css.indexOf('}', open);
+  return css.slice(open + 1, close);
+}
+
+function themeValue(block, name) {
+  const match = block.match(new RegExp(`${name}:\\s*([^;]+)`));
+  assert.ok(match, name);
+  return match[1].trim();
+}
+
+test('a portalled tip has an opaque background in light and dark', () => {
+  const theme = fs.readFileSync(path.join(__dirname, '../app/cockpit/jrl.css'), 'utf8');
+  const css = fs.readFileSync(path.join(__dirname, '../app/cockpit/cockpit.css'), 'utf8');
+  const helper = fs.readFileSync(path.join(__dirname, '../app/cockpit/ui/CursorTooltip.js'), 'utf8');
+  assert.match(helper, /querySelector\('\.jrl-root'\)/);
+  assert.match(css, /\.cursor-tip\.ov-tip, \.cursor-tip\.chart-tip \{[^}]*z-index:\s*80/);
+  assert.match(css, /\.cursor-tip\.ov-tip, \.cursor-tip\.chart-tip \{[^}]*background:\s*var\(--tip,\s*var\(--surface\)\)/);
+  assert.match(css, /\.cursor-tip\.ov-tip, \.cursor-tip\.chart-tip \{[^}]*color:\s*var\(--ink\)/);
+  for (const selector of ['.jrl-root[data-theme="light"]', '.jrl-root[data-theme="dark"]']) {
+    const block = themeBlock(theme, selector);
+    for (const name of ['--surface', '--tip', '--ink']) {
+      assert.match(themeValue(block, name), /^#[0-9a-fA-F]{6}$/);
+    }
+    assert.notEqual(themeValue(block, '--surface').toLowerCase(), themeValue(block, '--ink').toLowerCase());
+  }
+  const light = themeBlock(theme, '.jrl-root[data-theme="light"]');
+  const dark = themeBlock(theme, '.jrl-root[data-theme="dark"]');
+  assert.equal(themeValue(light, '--tip').toLowerCase(), '#ffffff');
+  assert.equal(themeValue(dark, '--tip').toLowerCase(), '#222222');
+  assert.equal(themeValue(dark, '--ink').toLowerCase(), '#f4f4f4');
 });

@@ -757,6 +757,7 @@ button.quick-card { cursor: pointer; }
   font-size: 11px;
 }
 .ov-tip { z-index: 4; display: grid; gap: 4px; padding: 10px 12px; border-radius: 14px; background: var(--surface); box-shadow: 0 10px 28px rgba(0,0,0,.14); }
+.cursor-tip.ov-tip, .cursor-tip.chart-tip { position: fixed; z-index: 80; background: var(--tip, var(--surface)); color: var(--ink); border: .5px solid var(--line); }
 .ov-tip b { font-size: .82rem; }
 .ov-tip p { display: flex; justify-content: space-between; gap: 12px; margin: 0; font-size: .75rem; }
 .ov-tip span { color: var(--muted); }
