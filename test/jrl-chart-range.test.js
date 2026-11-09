@@ -92,5 +92,5 @@ test('the JRL page drops the session bar, Sora tab, and full-width projection ba
   assert.match(screen, /x-cockpit-link/);
   assert.match(screen, /Year overlay/);
   assert.match(screen, /Last month/);
-  assert.match(css, /\.chart-tip, \.ov-tip \{[^}]*position: absolute/);
+  assert.match(css, /\.cursor-tip \{[^}]*position: fixed/);
 });

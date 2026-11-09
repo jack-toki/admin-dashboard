@@ -65,7 +65,8 @@
 .chart-plot { position: relative; }
 .chart-svg { width: 100%; height: auto; display: block; }
 .chart-hit { cursor: pointer; }
-.chart-tip, .ov-tip { position: absolute; z-index: 6; margin: 0; width: max-content; max-width: none; white-space: nowrap; padding: 8px 10px; border-radius: 10px; background: var(--tip, var(--surface)); color: var(--ink); border: .5px solid var(--hair); font-size: .92rem; line-height: 1.35; pointer-events: none; box-shadow: 0 8px 22px rgba(0,0,0,.16); }
+.chart-tip, .ov-tip { margin: 0; width: max-content; max-width: none; white-space: nowrap; padding: 8px 10px; border-radius: 10px; background: var(--tip, var(--surface)); color: var(--ink); border: .5px solid var(--hair); font-size: .92rem; line-height: 1.35; pointer-events: none; box-shadow: 0 8px 22px rgba(0,0,0,.16); }
+.cursor-tip { position: fixed; z-index: 80; }
 .chart-tip div, .ov-tip div, .ov-tip p, .ov-tip b { white-space: nowrap; }
 .chart-axis { fill: var(--muted); font-size: 12px; }
 .chart-grid { stroke: rgba(23,23,23,.12); stroke-width: 1; }
@@ -963,6 +964,6 @@ button.quick-card { padding: 18px 18px 16px; }
 .forecast-table { width: 100%; border-collapse: collapse; }
 .forecast-table th, .forecast-table td { text-align: left; padding: 6px 8px; white-space: nowrap; }
 .forecast-table input { width: 76px; font: inherit; color: var(--ink); background: var(--control); border: 0; border-radius: 8px; min-height: 32px; padding: 0 6px; }
-.chart-card[data-chart="forecast-plan"] .chart-axis { font-size: 12px; }
+.chart-card[data-chart="forecast-plan"] .chart-axis { font-size: unset; }
 .chart-axis { fill: var(--ink); }
 .chart-grid { stroke: var(--hair); stroke-width: .5; }

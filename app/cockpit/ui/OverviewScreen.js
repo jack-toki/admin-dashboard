@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { cursorPoint, usePlacedTooltip } from './CursorTooltip';
+import { TooltipPortal, cursorPoint } from './CursorTooltip';
 import { formatPounds } from '../../../lib/money';
 import { deriveLedger } from '../../../lib/jrl/finance';
 import { incomeBreakdown, workingMonthLines, sumLines } from '../../../lib/planning/entries';
@@ -44,22 +44,20 @@ function Tile({ label, value, onClick }) {
   );
 }
 
-function SegmentTip({ title, rows, forecast, showClients, tipRef, style }) {
+function SegmentTip({ title, rows, forecast, showClients, cursor }) {
   return (
-    <div ref={tipRef} className="ov-tip" role="tooltip" style={style}>
+    <TooltipPortal cursor={cursor} className="ov-tip">
       <b>{title}</b>
       {showClients && (rows.length ? rows.map((row) => (
         <p key={row.id}><span>{row.name}</span><b className="num">{row.minor == null ? '—' : formatPounds(row.minor)}</b></p>
       )) : <p className="no-data">No client lines</p>)}
       <p><span>{showClients ? 'Forecast' : 'Amount'}</span><b className="num">{forecast == null ? '—' : formatPounds(forecast)}</b></p>
-    </div>
+    </TooltipPortal>
   );
 }
 
 function IncomeChart({ series, details, onOpen }) {
-  const hostRef = useRef(null);
   const [tip, setTip] = useState(null);
-  const placed = usePlacedTooltip(hostRef, tip);
   const stacked = series.map((month) => (month.retainer || 0) + (month.project || 0));
   const actuals = series.map((month) => month.actual).filter((value) => value != null);
   const scale = poundTicks(Math.max(1, ...stacked, ...actuals));
@@ -74,7 +72,7 @@ function IncomeChart({ series, details, onOpen }) {
         <span><i className="swatch-project" />Project (forecast)</span>
         <span><i className="swatch-actual" />Actual received</span>
       </div>
-      <div className="ov-plot" ref={hostRef}>
+      <div className="ov-plot">
         <div className="ov-y" aria-hidden="true">
           {scale.ticks.map((tick) => <span key={tick}>{poundsLabel(tick)}</span>)}
         </div>
@@ -123,8 +121,7 @@ function IncomeChart({ series, details, onOpen }) {
         <p className="ov-axis-name ov-x-name">Month</p>
         {tip && tipMonth ? (
           <SegmentTip
-            tipRef={placed.tipRef}
-            style={placed.style}
+            cursor={tip}
             title={`${tipMonth.label} · ${tip.kind === 'retainer' ? 'Retainer' : tip.kind === 'project' ? 'Project' : 'Actual received'}`}
             rows={tip.kind === 'actual' ? [] : tipRows}
             showClients={tip.kind !== 'actual'}
@@ -149,15 +146,13 @@ function monthDetail(month, kind, details) {
 }
 
 function ClientChart({ clients, loading, onOpen }) {
-  const hostRef = useRef(null);
   const [tip, setTip] = useState(null);
-  const placed = usePlacedTooltip(hostRef, tip);
   const scale = hourTicks(Math.max(0, ...clients.map((client) => client.hours)));
   const active = clients.find((client) => client.name === tip?.name);
   return (
     <div className="ov-chart" onMouseLeave={() => setTip(null)}>
       <p className="ov-axis-name">Hours saved</p>
-      <div className="ov-plot" ref={hostRef}>
+      <div className="ov-plot">
         <div className="ov-y" aria-hidden="true">
           {scale.ticks.map((tick) => <span key={tick}>{hoursLabel(tick)}</span>)}
         </div>
@@ -195,11 +190,11 @@ function ClientChart({ clients, loading, onOpen }) {
         </div>
         <p className="ov-axis-name ov-x-name">Client</p>
         {active ? (
-          <div ref={placed.tipRef} className="ov-tip" role="tooltip" style={placed.style}>
+          <TooltipPortal cursor={tip} className="ov-tip">
             <b>{active.name}</b>
             <p><span>Time saved</span><b className="num">{hoursLabel(active.hours)}</b></p>
             <p><span>£ saved</span><b className="num">£{active.pounds.toLocaleString('en-GB')}</b></p>
-          </div>
+          </TooltipPortal>
         ) : null}
       </div>
     </div>

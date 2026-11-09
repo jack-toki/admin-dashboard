@@ -1,5 +1,5 @@
 'use client';
-import { useId, useRef, useState } from 'react';
+import { useId, useState } from 'react';
 import { CursorTooltip, cursorPoint } from './CursorTooltip';
 import { axisFrame, historyTickLabel, pointFraction } from '../../../lib/jrl/chartRange';
 
@@ -18,7 +18,6 @@ export function InteractiveSeriesChart({
   const [hidden, setHidden] = useState({});
   const [tip, setTip] = useState(null);
   const tipId = useId();
-  const plotRef = useRef(null);
   const visible = series.filter((item) => !hidden[item.id]);
   const values = visible.flatMap((item) => item.values.map((point) => point.value)).filter((value) => value != null && Number.isFinite(Number(value)));
   const max = Math.max(1, ...values.map((value) => Math.abs(Number(value))));
@@ -69,7 +68,7 @@ export function InteractiveSeriesChart({
           </button>
         ))}
       </div>
-      <div className="chart-plot" ref={plotRef} onMouseLeave={() => setTip(null)}>
+      <div className="chart-plot" onMouseLeave={() => setTip(null)}>
         <svg viewBox={`0 0 ${width} ${height}`} role="group" aria-label={name}>
           <text x={frame.yTitle.x} y={frame.yTitle.y} textAnchor={frame.yTitle.anchor} className="chart-axis">{yTitle || '£'}</text>
           {[0, 0.5, 1].map((step) => {
@@ -130,7 +129,7 @@ export function InteractiveSeriesChart({
             );
           })}
         </svg>
-        {tip && <CursorTooltip id={tipId} text={tip.text} cursor={tip} hostRef={plotRef} className="chart-tip" />}
+        {tip && <CursorTooltip id={tipId} text={tip.text} cursor={tip} className="chart-tip" />}
       </div>
       {caption && <p className="caveat">{caption}</p>}
       {showTable && <div className="ledger-scroll">
