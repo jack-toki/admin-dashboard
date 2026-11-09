@@ -715,7 +715,9 @@ button.quick-card { cursor: pointer; }
 .ov-ending h3 { margin: 0; font-size: .78rem; font-weight: 600; }
 .ov-end { display: flex; justify-content: space-between; gap: 12px; width: 100%; border: 0; background: var(--control); color: var(--ink); border-radius: 12px; padding: 8px 10px; font: inherit; cursor: pointer; text-align: left; }
 .ov-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.ov-tile { min-height: 78px; border: 0; background: var(--control); color: var(--ink); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; text-align: left; font: inherit; cursor: pointer; }
+.ov-tile { aspect-ratio: 1 / 1; width: 100%; min-height: 0; border: 0; background: var(--control); color: var(--ink); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; text-align: left; font: inherit; cursor: pointer; }
+.ov-axis-name { margin: 0; color: var(--muted); font-size: .68rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.ov-x-name { text-align: center; }
 .ov-tile span { color: var(--muted); font-size: .75rem; }
 .ov-tile b { font-size: 1rem; font-weight: 600; letter-spacing: -.02em; }
 .ov-spark { flex: 1; min-height: 96px; }

@@ -7,11 +7,12 @@ import { incomeBreakdown, workingMonthLines, sumLines } from '../../../lib/plann
 import { savingsFromZaps } from '../../../lib/automations/savings';
 import {
   clientSavings,
-  clientsForSegment,
   hourTicks,
   incomeYear,
   poundTicks,
   retainersEnding,
+  retainersHaveEndDates,
+  segmentLines,
 } from '../../../lib/cockpit/overview';
 
 function poundsLabel(pounds) {
@@ -52,10 +53,11 @@ function IncomeChart({ series, details, onOpen }) {
   const actuals = series.map((month) => month.actual).filter((value) => value != null);
   const scale = poundTicks(Math.max(1, ...stacked, ...actuals));
   const tipMonth = series.find((month) => month.id === tip?.id);
-  const tipRows = tipMonth && tip?.kind ? clientsForSegment(details, tip.kind, tipMonth.id) : [];
+  const tipRows = tipMonth && tip?.kind && tip.kind !== 'actual' ? segmentLines(details, tip.kind, tipMonth.id, tipMonth[tip.kind]) : [];
   const tipValue = tip?.kind === 'retainer' ? tipMonth?.retainer : tip?.kind === 'project' ? tipMonth?.project : tipMonth?.actual;
   return (
     <div className="ov-chart" onMouseLeave={() => setTip(null)}>
+      <p className="ov-axis-name">£</p>
       <div className="ov-legend" role="group" aria-label="Income series">
         <span><i className="swatch-retainer" />Retainer (forecast)</span>
         <span><i className="swatch-project" />Project (forecast)</span>
@@ -105,6 +107,7 @@ function IncomeChart({ series, details, onOpen }) {
             </div>
           ))}
         </div>
+        <p className="ov-axis-name ov-x-name">Month</p>
         {tip && tipMonth ? (
           <SegmentTip
             title={`${tipMonth.label} · ${tip.kind === 'retainer' ? 'Retainer' : tip.kind === 'project' ? 'Project' : 'Actual received'}`}
@@ -119,7 +122,7 @@ function IncomeChart({ series, details, onOpen }) {
 }
 
 function monthDetail(month, kind, details) {
-  const rows = clientsForSegment(details, kind, month.id);
+  const rows = segmentLines(details, kind, month.id, month[kind]);
   const label = kind === 'retainer' ? 'Retainer (forecast)' : 'Project (forecast)';
   return {
     title: `${month.label} ${label}`,
@@ -136,6 +139,7 @@ function ClientChart({ clients, onOpen }) {
   const active = clients.find((client) => client.name === tip);
   return (
     <div className="ov-chart" onMouseLeave={() => setTip(null)}>
+      <p className="ov-axis-name">Hours saved</p>
       <div className="ov-plot">
         <div className="ov-y" aria-hidden="true">
           {scale.ticks.map((tick) => <span key={tick}>{hoursLabel(tick)}</span>)}
@@ -171,6 +175,7 @@ function ClientChart({ clients, onOpen }) {
           ))}
           {!clients.length && <p className="ov-empty">No client time this month.</p>}
         </div>
+        <p className="ov-axis-name ov-x-name">Client</p>
         {active ? (
           <div className="ov-tip" role="tooltip">
             <b>{active.name}</b>
@@ -204,6 +209,7 @@ export function OverviewScreen({ forecast, plan = [], actuals = null, details = 
   const costs = sumLines(monthLines, 'cost');
   const ytd = series.filter((item) => item.id <= month).reduce((sum, item) => sum + (item.total || 0), 0);
   const ending = retainersEnding(details, now, 3);
+  const endsKnown = retainersHaveEndDates(details);
   const nextRetainer = (details || []).find((row) => row.kind === 'retainer' && !row.deletedAt);
   const ledger = deriveLedger(jrl?.body?.entries || []);
   const latest = ledger.at(-1);
@@ -223,7 +229,12 @@ export function OverviewScreen({ forecast, plan = [], actuals = null, details = 
         <IncomeChart series={series} details={details} onOpen={onOpen} />
         <section className="ov-ending" aria-label="Retainers ending">
           <h3>Retainers ending</h3>
-          {ending.length ? ending.map((row) => (
+          {!endsKnown ? (
+            <button type="button" className="ov-end" onClick={() => openToki({ section: 'sources', quick: { kind: 'retainer', party: '', amount: '', services: '', firstPaymentMonth: month, contractEndDate: '' } })}>
+              <span>No retainer end dates set</span>
+              <b>Add end dates</b>
+            </button>
+          ) : ending.length ? ending.map((row) => (
             <button key={row.id || row.party} type="button" className="ov-end" onClick={() => openToki({
               section: 'sources',
               detail: {

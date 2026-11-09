@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { incomeBreakdown, workingMonthLines } = require('../lib/planning/entries');
 const { savingsFromZaps } = require('../lib/automations/savings');
-const { incomeYear, clientsForSegment, retainersEnding, clientSavings } = require('../lib/cockpit/overview');
+const { incomeYear, clientsForSegment, segmentLines, retainersEnding, retainersHaveEndDates, clientSavings } = require('../lib/cockpit/overview');
 
 const rows = [
   { label: 'Retained Clients', kind: 'revenue', rowNumber: 3, cells: { '2026-01': { minor: 800000, blank: false }, '2026-11': { minor: 1000000, blank: false } } },
@@ -30,6 +30,30 @@ test('a segment lists only the clients of that kind', () => {
   assert.deepEqual(clientsForSegment(details, 'retainer', '2026-11').map((row) => row.name), ['Louise']);
   assert.deepEqual(clientsForSegment(details, 'project', '2026-11').map((row) => row.name), ['Harbour']);
   assert.deepEqual(clientsForSegment(details, 'project', '2026-12'), []);
+});
+
+test('observed months match the segment and the bar gap stays visible', () => {
+  const retainers = Array.from({ length: 12 }, (_, index) => ({
+    id: `r${index}`,
+    kind: 'retainer',
+    party: `Retainer ${index + 1}`,
+    amountMinor: index === 0 ? 882350 - (11 * 70000) : 70000,
+    observedMonth: '2026-11',
+  }));
+  const projects = [200000, 150000, 100000, 90000].map((amountMinor, index) => ({
+    id: `p${index}`,
+    kind: 'project',
+    party: `Project ${index + 1}`,
+    amountMinor,
+    observedMonth: '2026-11',
+  }));
+  const retainerLines = segmentLines(retainers, 'retainer', '2026-11', 890000);
+  const projectLines = segmentLines(projects, 'project', '2026-11', 540000);
+  assert.equal(retainerLines.filter((row) => row.name !== 'Unattributed').length, 12);
+  assert.equal(retainerLines.find((row) => row.name === 'Unattributed').minor, 890000 - 882350);
+  assert.equal(projectLines.length, 4);
+  assert.equal(projectLines.some((row) => row.name === 'Unattributed'), false);
+  assert.equal(retainersHaveEndDates(retainers), false);
 });
 
 test('retainers ending stays inside the next three months', () => {

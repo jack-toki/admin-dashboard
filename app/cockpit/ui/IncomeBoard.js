@@ -37,6 +37,10 @@ export function IncomeBoard({ month, records, stored, baselineRetainer, baseline
       amount: row.amountMinor == null ? '' : String(row.amountMinor / 100),
       firstPaymentMonth: row.firstPaymentMonth || '',
       contractEndDate: row.contractEndDate || '',
+      contractEndUnknown: row.contractEndUnknown === true,
+      observedMonth: row.observedMonth || '',
+      source: row.source || 'manual',
+      sourceRowId: row.sourceRowId || '',
       totalPayments: row.totalPayments || '',
       comment: row.comment || '',
     } : blank(nextKind));
@@ -44,7 +48,13 @@ export function IncomeBoard({ month, records, stored, baselineRetainer, baseline
 
   async function save(event) {
     event.preventDefault();
-    const ok = await onSave({ ...draft, kind: draft.kind || kind, observedMonth: (draft.kind || kind) === 'additional_cost' ? month : draft.observedMonth });
+    const ok = await onSave({
+      ...draft,
+      kind: draft.kind || kind,
+      observedMonth: draft.observedMonth || ((draft.kind || kind) === 'additional_cost' ? month : null),
+      contractEndDate: draft.contractEndDate || '',
+      contractEndUnknown: draft.contractEndDate ? false : draft.contractEndUnknown === true,
+    });
     if (ok) setEditing('');
   }
 

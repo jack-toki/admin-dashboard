@@ -50,7 +50,8 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
     if (!focus || focus.area !== 'toki') return;
     if (focus.month) setMonth(focus.month);
     if (focus.board) setBoard(focus.board);
-    if (focus.detail) setDetail(focus.detail);
+    if (focus.quick) { setQuick(focus.quick); setDetail(null); }
+    else if (focus.detail) setDetail(focus.detail);
     onFocusApplied?.();
   }, [focus]);
 
