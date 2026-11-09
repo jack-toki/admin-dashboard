@@ -82,10 +82,7 @@ export default function JrlScreen({ gate }) {
     window.dispatchEvent(new Event('jrl-theme'));
   }
 
-  const signedIn = Boolean(gate?.body?.auth?.supabaseUser);
-
   useEffect(() => {
-    if (!signedIn) return undefined;
     let cancel = false;
     fetch('/api/cockpit/jrl/pots').then(async (res) => {
       if (!res.ok || cancel) return;
@@ -94,7 +91,7 @@ export default function JrlScreen({ gate }) {
       setPotStored(body.stored === true);
     }).catch(() => {});
     return () => { cancel = true; };
-  }, [signedIn]);
+  }, []);
 
   async function onPots(next) {
     const res = await fetch('/api/cockpit/jrl/pots', {
@@ -143,15 +140,11 @@ export default function JrlScreen({ gate }) {
           </div>
           <div className="nudge glass">
               <span className="nudge-dot" />
-              <span>{auth?.expired ? 'The JRL session expired. Sign in again. The ledger was not filled in.' : auth?.supabaseUser ? `Signed in to JRL. The session expires ${auth.expiresAt ? new Date(auth.expiresAt).toLocaleString('en-GB') : 'on its own'}.` : (!auth?.configured ? `JRL sign-in needs ${(auth?.missing || ['JRL_SUPABASE_URL', 'JRL_SUPABASE_ANON_KEY']).join(' and ')} on this server. The legacy anon key is accepted. No service role is used.` : 'Sign in with the JRL account. The cockpit password does not open the ledger.')}</span>
-              {auth?.supabaseUser ? <button type="button" className="nudge-btn" onClick={async () => { await fetch('/api/cockpit/jrl/session', { method: 'DELETE', headers: { 'x-cockpit-link': '1' } }); window.location.assign('/cockpit#jrl'); }}>Sign out of JRL</button> : auth?.configured ? <a className="nudge-btn" href={auth?.handoff || '/cockpit/jrl/login?return=/cockpit%23jrl'}>JRL sign-in</a> : null}
+              <span>{auth?.expired ? 'The JRL session expired. Sign in again. The ledger was not filled in.' : auth?.supabaseUser ? `Signed in to JRL. The session expires ${auth.expiresAt ? new Date(auth.expiresAt).toLocaleString('en-GB') : 'on its own'}.` : auth?.ownerLink ? 'The owner link is on. The ledger was not opened from the stored connection.' : (!auth?.configured ? `JRL sign-in needs ${(auth?.missing || ['JRL_SUPABASE_URL', 'JRL_SUPABASE_ANON_KEY']).join(' and ')} on this server. The legacy anon key is accepted. No service role is used.` : 'Sign in with the JRL account. The cockpit password does not open the ledger.')}</span>
+              {auth?.supabaseUser ? <button type="button" className="nudge-btn" onClick={async () => { await fetch('/api/cockpit/jrl/session', { method: 'DELETE', headers: { 'x-cockpit-link': '1' } }); window.location.assign('/cockpit#jrl'); }}>Sign out of JRL</button> : auth?.configured && !auth?.ownerLink ? <a className="nudge-btn" href={auth?.handoff || '/cockpit/jrl/login?return=/cockpit%23jrl'}>JRL sign-in</a> : null}
           </div>
-          {auth?.supabaseUser && section === 'overview' && (
-            <>
-              <PotCard record={potRecord} ledger={ledger} portfolioAvailable={Boolean(latestPortfolioValue(ledger))} onChange={onPots} editable={potStored} />
-              <Overview ledger={ledger} targets={targets} />
-            </>
-          )}
+          {section === 'overview' && <PotCard record={potRecord} ledger={ledger} portfolioAvailable={Boolean(latestPortfolioValue(ledger))} onChange={onPots} editable={potStored} />}
+          {auth?.supabaseUser && section === 'overview' && <Overview ledger={ledger} targets={targets} />}
           {auth?.supabaseUser && section === 'month' && (
             <MonthForm form={form} setForm={setForm} period={period} setPeriod={setPeriod} options={window.options} ledger={ledger} onSave={onSave} note={saveNote} />
           )}
