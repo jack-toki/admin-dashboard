@@ -1,7 +1,7 @@
 import { canAccess, readSession } from '../../../../lib/auth.js';
 import { importBaseline, importNormalized } from '../../../../lib/forecast/import.js';
 import { modelFromStoredCells, DELETION_AUDIT } from '../../../../lib/forecast/model.js';
-import { mergeForecastCells, readForecastSheet } from '../../../../lib/forecast/liveSheet.js';
+import { applyLiveRead, readForecastSheet } from '../../../../lib/forecast/liveSheet.js';
 import { validateAdditionalPacket, evidenceView } from '../../../../lib/forecast/additional.js';
 import { openAppStore, supabaseGuard } from '../../../../lib/store/index.js';
 
@@ -53,20 +53,25 @@ export async function GET(req) {
     throw error;
   }
   const live = await readForecastSheet().catch(() => ({ ok: false, configured: false, cells: [] }));
-  const merged = live.ok ? mergeForecastCells(cells, live.cells) : cells;
+  const applied = await applyLiveRead({
+    stored: cells,
+    live,
+    save: live.ok && typeof opened.store.saveBaseline === 'function' ? (next) => opened.store.saveBaseline(next) : null,
+    recordRead: live.ok && typeof opened.store.saveSyncState === 'function' ? (row) => opened.store.saveSyncState(row) : null,
+  });
   return Response.json({
     ok: true,
     connected: true,
     storedCount: cells.length,
     testedAgainstPreview: false,
-    cells: merged,
-    model: modelFromStoredCells(merged),
+    cells: applied.cells,
+    model: modelFromStoredCells(applied.cells),
     actuals: evidence?.actuals || null,
     evidence,
-    sheetRuntime: live.ok === true,
+    sheetRuntime: applied.sheetRuntime === true,
     sheetConfigured: live.configured === true,
     sheetMonths: live.months || [],
-    sheetFallback: false,
+    sheetFallback: applied.sheetFallback === true,
     workbookRequiredAtRuntime: false,
     allSheetsSafeToDelete: DELETION_AUDIT.allGoogleSheetsSafeToDelete,
     provenance: 'forecast_baseline',
