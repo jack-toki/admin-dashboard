@@ -222,7 +222,6 @@ export function OverviewScreen({ forecast, plan = [], actuals = null, details = 
   const ytd = series.filter((item) => item.id <= month).reduce((sum, item) => sum + (item.total || 0), 0);
   const ending = retainersEnding(details, now, 3);
   const endsKnown = retainersHaveEndDates(details);
-  const nextRetainer = (details || []).find((row) => row.kind === 'retainer' && !row.deletedAt);
   const ledger = deriveLedger(jrl?.body?.entries || []);
   const latest = ledger.at(-1);
   const posts = runs?.posts;
@@ -230,7 +229,7 @@ export function OverviewScreen({ forecast, plan = [], actuals = null, details = 
   const jrlPending = Boolean(jrlLoading && !jrl);
   const saved = savingsFromZaps(runs?.zapRows || [], rates);
   const clients = clientSavings(runs?.zapRows || [], rates);
-  const openCount = outstanding.length + auto.length;
+  const openCount = outstanding.filter((item) => !item?.doneAt).length;
   const jrlSpark = ledger.map((row) => ({ id: row.period, value: row.net_total }));
   const openToki = (extra = {}) => onOpen?.({ area: 'toki', ...extra });
   const openAuto = (extra = {}) => onOpen?.({ area: 'automations', ...extra });
@@ -269,9 +268,6 @@ export function OverviewScreen({ forecast, plan = [], actuals = null, details = 
           <Tile label="Costs" value={costs == null ? '—' : formatPounds(costs)} onClick={() => openToki({ month, board: 'groups', detail: { title: 'Costs', fields: [{ label: 'Month', value: month }, { label: 'Costs', value: costs == null ? '—' : formatPounds(costs) }] } })} />
           <Tile label="Profit" value={income == null || costs == null ? '—' : formatPounds(income - costs)} onClick={() => openToki({ month, detail: { title: 'Profit', fields: [{ label: 'Month', value: month }, { label: 'Profit', value: income == null || costs == null ? '—' : formatPounds(income - costs) }] } })} />
           <Tile label="Year to date" value={ytd ? formatPounds(ytd) : '—'} onClick={() => openToki({ board: 'year' })} />
-          <Tile label="Time saved" value={pending(runsPending, posts == null ? null : hoursLabel(saved.hours))} onClick={() => openAuto()} />
-          <Tile label="£ saved" value={pending(runsPending, posts == null ? null : `£${saved.pounds.toLocaleString('en-GB')}`)} onClick={() => openAuto({ detail: { title: '£ saved', fields: clients.map((client) => ({ label: client.name, value: `£${client.pounds.toLocaleString('en-GB')}` })) } })} />
-          <Tile label="Next retainer" value={nextRetainer?.party || '—'} onClick={() => openToki(nextRetainer ? { section: 'sources', detail: { title: nextRetainer.party, fields: [{ label: 'Kind', value: 'Retainer' }, { label: 'Amount', value: nextRetainer.amountMinor == null ? '—' : formatPounds(nextRetainer.amountMinor) }] } } : { section: 'sources' })} />
           <Tile label="Outstanding" value={String(openCount)} onClick={() => openToki()} />
         </div>
         <button type="button" className="btn" onClick={() => openToki()}>View Toki</button>

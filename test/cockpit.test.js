@@ -248,7 +248,7 @@ test('sidebar remembers compact or expanded and only lists allowed areas', () =>
   assert.equal(toggleCollapsed(memory), true);
   assert.equal(memory.getItem(NAV_STORAGE_KEY), 'compact');
   assert.equal(toggleCollapsed(memory), false);
-  assert.deepEqual(TOKI_VIEWS.map((item) => item.label), ['Income and costs']);
+  assert.deepEqual(TOKI_VIEWS.map((item) => item.label), ['Revenue Split']);
   assert.deepEqual(visibleNav(['jrl', 'toki', 'automations']).map((item) => item.label), ['JRL', 'Toki', 'Automations']);
   assert.deepEqual(visibleNav(['toki', 'automations']).map((item) => item.id), ['toki', 'automations']);
   assert.equal(visibleNav(['jrl']).some((item) => item.id === 'toki'), false);

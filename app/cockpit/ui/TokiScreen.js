@@ -233,7 +233,7 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
   }
 
   return (
-    <section className={page === 'toki' ? 'toki-view toki-dash' : 'toki-view'} aria-label={page === 'sources' ? 'Income and costs' : 'Toki'}>
+    <section className={page === 'toki' ? 'toki-view toki-dash' : 'toki-view'} aria-label={page === 'sources' ? 'Revenue Split' : 'Toki'}>
       <div className="toki-sticky">
         <div className="toki-section-switch" role="navigation" aria-label="Toki sections">
           <button type="button" aria-current={page === 'toki' ? 'page' : undefined} onClick={() => onSection?.('toki')}>Toki</button>
