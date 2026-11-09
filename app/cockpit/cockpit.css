@@ -686,7 +686,8 @@ button.quick-card { cursor: pointer; }
 .overview-rows { display: flex; flex-direction: column; gap: 10px; }
 .overview-rows p { display: flex; justify-content: space-between; gap: 12px; margin: 0; align-items: baseline; }
 .overview-rows span { color: var(--muted); }
-.overview-card .btn { margin-top: 12px; align-self: flex-start; }
+.overview-card .btn { margin-top: auto; align-self: flex-start; }
+.overview-card .kpi.loading { font-size: 1rem; letter-spacing: 0; }
 .ov-chart { position: relative; display: flex; flex-direction: column; gap: 8px; min-height: 168px; flex: 1; }
 .ov-legend { display: flex; flex-wrap: wrap; gap: 8px 12px; color: var(--muted); font-size: .72rem; }
 .ov-legend span { display: inline-flex; align-items: center; gap: 6px; }
@@ -720,7 +721,9 @@ button.quick-card { cursor: pointer; }
 .ov-x-name { text-align: center; }
 .ov-tile span { color: var(--muted); font-size: .75rem; }
 .ov-tile b { font-size: 1rem; font-weight: 600; letter-spacing: -.02em; }
-.ov-spark { flex: 1; min-height: 96px; }
+.overview-card .ov-spark { flex: none; height: 72px; min-height: 72px; margin: 4px 0 8px; }
+.overview-card .ov-client i[data-state="value"] { background: #171717; }
+.jrl-root[data-theme="dark"] .overview-card .ov-client i[data-state="value"] { background: #f4f4f4; }
 .ov-empty { margin: auto; color: var(--muted); font-size: .8rem; }
 .overview-card .ov-tile:hover,
 .overview-card .ov-tile:focus-visible,
@@ -731,7 +734,8 @@ button.quick-card { cursor: pointer; }
 .overview-card .ov-end:hover,
 .overview-card .ov-end:focus-visible { color: #fff; }
 .overview-card .ov-seg:hover i[data-state="value"],
-.overview-card .ov-seg:focus-visible i[data-state="value"] { background: var(--orange) !important; }
+.overview-card .ov-seg:focus-visible i[data-state="value"],
+.overview-card .ov-seg[aria-pressed="true"] i[data-state="value"] { background: var(--orange) !important; }
 .overview-card .ov-seg:hover i[data-bar="project"][data-state="value"],
 .overview-card .ov-seg:focus-visible i[data-bar="project"][data-state="value"] { background: repeating-linear-gradient(-45deg, var(--orange) 0 3px, rgba(255,255,255,.55) 3px 5px) !important; }
 .spark { display: flex; align-items: flex-end; gap: 4px; height: 72px; margin: 8px 0 12px; }
