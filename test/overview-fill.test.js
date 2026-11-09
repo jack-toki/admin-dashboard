@@ -95,7 +95,9 @@ test('overview loads JRL and Automations on mount and paints client bars', () =>
   assert.match(css, /\.overview-card \.ov-client i\[data-state="value"\] \{ background: #171717; \}/);
   assert.match(css, /\.overview-card \.ov-spark \{ flex: 0 0 132px; height: 132px;/);
   assert.match(css, /\.ov-tile b \{[^}]*font-size: 17px/);
-  assert.match(css, /\.overview-card \.ov-income \.ov-x \{[^}]*font-size: 13px/);
+  assert.match(css, /\.overview-card \.ov-income \.ov-x \{[^}]*font-size: 12px/);
+  assert.equal(css.includes('writing-mode: vertical-rl'), false);
+  assert.match(css, /\.overview-card \.ov-chart:not\(\.ov-income\) \.ov-x \{[^}]*text-overflow: ellipsis/);
   assert.equal(css.includes('@container (max-width: 30px)'), false);
   assert.match(css, /\.overview-card \.ov-income \.ov-plot \{[^}]*min-height: 148px/);
   assert.equal(/\.ov-tile \{[^}]*aspect-ratio/.test(css), false);

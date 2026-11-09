@@ -177,7 +177,7 @@ function ClientChart({ clients, loading, onOpen }) {
                   <i data-bar="hours" data-state={client.hours ? 'value' : 'zero'} />
                 </button>
               </span>
-              <span className="ov-x" title={client.name}>{client.name}</span>
+              <span className="ov-x" title={client.name} onMouseEnter={() => setTip(client.name)}>{client.name}</span>
             </div>
           ))}
           {loading ? <p className="ov-empty">Loading client time…</p> : !clients.length ? <p className="ov-empty">No client time this month.</p> : null}

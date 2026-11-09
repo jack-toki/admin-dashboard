@@ -739,18 +739,20 @@ button.quick-card { cursor: pointer; }
 .overview-card .ov-income .ov-cols { gap: 2px; }
 .overview-card .ov-income .ov-col { overflow: hidden; }
 .overview-card .ov-income .ov-x {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  height: 36px;
-  flex: none;
-  font-size: 13px;
-  line-height: 13px;
-  letter-spacing: 0;
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  transform: rotate(180deg);
+  height: 16px;
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: -.06em;
+  writing-mode: horizontal-tb;
+  transform: none;
   overflow: hidden;
+  text-overflow: clip;
+}
+.overview-card .ov-chart:not(.ov-income) .ov-x {
+  text-overflow: ellipsis;
+  overflow: hidden;
+  letter-spacing: 0;
+  font-size: 11px;
 }
 .ov-tip { position: absolute; z-index: 4; left: 28%; top: 8px; min-width: 180px; max-width: 240px; display: grid; gap: 4px; padding: 10px 12px; border-radius: 14px; background: var(--surface); color: var(--ink); box-shadow: 0 10px 28px rgba(0,0,0,.14); pointer-events: none; }
 .ov-tip b { font-size: .82rem; }

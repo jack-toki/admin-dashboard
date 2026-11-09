@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { applyRange, yearOverlay, stateAnnualRate, futureValue, forecastSeries, forecastRate, pointFraction, axisFrame } = require('../lib/jrl/chartRange');
+const { applyRange, yearOverlay, stateAnnualRate, futureValue, forecastSeries, forecastRate, pointFraction, axisFrame, historyTickLabel } = require('../lib/jrl/chartRange');
 
 const rows = [
   { period: '2025-11-01', chase_total: 100 },
@@ -78,6 +78,9 @@ test('forecast growth uses the tracked state rate and keeps the short-history ca
   assert.ok(frame.yTitle.y + 8 < frame.tickTop);
   assert.ok(frame.xTitle.y > frame.labelY);
   assert.ok(frame.xTitle.x < frame.padL + (640 - frame.padL - frame.padR) * 0.6);
+  assert.equal(historyTickLabel('2026-09', 28), 'Now');
+  assert.equal(historyTickLabel('1y', 28), '1y');
+  assert.equal(historyTickLabel('2026-09', 80), '2026-09');
 });
 
 test('the JRL page drops the session bar, Sora tab, and full-width projection bars', () => {
