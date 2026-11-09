@@ -1,6 +1,6 @@
 'use client';
 import { useId, useState } from 'react';
-import { axisFrame, pointFraction } from '../../../lib/jrl/chartRange';
+import { axisFrame, historyTickLabel, pointFraction } from '../../../lib/jrl/chartRange';
 
 export function InteractiveSeriesChart({
   name,
@@ -25,6 +25,14 @@ export function InteractiveSeriesChart({
   const frame = axisFrame({ width, height });
   const { padL, padR, padT, padB } = frame;
   const xAt = (index) => padL + pointFraction(points, index) * (width - padL - padR);
+  const tickLabel = (index) => {
+    const point = points[index];
+    if (!point?.label) return '';
+    let next = index + 1;
+    while (next < points.length && !points[next]?.label) next += 1;
+    const gap = next < points.length ? xAt(next) - xAt(index) : null;
+    return historyTickLabel(point.label, gap);
+  };
 
   function place(event) {
     const host = event.currentTarget?.ownerSVGElement?.parentElement || event.currentTarget;
@@ -100,7 +108,7 @@ export function InteractiveSeriesChart({
             const next = index === points.length - 1 ? width - padR : (x + xAt(index + 1)) / 2;
             return (
               <g key={point.id}>
-                {point.label ? <text x={x} y={frame.labelY} textAnchor="middle" className="chart-axis">{point.label}</text> : null}
+                {tickLabel(index) ? <text x={x} y={frame.labelY} textAnchor="middle" className="chart-axis">{tickLabel(index)}</text> : null}
                 <rect
                   className="chart-hit"
                   data-chart-point={point.id}
