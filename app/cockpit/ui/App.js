@@ -6,10 +6,11 @@ import JrlScreen from './JrlScreen';
 import { readCollapsed, toggleCollapsed, visibleNav, NAV_STORAGE_KEY, TOKI_VIEWS } from '../../../lib/nav/sidebar';
 import { readTheme, writeTheme } from '../../../lib/theme';
 import { NavMark } from './marks';
+import { syntheticBaseline } from '../../../lib/fixtures/synthetic';
 import '../jrl.css';
 import '../cockpit.css';
 
-export default function App({ role, areas, client }) {
+export default function App({ role, areas, client, fixture = false }) {
   const [area, setArea] = useState(areas.includes('toki') ? 'toki' : areas[0]);
   const [tokiView, setTokiView] = useState('toki');
   const [collapsed, setCollapsed] = useState(false);
@@ -28,23 +29,36 @@ export default function App({ role, areas, client }) {
   const [runError, setRunError] = useState('');
 
   useEffect(() => {
+    if (!fixture) return;
+    setStoredForecast(syntheticBaseline());
+    setForecastError('');
+    setPlan([]);
+    setDetails([]);
+    setDetailStored(false);
+    setStatus({ coverage: { clientOnWithIngest: 0, clientOn: 3, jackOwnOnWithIngest: 0, jackOwnOn: 1, louise: 'not in this fixture' } });
+    setJrl({ status: 200, body: { entries: [], source: { connected: false, ledger: 'not_loaded' }, auth: { supabaseUser: false, ownerLink: false } } });
+    setRunError('run_log_not_configured');
+  }, [fixture]);
+
+  useEffect(() => {
+    if (fixture) return;
     fetch('/api/cockpit/workspace').then(async (res) => {
       if (res.status === 401) window.location.href = '/cockpit/login';
       else setStatus(await res.json());
     }).catch(() => setStatus({ error: 'workspace_unavailable' }));
-  }, []);
+  }, [fixture]);
 
   useEffect(() => {
     if (window.location.hash === '#jrl' && areas.includes('jrl')) setArea('jrl');
   }, [areas]);
 
   useEffect(() => {
-    if (area !== 'jrl') return;
+    if (fixture || area !== 'jrl') return;
     fetch('/api/cockpit/jrl').then(async (res) => setJrl({ status: res.status, body: await res.json() }));
   }, [area]);
 
   useEffect(() => {
-    if (area !== 'automations') return;
+    if (fixture || area !== 'automations') return;
     fetch('/api/cockpit/automations').then(async (res) => {
       const body = await res.json().catch(() => ({}));
       if (!res.ok || !body.summary) {
@@ -61,7 +75,7 @@ export default function App({ role, areas, client }) {
   }, [area]);
 
   useEffect(() => {
-    if (!areas.includes('toki')) return;
+    if (fixture || !areas.includes('toki')) return;
     fetch('/api/cockpit/forecast').then(async (res) => {
       const body = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -81,7 +95,7 @@ export default function App({ role, areas, client }) {
   }, [areas]);
 
   useEffect(() => {
-    if (!areas.includes('toki')) return;
+    if (fixture || !areas.includes('toki')) return;
     fetch('/api/cockpit/plan').then(async (res) => {
       if (!res.ok) return;
       const body = await res.json();
@@ -91,7 +105,7 @@ export default function App({ role, areas, client }) {
   }, [areas]);
 
   useEffect(() => {
-    if (!areas.includes('toki')) return;
+    if (fixture || !areas.includes('toki')) return;
     fetch('/api/cockpit/income-detail').then(async (res) => {
       if (!res.ok) return;
       const body = await res.json();
@@ -210,20 +224,29 @@ export default function App({ role, areas, client }) {
     window.location.href = '/cockpit/login';
   }
 
-  function onTheme(event) {
-    const next = writeTheme(window.localStorage, event.target.checked ? 'dark' : 'light');
-    setTheme(next);
+  function setThemeMode(next) {
+    const saved = writeTheme(window.localStorage, next);
+    setTheme(saved);
     window.dispatchEvent(new Event('jrl-theme'));
   }
 
-  const title = area === 'jrl' ? 'JRL' : area === 'automations' ? 'Automations' : 'Toki';
+  const who = role === 'admin' ? 'Jack' : (client || role);
+  const hello = greeting();
+  const subtitle = area === 'jrl'
+    ? 'Personal pots and the ledger. A missing figure stays missing.'
+    : area === 'automations'
+      ? 'Run coverage for this cockpit. Nothing here calls Zapier.'
+      : 'Forecast, income, and costs. The workbook is not read while this is open.';
 
   return (
     <div className="jrl-root" data-theme={theme === 'dark' ? 'dark' : 'light'}>
-      <div className="aura" aria-hidden="true" />
-      <div className="app">
+      <div className="fx-shell">
         <aside className="side" data-collapsed={collapsed ? 'true' : 'false'} aria-label="Cockpit sections">
-          <nav id="cockpit-nav">
+          <div className="rail-group rail-theme">
+            <button type="button" className={theme === 'light' ? 'on' : undefined} aria-label="Light" aria-pressed={theme === 'light'} onClick={() => setThemeMode('light')}><SunIcon /></button>
+            <button type="button" className={theme === 'dark' ? 'on' : undefined} aria-label="Dark" aria-pressed={theme === 'dark'} onClick={() => setThemeMode('dark')}><MoonIcon /></button>
+          </div>
+          <nav id="cockpit-nav" className="rail-group">
             {items.map((item) => (
               <Fragment key={item.id}>
                 <a
@@ -231,62 +254,109 @@ export default function App({ role, areas, client }) {
                   className={area === item.id ? 'on' : undefined}
                   aria-label={item.label}
                   aria-current={item.id === 'toki' ? (area === 'toki' && tokiView === 'toki' ? 'page' : undefined) : (area === item.id ? 'page' : undefined)}
-                  aria-expanded={item.id === 'toki' ? area === 'toki' : undefined}
                   onClick={(event) => { event.preventDefault(); setArea(item.id); if (item.id === 'toki') setTokiView('toki'); }}
                 >
                   <span className="ic"><NavMark id={item.id} /></span>
                   <span className="lbl">{item.label}</span>
-                  <span className="lbl-short">{item.label}</span>
                   <span className="nav-tip">{item.label}</span>
                 </a>
-                {item.id === 'toki' && area === 'toki' && (
-                  <div className="toki-subnav" aria-label="Toki sections">
-                    {TOKI_VIEWS.map((view) => (
-                      <button
-                        key={view.id}
-                        type="button"
-                        className={tokiView === view.id ? 'on' : undefined}
-                        aria-current={tokiView === view.id ? 'page' : undefined}
-                        onClick={() => setTokiView(view.id)}
-                      >
-                        {view.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
               </Fragment>
             ))}
           </nav>
-          <div className="spacer" />
-          <button type="button" className="toggle glass" aria-label={collapsed ? 'Expand menu' : 'Collapse menu'} onClick={onToggleNav}>{collapsed ? '»' : '«'}</button>
-          <div className="help"><b>Menu</b><span>Press [ to collapse the menu ({NAV_STORAGE_KEY}).</span></div>
-        </aside>
-        <main className="main">
-          <div className="head">
-            <div>
-              <h1>{title}</h1>
-              <div className="period">{role}{client ? ` · ${client}` : ''}</div>
-            </div>
-            <div className="head-actions">
-              <label className="theme-switch">
-                <span>Dark</span>
-                <input type="checkbox" role="switch" aria-checked={theme === 'dark'} checked={theme === 'dark'} onChange={onTheme} />
-              </label>
-              <button type="button" className="toggle glass signout" onClick={onSignOut}>Sign out</button>
-            </div>
+          <div className="rail-group rail-foot">
+            <button type="button" aria-label={collapsed ? 'Expand menu' : 'Collapse menu'} title={`Press [ to collapse the menu (${NAV_STORAGE_KEY}).`} onClick={onToggleNav}><HelpIcon /></button>
+            <button type="button" aria-label="Sign out" onClick={onSignOut}><LogoutIcon /></button>
           </div>
-          {area === 'toki' && <TokiScreen baseline={baseline} actuals={actuals} evidence={evidence} plan={plan} planNote={planNote} onSave={onSave} onRemove={onRemove} formError={formError} forecastError={forecastError} section={tokiView} onSection={setTokiView} details={details} detailStored={detailStored} onSaveDetail={onSaveDetail} onRemoveDetail={onRemoveDetail} />}
-          {area === 'automations' && (
-            <>
-              <AutomationsScreen board={runBoard} error={runError} />
-              {status && <p className="caveat">The ingest alias was not called. The last export snapshot recorded {status.coverage.clientOnWithIngest} of {status.coverage.clientOn} client workflows on, and {status.coverage.jackOwnOnWithIngest} of {status.coverage.jackOwnOn} on Jack’s own account. Louise was {status.coverage.louise}.</p>}
-            </>
-          )}
-          {area === 'jrl' && <JrlScreen gate={jrl} />}
-        </main>
+        </aside>
+        <div className="fx-canvas">
+          <header className="fx-top">
+            <div className="fx-brand">
+              <span className="fx-logo" aria-hidden="true"><NavMark id="toki" /></span>
+              <span>Toki</span>
+            </div>
+            <div className="fx-tabs" role="tablist" aria-label="Cockpit">
+              {items.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={area === item.id && (item.id !== 'toki' || tokiView === 'toki')}
+                  onClick={() => { setArea(item.id); if (item.id === 'toki') setTokiView('toki'); }}
+                >
+                  {item.label}
+                </button>
+              ))}
+              {areas.includes('toki') && TOKI_VIEWS.map((view) => (
+                <button key={view.id} type="button" role="tab" aria-selected={area === 'toki' && tokiView === view.id} onClick={() => { setArea('toki'); setTokiView(view.id); }}>{view.label}</button>
+              ))}
+            </div>
+            <div className="fx-theme">
+              <button type="button" aria-label="Light" aria-pressed={theme === 'light'} onClick={() => setThemeMode('light')}><SunIcon /></button>
+              <button type="button" aria-label="Dark" aria-pressed={theme === 'dark'} onClick={() => setThemeMode('dark')}><MoonIcon /></button>
+            </div>
+            <button type="button" className="fx-signout" aria-label="Sign out" onClick={onSignOut}><LogoutIcon /></button>
+            <div className="fx-user">
+              <span className="fx-avatar" aria-hidden="true">{String(who).slice(0, 1)}</span>
+              <span className="fx-user-text">
+                <b>{who}</b>
+                <span>{client || role}</span>
+              </span>
+              <ChevronIcon />
+            </div>
+          </header>
+          <div className="fx-greet">
+            <h1>{hello}, {who}</h1>
+            <p>{subtitle}</p>
+          </div>
+          <main className="main">
+            {area === 'toki' && <TokiScreen baseline={baseline} actuals={actuals} evidence={evidence} plan={plan} planNote={planNote} onSave={onSave} onRemove={onRemove} formError={formError} forecastError={forecastError} section={tokiView} onSection={setTokiView} details={details} detailStored={detailStored} onSaveDetail={onSaveDetail} onRemoveDetail={onRemoveDetail} />}
+            {area === 'automations' && (
+              <>
+                <AutomationsScreen board={runBoard} error={runError} />
+                {status?.coverage && <p className="caveat">The ingest alias was not called. The last export snapshot recorded {status.coverage.clientOnWithIngest} of {status.coverage.clientOn} client workflows on, and {status.coverage.jackOwnOnWithIngest} of {status.coverage.jackOwnOn} on Jack’s own account. Louise was {status.coverage.louise}.</p>}
+              </>
+            )}
+            {area === 'jrl' && <JrlScreen gate={jrl} />}
+          </main>
+        </div>
       </div>
     </div>
   );
+}
+
+function greeting(date = new Date()) {
+  const hour = date.getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function Stroke({ children }) {
+  return (
+    <svg className="fx-ico" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      {children}
+    </svg>
+  );
+}
+
+function SunIcon() {
+  return <Stroke><circle cx="12" cy="12" r="4" /><path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" /></Stroke>;
+}
+
+function MoonIcon() {
+  return <Stroke><path d="M20 14.5A7.5 7.5 0 0 1 9.5 4 6.5 6.5 0 1 0 20 14.5z" /></Stroke>;
+}
+
+function HelpIcon() {
+  return <Stroke><circle cx="12" cy="12" r="9" /><path d="M9.5 9a2.5 2.5 0 1 1 3.2 2.4c-.7.3-1.2.8-1.2 1.6V14" /><path d="M12 17h.01" /></Stroke>;
+}
+
+function LogoutIcon() {
+  return <Stroke><path d="M10 7V5a2 2 0 0 1 2-2h7v18h-7a2 2 0 0 1-2-2v-2" /><path d="M15 12H3m0 0 3-3M3 12l3 3" /></Stroke>;
+}
+
+function ChevronIcon() {
+  return <Stroke><path d="M7 10l5 5 5-5" /></Stroke>;
 }
 
 function RegisterForm() {
