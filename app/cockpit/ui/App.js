@@ -33,6 +33,20 @@ export default function App({ role, areas, client, fixture = false }) {
   const [forecastError, setForecastError] = useState('');
   const [runBoard, setRunBoard] = useState(null);
   const [runError, setRunError] = useState('');
+  const [focus, setFocus] = useState(null);
+
+  function openSpace(target) {
+    if (!target || typeof target === 'string') {
+      const next = target || 'toki';
+      setArea(next);
+      if (next === 'toki') setTokiView('toki');
+      setFocus(null);
+      return;
+    }
+    setArea(target.area);
+    if (target.area === 'toki') setTokiView(target.section || 'toki');
+    setFocus(target);
+  }
 
   useEffect(() => {
     if (!fixture) return;
@@ -41,11 +55,19 @@ export default function App({ role, areas, client, fixture = false }) {
     setPlan([]);
     setDetails([
       { id: 'syn-retainer', kind: 'retainer', party: 'Example Studio', services: 'Design', amountMinor: 150000, firstPaymentMonth: '2026-01', contractEndDate: '2026-06-30', totalPayments: 6, comment: 'Scheduled 2 of 6', source: 'manual' },
-      { id: 'syn-retainer-2', kind: 'retainer', party: 'Northwind', services: 'Support', amountMinor: 80000, firstPaymentMonth: '2026-01', contractEndDate: null, contractEndUnknown: true, comment: '', source: 'manual' },
+      { id: 'syn-retainer-2', kind: 'retainer', party: 'Northwind', services: 'Support', amountMinor: 80000, firstPaymentMonth: '2026-01', contractEndDate: '2027-01-15', contractEndUnknown: false, comment: '', source: 'manual' },
       { id: 'syn-project', kind: 'project', party: 'Example Launch', services: 'Site', amountMinor: 240000, firstPaymentMonth: '2026-03', contractEndDate: '2026-05-31', totalPayments: 3, comment: '', source: 'manual' },
       { id: 'syn-project-2', kind: 'project', party: 'Harbour', services: 'Film', amountMinor: null, firstPaymentMonth: '', contractEndDate: null, comment: 'Scheduled 1 of 4', source: 'manual' },
     ]);
     setDetailStored(true);
+    setRunBoard({
+      posts: 12,
+      zapRows: [
+        { zapId: 'inv', title: 'Send invoice', account: 'Example Studio', runs: 8 },
+        { zapId: 'mail', title: 'Send email', account: 'Northwind', runs: 4 },
+      ],
+      daily: [],
+    });
     setJrl({ status: 200, body: { entries: exampleEntries(), source: { connected: true, ledger: 'readable' }, auth: { supabaseUser: true, ownerLink: true } } });
   }, [fixture]);
 
@@ -377,11 +399,11 @@ export default function App({ role, areas, client, fixture = false }) {
             <p>{subtitle}</p>
           </div>
           <main className="main">
-            {area === 'overview' && <OverviewScreen forecast={storedForecast} details={details} jrl={jrl} runs={runBoard} outstanding={outstanding} auto={deriveAutoTasks({ period: new Date().toISOString().slice(0, 7), cells: (storedForecast?.rows || []).flatMap((row) => Object.entries(row.cells || {}).map(([key, cell]) => ({ label: row.label, kind: row.kind, rowNumber: row.rowNumber, month: key, enteredMinor: cell.blank ? null : cell.minor, nullState: cell.blank ? 'blank' : 'amount' }))), details, entries: jrl?.body?.entries || [], posts: runBoard?.posts ?? null, dismissals })} onOpen={(next) => { setArea(next); if (next === 'toki') setTokiView('toki'); }} />}
-            {area === 'toki' && <TokiScreen baseline={baseline} actuals={actuals} evidence={evidence} plan={plan} planNote={planNote} onSave={onSave} onRemove={onRemove} formError={formError} forecastError={forecastError} section={tokiView} onSection={setTokiView} details={details} detailStored={detailStored} onSaveDetail={onSaveDetail} onRemoveDetail={onRemoveDetail} outstanding={outstanding} outstandingStored={outstandingStored} onAddOutstanding={onAddOutstanding} onCompleteOutstanding={onCompleteOutstanding} jrlEntries={jrl?.body?.entries || []} automationPosts={runBoard?.posts ?? null} dismissals={dismissals} onDismissAuto={onDismissAuto} />}
+            {area === 'overview' && <OverviewScreen forecast={storedForecast} plan={plan} actuals={actuals} details={details} jrl={jrl} runs={runBoard} outstanding={outstanding} auto={deriveAutoTasks({ period: new Date().toISOString().slice(0, 7), cells: (storedForecast?.rows || []).flatMap((row) => Object.entries(row.cells || {}).map(([key, cell]) => ({ label: row.label, kind: row.kind, rowNumber: row.rowNumber, month: key, enteredMinor: cell.blank ? null : cell.minor, nullState: cell.blank ? 'blank' : 'amount' }))), details, entries: jrl?.body?.entries || [], posts: runBoard?.posts ?? null, dismissals })} onOpen={openSpace} />}
+            {area === 'toki' && <TokiScreen baseline={baseline} actuals={actuals} evidence={evidence} plan={plan} planNote={planNote} onSave={onSave} onRemove={onRemove} formError={formError} forecastError={forecastError} section={tokiView} onSection={setTokiView} details={details} detailStored={detailStored} onSaveDetail={onSaveDetail} onRemoveDetail={onRemoveDetail} outstanding={outstanding} outstandingStored={outstandingStored} onAddOutstanding={onAddOutstanding} onCompleteOutstanding={onCompleteOutstanding} jrlEntries={jrl?.body?.entries || []} automationPosts={runBoard?.posts ?? null} dismissals={dismissals} onDismissAuto={onDismissAuto} focus={focus} onFocusApplied={() => setFocus(null)} />}
             {area === 'automations' && (
               <>
-                <AutomationsScreen board={runBoard} error={runError} />
+                <AutomationsScreen board={runBoard} error={runError} focus={focus} onFocusApplied={() => setFocus(null)} />
                 {status?.coverage && <p className="caveat">The ingest alias was not called. The last export snapshot recorded {status.coverage.clientOnWithIngest} of {status.coverage.clientOn} client workflows on, and {status.coverage.jackOwnOnWithIngest} of {status.coverage.jackOwnOn} on Jack’s own account. Louise was {status.coverage.louise}.</p>}
               </>
             )}

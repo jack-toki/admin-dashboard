@@ -686,7 +686,52 @@ button.quick-card { cursor: pointer; }
 .overview-rows { display: flex; flex-direction: column; gap: 10px; }
 .overview-rows p { display: flex; justify-content: space-between; gap: 12px; margin: 0; align-items: baseline; }
 .overview-rows span { color: var(--muted); }
-.overview-card .btn { margin-top: auto; align-self: flex-start; }
+.overview-card .btn { margin-top: 12px; align-self: flex-start; }
+.ov-chart { position: relative; display: flex; flex-direction: column; gap: 8px; min-height: 168px; flex: 1; }
+.ov-legend { display: flex; flex-wrap: wrap; gap: 8px 12px; color: var(--muted); font-size: .72rem; }
+.ov-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.ov-legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.ov-legend i.swatch-retainer { background: #171717; }
+.ov-legend i.swatch-project { background: repeating-linear-gradient(-45deg, #171717 0 2px, rgba(255,255,255,.55) 2px 4px); }
+.ov-legend i.swatch-actual { width: 4px; height: 12px; background: #8a8a8a; }
+.jrl-root[data-theme="dark"] .ov-legend i.swatch-retainer { background: #f4f4f4; }
+.jrl-root[data-theme="dark"] .ov-legend i.swatch-project { background: repeating-linear-gradient(-45deg, #f4f4f4 0 2px, rgba(0,0,0,.4) 2px 4px); }
+.ov-plot { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; flex: 1; min-height: 180px; }
+.ov-y { display: flex; flex-direction: column; justify-content: space-between; height: calc(100% - 18px); color: var(--muted); font-size: .68rem; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ov-cols { display: flex; align-items: stretch; gap: 4px; min-width: 0; height: 100%; }
+.ov-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ov-bars { flex: 1; display: flex; align-items: flex-end; justify-content: center; gap: 2px; min-height: 0; }
+.ov-stack { width: 58%; max-width: 22px; height: 100%; }
+.ov-seg { display: block; width: 100%; padding: 0; border: 0; background: transparent; cursor: pointer; flex: none; }
+.ov-seg i { display: block; width: 100%; height: 100%; }
+.ov-actual { width: 6px; align-self: flex-end; }
+.ov-client { width: 70%; max-width: 36px; margin: 0 auto; }
+.ov-x { height: 18px; font-size: .62rem; line-height: 18px; text-align: center; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ov-tip { position: absolute; z-index: 4; left: 28%; top: 8px; min-width: 180px; max-width: 240px; display: grid; gap: 4px; padding: 10px 12px; border-radius: 14px; background: var(--surface); color: var(--ink); box-shadow: 0 10px 28px rgba(0,0,0,.14); pointer-events: none; }
+.ov-tip b { font-size: .82rem; }
+.ov-tip p { display: flex; justify-content: space-between; gap: 12px; margin: 0; font-size: .75rem; }
+.ov-tip span { color: var(--muted); }
+.ov-ending { display: flex; flex-direction: column; gap: 6px; }
+.ov-ending h3 { margin: 0; font-size: .78rem; font-weight: 600; }
+.ov-end { display: flex; justify-content: space-between; gap: 12px; width: 100%; border: 0; background: var(--control); color: var(--ink); border-radius: 12px; padding: 8px 10px; font: inherit; cursor: pointer; text-align: left; }
+.ov-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.ov-tile { min-height: 78px; border: 0; background: var(--control); color: var(--ink); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; text-align: left; font: inherit; cursor: pointer; }
+.ov-tile span { color: var(--muted); font-size: .75rem; }
+.ov-tile b { font-size: 1rem; font-weight: 600; letter-spacing: -.02em; }
+.ov-spark { flex: 1; min-height: 96px; }
+.ov-empty { margin: auto; color: var(--muted); font-size: .8rem; }
+.overview-card .ov-tile:hover,
+.overview-card .ov-tile:focus-visible,
+.overview-card .ov-end:hover,
+.overview-card .ov-end:focus-visible { background: var(--orange); color: #fff; }
+.overview-card .ov-tile:hover span,
+.overview-card .ov-tile:focus-visible span,
+.overview-card .ov-end:hover,
+.overview-card .ov-end:focus-visible { color: #fff; }
+.overview-card .ov-seg:hover i[data-state="value"],
+.overview-card .ov-seg:focus-visible i[data-state="value"] { background: var(--orange) !important; }
+.overview-card .ov-seg:hover i[data-bar="project"][data-state="value"],
+.overview-card .ov-seg:focus-visible i[data-bar="project"][data-state="value"] { background: repeating-linear-gradient(-45deg, var(--orange) 0 3px, rgba(255,255,255,.55) 3px 5px) !important; }
 .spark { display: flex; align-items: flex-end; gap: 4px; height: 72px; margin: 8px 0 12px; }
 .spark i { flex: 1; min-width: 4px; border-radius: 4px 4px 0 0; background: #171717; display: block; }
 .jrl-root[data-theme="dark"] .spark i { background: #f4f4f4; }
