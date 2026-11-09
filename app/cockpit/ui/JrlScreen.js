@@ -295,8 +295,8 @@ function ledgerFields(row) {
     { label: 'Tax', value: money(row.tax_total) },
     { label: 'Chase', value: money(row.chase_total) },
     { label: 'HargLans contributions', value: money(row.hl_contributed) },
-    { label: 'ISA value', value: row.hl_value == null ? 'Missing' : money(row.hl_value) },
-    { label: 'Gain', value: row.gain == null ? 'Missing' : money(row.gain) },
+    { label: 'ISA value', value: row.hl_value == null ? '—' : money(row.hl_value) },
+    { label: 'Gain', value: row.gain == null ? '—' : money(row.gain) },
   ];
 }
 

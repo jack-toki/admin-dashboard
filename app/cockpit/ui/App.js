@@ -2,6 +2,8 @@
 import { Fragment, useEffect, useState } from 'react';
 import { validateEntry } from '../../../lib/planning/entries';
 import { TokiScreen, AutomationsScreen } from './TokiScreen';
+import { OverviewScreen } from './OverviewScreen';
+import { deriveAutoTasks } from '../../../lib/planning/autoTasks';
 import JrlScreen from './JrlScreen';
 import { readCollapsed, toggleCollapsed, visibleNav, NAV_STORAGE_KEY, TOKI_VIEWS } from '../../../lib/nav/sidebar';
 import { readTheme, writeTheme } from '../../../lib/theme';
@@ -22,6 +24,7 @@ export default function App({ role, areas, client, fixture = false }) {
   const [details, setDetails] = useState([]);
   const [detailStored, setDetailStored] = useState(false);
   const [outstanding, setOutstanding] = useState([]);
+  const [dismissals, setDismissals] = useState([]);
   const [outstandingStored, setOutstandingStored] = useState(false);
   const [planNote, setPlanNote] = useState('');
   const [formError, setFormError] = useState('');
@@ -126,6 +129,7 @@ export default function App({ role, areas, client, fixture = false }) {
       if (!res.ok) return;
       const body = await res.json();
       setOutstanding(body.items || []);
+      setDismissals(body.dismissals || []);
       setOutstandingStored(body.stored === true);
     }).catch(() => setOutstandingStored(false));
   }, [areas, fixture]);
@@ -233,6 +237,7 @@ export default function App({ role, areas, client, fixture = false }) {
     }
     setFormError('');
     setOutstanding((current) => [...current, body.item]);
+    if (body.sheet?.status === 'conflict') setFormError(`The Sheet cell ${body.sheet.cell || ''} changed since the last sync. It was not overwritten.`);
     return true;
   }
 
@@ -247,6 +252,19 @@ export default function App({ role, areas, client, fixture = false }) {
       return;
     }
     setOutstanding((current) => current.filter((item) => item.id !== id));
+  }
+
+  async function onDismissAuto(task) {
+    const res = await fetch('/api/cockpit/outstanding', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id: task.id, source: 'auto', taskKey: task.taskKey, period: task.period }),
+    });
+    if (!res.ok) {
+      setFormError('That task was not dismissed. The dismissal table may not be applied yet.');
+      return;
+    }
+    setDismissals((current) => [...current, { id: task.id, taskKey: task.taskKey, period: task.period }]);
   }
 
   async function onRemove(id) {
@@ -294,7 +312,7 @@ export default function App({ role, areas, client, fixture = false }) {
             <button type="button" className={theme === 'dark' ? 'on' : undefined} aria-label="Dark" aria-pressed={theme === 'dark'} onClick={() => setThemeMode('dark')}><MoonIcon /></button>
           </div>
           <nav id="cockpit-nav" className="rail-group">
-            <span className="rail-apps" aria-hidden="true"><GridIcon /></span>
+            <button type="button" className={area === 'overview' ? 'rail-apps on' : 'rail-apps'} aria-label="Overview" aria-pressed={area === 'overview'} onClick={() => setArea('overview')}><GridIcon /></button>
             {items.map((item) => (
               <Fragment key={item.id}>
                 <a
@@ -359,7 +377,8 @@ export default function App({ role, areas, client, fixture = false }) {
             <p>{subtitle}</p>
           </div>
           <main className="main">
-            {area === 'toki' && <TokiScreen baseline={baseline} actuals={actuals} evidence={evidence} plan={plan} planNote={planNote} onSave={onSave} onRemove={onRemove} formError={formError} forecastError={forecastError} section={tokiView} onSection={setTokiView} details={details} detailStored={detailStored} onSaveDetail={onSaveDetail} onRemoveDetail={onRemoveDetail} outstanding={outstanding} outstandingStored={outstandingStored} onAddOutstanding={onAddOutstanding} onCompleteOutstanding={onCompleteOutstanding} />}
+            {area === 'overview' && <OverviewScreen forecast={storedForecast} details={details} jrl={jrl} runs={runBoard} outstanding={outstanding} auto={deriveAutoTasks({ period: new Date().toISOString().slice(0, 7), cells: (storedForecast?.rows || []).flatMap((row) => Object.entries(row.cells || {}).map(([key, cell]) => ({ label: row.label, kind: row.kind, month: key, enteredMinor: cell.blank ? null : cell.minor, nullState: cell.blank ? 'blank' : 'amount' }))), details, entries: jrl?.body?.entries || [], posts: runBoard?.posts ?? null, dismissals })} onOpen={(next) => { setArea(next); if (next === 'toki') setTokiView('toki'); }} />}
+            {area === 'toki' && <TokiScreen baseline={baseline} actuals={actuals} evidence={evidence} plan={plan} planNote={planNote} onSave={onSave} onRemove={onRemove} formError={formError} forecastError={forecastError} section={tokiView} onSection={setTokiView} details={details} detailStored={detailStored} onSaveDetail={onSaveDetail} onRemoveDetail={onRemoveDetail} outstanding={outstanding} outstandingStored={outstandingStored} onAddOutstanding={onAddOutstanding} onCompleteOutstanding={onCompleteOutstanding} jrlEntries={jrl?.body?.entries || []} automationPosts={runBoard?.posts ?? null} dismissals={dismissals} onDismissAuto={onDismissAuto} />}
             {area === 'automations' && (
               <>
                 <AutomationsScreen board={runBoard} error={runError} />
