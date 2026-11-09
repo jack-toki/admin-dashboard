@@ -818,6 +818,12 @@ button.quick-card { cursor: pointer; }
   .drawer { border-radius: 0; }
 }
 .click-row { cursor: pointer; }
+.pin-pad { display: flex; flex-direction: column; gap: 10px; }
+.pin-dots { margin: 0; letter-spacing: .4em; font-size: 1.4rem; color: var(--ink); }
+.pin-keys { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.pin-keys button { min-height: 48px; border: 0; border-radius: 12px; background: var(--control); color: var(--ink); font: inherit; font-size: 1.1rem; cursor: pointer; }
+.pin-change { display: flex; flex-direction: column; gap: 8px; min-width: 220px; }
+.pin-change input { border: 0; background: var(--control); color: var(--ink); border-radius: 10px; min-height: 40px; padding: 0 10px; font: inherit; }
 .auto-ranges { display: flex; flex-wrap: wrap; gap: 6px; }
 .auto-ranges button { border: 0; background: var(--control); color: var(--ink); font: inherit; font-size: 13px; min-height: 34px; padding: 0 12px; border-radius: 999px; cursor: pointer; }
 .auto-ranges button:hover, .auto-ranges button[aria-pressed="true"] { background: var(--orange); color: #fff; }

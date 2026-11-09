@@ -1,37 +1,46 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { safeCockpitReturn } from '../../../lib/jrl/return';
 import '../jrl.css';
 
 export default function LoginForm() {
+  const [mode, setMode] = useState('password');
   const [password, setPassword] = useState('');
+  const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
 
-  async function onSubmit(event) {
-    event.preventDefault();
-    const entered = event.currentTarget.elements.password?.value ?? password;
+  useEffect(() => {
+    fetch('/api/cockpit/login').then(async (res) => {
+      const body = await res.json().catch(() => ({}));
+      if (body.mode === 'pin') setMode('pin');
+    }).catch(() => {});
+  }, []);
+
+  async function submit(body) {
     setError('');
     setPending(true);
     try {
       const res = await fetch('/api/cockpit/login', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ password: entered }),
+        body: JSON.stringify(body),
       });
       if (res.status === 503) {
-        const body = await res.json().catch(() => ({}));
-        setError(body.error === 'password_verifier_malformed'
+        const payload = await res.json().catch(() => ({}));
+        setError(payload.error === 'password_verifier_malformed'
           ? 'The password verifier is set but unreadable. The plaintext password was not used.'
-          : 'Sign-in is not configured. The server needs DASHBOARD_SESSION_SECRET and either DASHBOARD_PASSWORD_HASH or DASHBOARD_PASSWORD.');
+          : 'Sign-in is not configured. The server needs DASHBOARD_SESSION_SECRET and either a code or the existing password.');
         return;
       }
       if (res.status === 429) {
-        setError('Too many attempts. Wait a few minutes and try again.');
+        setError('Too many attempts. Wait and try again.');
+        setPin('');
         return;
       }
       if (!res.ok) {
-        setError('That password was not accepted.');
+        setError(mode === 'pin' ? 'That code was not accepted.' : 'That password was not accepted.');
+        setPin('');
         return;
       }
       const params = new URLSearchParams(window.location.search);
@@ -43,17 +52,53 @@ export default function LoginForm() {
     }
   }
 
+  function enterDigit(digit) {
+    if (pending) return;
+    const next = `${pin}${digit}`.slice(0, 4);
+    setPin(next);
+    if (next.length === 4) submit({ pin: next });
+  }
+
+  async function onSubmit(event) {
+    event.preventDefault();
+    if (mode === 'pin') {
+      if (pin.length === 4) submit({ pin });
+      return;
+    }
+    const entered = event.currentTarget.elements.password?.value ?? password;
+    submit({ password: entered });
+  }
+
   return (
     <div className="jrl-root">
       <div className="aura" aria-hidden="true" />
       <main className="login-wrap">
         <form className="panel glass login-card" method="post" action="/cockpit/login" onSubmit={onSubmit}>
           <h1>Cockpit sign-in</h1>
-          <p className="sub">This password is not the personal Supabase sign-in. The public site is unchanged.</p>
-          <label className="entry-row" htmlFor="password"><span>Password</span></label>
-          <span className="entry-input login-input"><input id="password" name="password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" aria-invalid={error ? 'true' : 'false'} aria-describedby="login-error" /></span>
+          <p className="sub">{mode === 'pin' ? 'Enter the 4-digit code.' : 'This password is not the personal Supabase sign-in. The public site is unchanged.'}</p>
+          {mode === 'pin' ? (
+            <div className="pin-pad">
+              <p className="pin-dots" aria-live="polite">{pin.replace(/./g, '•')}{pin.length < 4 ? '◦'.repeat(4 - pin.length) : ''}</p>
+              <input id="pin" name="pin" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]*" maxLength={4} value={pin} aria-label="4-digit code" aria-invalid={error ? 'true' : 'false'} aria-describedby="login-error" onChange={(event) => {
+                const next = event.target.value.replace(/\D/g, '').slice(0, 4);
+                setPin(next);
+                if (next.length === 4) submit({ pin: next });
+              }} />
+              <div className="pin-keys" role="group" aria-label="Numeric keypad">
+                {['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'].map((digit) => (
+                  <button key={digit} type="button" onClick={() => enterDigit(digit)}>{digit}</button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <>
+              <label className="entry-row" htmlFor="password"><span>Password</span></label>
+              <span className="entry-input login-input"><input id="password" name="password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" aria-invalid={error ? 'true' : 'false'} aria-describedby="login-error" /></span>
+            </>
+          )}
           <p id="login-error" role="alert" className="entry-err">{error}</p>
           <button className="btn" type="submit" disabled={pending} aria-busy={pending}>{pending ? 'Signing in…' : 'Continue'}</button>
+          {mode === 'pin' ? <button type="button" className="btn btn-ghost" onClick={() => setMode('password')}>Use password</button> : null}
         </form>
       </main>
     </div>
