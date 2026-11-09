@@ -63,6 +63,12 @@ test('the overview drops the duplicate Toki tiles and the nav says Revenue Split
   assert.match(app, /\{view\.label\}/);
   assert.match(app, /hash === '#money'/);
   assert.match(app, />Forecast</);
+  assert.match(app, /hash === '#outstanding'/);
+  assert.match(screen, /label="Outstanding Tasks"/);
+  assert.match(screen, /scroll: 'outstanding'/);
+  assert.match(screen, /<Tile label="Outstanding"/);
+  const toki = fs.readFileSync(path.join(__dirname, '../app/cockpit/ui/TokiScreen.js'), 'utf8');
+  assert.match(toki, /id="outstanding"/);
   const route = fs.readFileSync(path.join(__dirname, '../app/api/cockpit/forecast-plan/route.js'), 'utf8');
   assert.equal(route.includes('SHEET_CSV_URL'), false);
   assert.equal(route.includes('googleapis'), false);

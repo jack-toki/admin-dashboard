@@ -268,7 +268,7 @@ export function OverviewScreen({ forecast, plan = [], actuals = null, details = 
           <Tile label="Costs" value={costs == null ? '—' : formatPounds(costs)} onClick={() => openToki({ month, board: 'groups', detail: { title: 'Costs', fields: [{ label: 'Month', value: month }, { label: 'Costs', value: costs == null ? '—' : formatPounds(costs) }] } })} />
           <Tile label="Profit" value={income == null || costs == null ? '—' : formatPounds(income - costs)} onClick={() => openToki({ month, detail: { title: 'Profit', fields: [{ label: 'Month', value: month }, { label: 'Profit', value: income == null || costs == null ? '—' : formatPounds(income - costs) }] } })} />
           <Tile label="Year to date" value={ytd ? formatPounds(ytd) : '—'} onClick={() => openToki({ board: 'year' })} />
-          <Tile label="Outstanding" value={String(openCount)} onClick={() => openToki()} />
+          <Tile label="Outstanding Tasks" value={String(openCount)} onClick={() => openToki({ section: 'toki', scroll: 'outstanding' })} />
         </div>
         <button type="button" className="btn" onClick={() => openToki()}>View Toki</button>
       </article>

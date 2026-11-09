@@ -58,6 +58,14 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
   const page = section === 'sources' || section === 'plan' ? 'sources' : 'toki';
 
   useLayoutEffect(() => {
+    if (!focus || focus.area !== 'toki' || focus.scroll !== 'outstanding' || page !== 'toki') return;
+    const node = document.getElementById('outstanding');
+    if (!node) return;
+    node.scrollIntoView({ block: 'start' });
+    if (typeof window !== 'undefined' && window.location.hash !== '#outstanding') window.location.hash = 'outstanding';
+  }, [focus, page]);
+
+  useLayoutEffect(() => {
     const strip = monthStripRef.current;
     if (!strip) return undefined;
     const scrollSelected = () => {
@@ -335,7 +343,7 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
               <p className="sub">A retainer needs a contract end. It is not added to the forecast.</p>
               <span className="btn quick-foot">Add a retainer</span>
             </button>
-            <article className="card glass quick-card">
+            <article className="card glass quick-card" id="outstanding" tabIndex={-1}>
               <QuickMark name="todo" />
               <h3>Outstanding</h3>
               <p className="sub">{outstandingStored ? 'Tick an item when it is done.' : 'Outstanding items are not saved on this server yet.'}</p>

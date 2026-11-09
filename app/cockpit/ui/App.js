@@ -90,6 +90,11 @@ export default function App({ role, areas, client, fixture = false }) {
       setTokiView('sources');
     }
     if (hash === '#forecast' && areas.includes('toki')) setArea('forecast');
+    if (hash === '#outstanding' && areas.includes('toki')) {
+      setArea('toki');
+      setTokiView('toki');
+      setFocus({ area: 'toki', section: 'toki', scroll: 'outstanding' });
+    }
   }, [areas]);
 
   useEffect(() => {
