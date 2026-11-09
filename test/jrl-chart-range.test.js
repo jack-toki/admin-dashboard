@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { applyRange, yearOverlay, stateAnnualRate, futureValue, forecastSeries, forecastRate } = require('../lib/jrl/chartRange');
+const { applyRange, yearOverlay, stateAnnualRate, futureValue, forecastSeries, forecastRate, pointFraction, axisFrame } = require('../lib/jrl/chartRange');
 
 const rows = [
   { period: '2025-11-01', chase_total: 100 },
@@ -19,7 +19,7 @@ test('a date range filters the view and leaves the stored rows in place', () => 
   const year = applyRange(rows, { preset: 'year', year: 2026 }, new Date('2026-11-09T00:00:00Z'));
   assert.deepEqual(year.rows.map((row) => row.period), ['2026-01-01', '2026-08-01']);
   const last = applyRange(rows, { preset: 'last' }, new Date('2026-11-09T00:00:00Z'));
-  assert.deepEqual(last.rows.map((row) => row.period), []);
+  assert.deepEqual(last.rows.map((row) => row.period), ['2026-08-01']);
   const august = applyRange(rows, { preset: 'last' }, new Date('2026-09-02T00:00:00Z'));
   assert.deepEqual(august.rows.map((row) => row.period), ['2026-08-01']);
   const custom = applyRange(rows, { preset: 'custom', from: '2025-12', to: '2026-01' });
@@ -65,6 +65,19 @@ test('forecast growth uses the tracked state rate and keeps the short-history ca
   assert.equal(forecastRate(rate, 3).benchmark, true);
   assert.equal(forecastRate(rate, 3).rate, 0.07);
   assert.equal(forecastRate(rate, 12).benchmark, false);
+  const y1 = chart.points.find((point) => point.id === 'y-1').years;
+  const y2 = chart.points.find((point) => point.id === 'y-2').years;
+  const y5 = chart.points.find((point) => point.id === 'y-5').years;
+  const y10 = chart.points.find((point) => point.id === 'y-10').years;
+  const gap = (from, to) => pointFraction(chart.points, chart.points.findIndex((point) => point.years === to))
+    - pointFraction(chart.points, chart.points.findIndex((point) => point.years === from));
+  assert.equal(y5 - y1, 4);
+  assert.equal(y10 - y5, 5);
+  assert.ok(Math.abs(gap(y5, y10) / gap(y1, y2) - 5) < 0.001);
+  const frame = axisFrame();
+  assert.ok(frame.yTitle.y + 8 < frame.tickTop);
+  assert.ok(frame.xTitle.y > frame.labelY);
+  assert.ok(frame.xTitle.x < frame.padL + (640 - frame.padL - frame.padR) * 0.6);
 });
 
 test('the JRL page drops the session bar, Sora tab, and full-width projection bars', () => {
