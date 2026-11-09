@@ -242,10 +242,11 @@ function Overview({ ledger, targets }) {
         <div className="ledger-head"><h2>Ledger</h2></div>
         <div className="ledger-scroll">
           <table>
-            <thead><tr><th>Month</th><th>Savings</th><th>Tax</th><th>Chase</th><th>HargLans ISA</th><th>ISA value</th><th>Gain</th></tr></thead>
+            <thead><tr><th><span className="sr">Select</span></th><th>Month</th><th>Savings</th><th>Tax</th><th>Chase</th><th>HargLans ISA</th><th>ISA value</th><th>Gain</th></tr></thead>
             <tbody>
               {[...ledger].reverse().map((row, index) => (
                 <tr key={row.period} className={index === 0 ? 'latest' : undefined}>
+                  <td><input type="checkbox" aria-label={`Select ${row.period}`} /></td>
                   <td>{row.period}</td>
                   <td>{money(row.savings_total)}</td>
                   <td>{money(row.tax_total)}</td>

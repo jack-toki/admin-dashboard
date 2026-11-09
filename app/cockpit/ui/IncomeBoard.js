@@ -63,15 +63,17 @@ export function IncomeBoard({ month, records, stored, baselineRetainer, baseline
           {stored && <button type="button" className="btn" onClick={() => start(nextKind)}>Add</button>}
         </header>
         <table>
-          <thead><tr><th>Company</th><th>Amount</th><th>Schedule</th><th></th></tr></thead>
+          <thead><tr><th><span className="sr">Select</span></th><th>Company</th><th>Amount</th><th>Schedule</th><th></th></tr></thead>
           <tbody>
             {visible.map((row) => {
               const schedule = scheduleFor(row, month);
+              const tone = row.amountMinor == null || schedule.state === 'unknown' ? 'miss' : schedule.state === 'scheduled' ? 'ok' : 'warn';
               return (
                 <tr key={row.id}>
+                  <td><input type="checkbox" aria-label={`Select ${row.party}`} /></td>
                   <td><strong>{row.party}</strong></td>
-                  <td>{row.amountMinor == null ? <em className="miss-pill">Missing</em> : formatPounds(row.amountMinor)}</td>
-                  <td>{schedule.state === 'unknown' ? <em className="miss-pill">Missing</em> : <span className="status-dot">{schedule.label}</span>}{row.contractEndDate ? ` · ends ${row.contractEndDate}` : ''}</td>
+                  <td>{row.amountMinor == null ? <span className="status-dot miss">Missing</span> : formatPounds(row.amountMinor)}</td>
+                  <td><span className={`status-dot ${tone}`}>{schedule.state === 'unknown' ? 'Missing' : schedule.label}</span>{row.contractEndDate ? ` · ends ${row.contractEndDate}` : ''}</td>
                   <td>{stored && (
                     <div className="income-row-actions">
                       <button type="button" onClick={() => start(nextKind, row)}>Edit</button>
@@ -81,7 +83,7 @@ export function IncomeBoard({ month, records, stored, baselineRetainer, baseline
                 </tr>
               );
             })}
-            {!visible.length && <tr><td colSpan="4" className="income-empty">No {title.toLowerCase()} this month.</td></tr>}
+            {!visible.length && <tr><td colSpan="5" className="income-empty">No {title.toLowerCase()} this month.</td></tr>}
           </tbody>
         </table>
       </section>

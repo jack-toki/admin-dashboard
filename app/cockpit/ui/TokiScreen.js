@@ -261,14 +261,14 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
             </div>
           </article>
           <div className="bento-stats">
-            <Tile icon="income" highlight label="Income" value={showMoney(billingShown)} />
-            <Tile icon="cost" label="Costs" value={showMoney(costShown)} />
-            <Tile icon="result" label="Result" value={showMoney(billingShown == null || costShown == null ? null : billingShown - costShown)} />
-            <Tile icon="year" label="Known months" value={String(chartSeries.year.filter((item) => item.total != null).length)} />
+            <Tile icon="income" highlight label="Income" value={showMoney(billingShown)} delta={monthDelta(chartSeries.year, month, 'total')} />
+            <Tile icon="cost" label="Costs" value={showMoney(costShown)} delta={null} note="No prior month" />
+            <Tile icon="result" label="Result" value={showMoney(billingShown == null || costShown == null ? null : billingShown - costShown)} delta={null} note="No prior month" />
+            <Tile icon="year" label="Known months" value={String(chartSeries.year.filter((item) => item.total != null).length)} delta={null} note="No prior month" />
           </div>
           <div className="bento-chart">
             {board === 'month' && <HorizontalBars name="This month" tabs={<ChartTabs board={board} setBoard={setBoard} />} points={chartSeries.compare.points} series={chartSeries.compare.series} format={formatPounds} />}
-            {board === 'year' && <YearColumns name="Income" tabs={<ChartTabs board={board} setBoard={setBoard} />} months={chartSeries.year} selectedId={month} onOpen={(key) => { setMonth(key); onSection?.('sources'); }} format={formatPounds} />}
+            {board === 'year' && <YearColumns name="Income" subtitle="Retainer and project income by month" tabs={<ChartTabs board={board} setBoard={setBoard} />} months={chartSeries.year} selectedId={month} onOpen={(key) => { setMonth(key); onSection?.('sources'); }} format={formatPounds} />}
             {board === 'groups' && <HorizontalBars name="Cost groups" tabs={<ChartTabs board={board} setBoard={setBoard} />} points={chartSeries.groups.points} series={chartSeries.groups.series} format={formatPounds} />}
           </div>
           <section className="card glass bento-table">
@@ -283,14 +283,15 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
             </header>
             <div className="ledger-scroll">
               <table>
-                <thead><tr><th>Line</th><th>Kind</th><th>Amount</th><th>Status</th></tr></thead>
+                <thead><tr><th><span className="sr">Select</span></th><th>Line</th><th>Kind</th><th>Amount</th><th>Status</th></tr></thead>
                 <tbody>
                   {lines.filter((line) => (lineKind === 'all' || line.kind === lineKind) && String(line.party || '').toLowerCase().includes(lineQuery.toLowerCase())).map((line) => (
                     <tr key={line.key}>
+                      <td><input type="checkbox" aria-label={`Select ${line.party}`} /></td>
                       <td>{line.party}</td>
                       <td>{line.kind === 'sale' ? (line.workType === 'project' ? 'Project' : line.workType === 'retainer' ? 'Retainer' : 'Income') : 'Cost'}</td>
                       <td className="num">{showMoney(line.minor)}</td>
-                      <td>{line.minor == null ? <em className="miss-pill">Missing</em> : <span className="status-dot">In forecast</span>}</td>
+                      <td>{line.minor == null ? <span className="status-dot miss">Missing</span> : <span className={line.kind === 'cost' ? 'status-dot warn' : 'status-dot ok'}>In forecast</span>}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -299,9 +300,9 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
           </section>
           <section className="card glass bento-progress">
             <div className="k">Costs against income</div>
-            <div className="v num">{showMoney(costShown)}</div>
-            <p className="sub">of {showMoney(billingShown)} income. A missing side is not zero.</p>
-            <div className="prow"><span className="bar"><i style={{ width: billingShown ? `${Math.min(100, Math.round(((costShown || 0) / billingShown) * 100))}%` : '0%' }} /></span></div>
+            <p className="spend-line"><b>{showMoney(costShown)}</b> spent out of <b>{showMoney(billingShown)}</b></p>
+            <div className="limit-track" aria-hidden="true"><i style={{ width: billingShown && costShown != null ? `${Math.min(100, Math.round((costShown / billingShown) * 100))}%` : '0%' }} /></div>
+            <p className="sub">A missing side stays missing. It is not treated as zero.</p>
           </section>
         </div>
       )}
@@ -512,13 +513,23 @@ function StatIcon({ name }) {
   );
 }
 
-export function Tile({ label, value, icon = 'income', highlight = false, delta = null }) {
+function monthDelta(months, monthId, field) {
+  const index = (months || []).findIndex((item) => item.id === monthId);
+  if (index <= 0) return null;
+  const current = months[index]?.[field];
+  const prior = months[index - 1]?.[field];
+  if (current == null || prior == null || !Number.isFinite(current) || !Number.isFinite(prior)) return null;
+  return formatPounds(current - prior);
+}
+
+export function Tile({ label, value, icon = 'income', highlight = false, delta = null, note = null }) {
+  const down = typeof delta === 'string' && (delta.startsWith('-') || delta.includes('−'));
   return (
     <article className={highlight ? 'card glass hero' : 'card glass'}>
       <StatIcon name={icon} />
       <div className="k">{label}</div>
       <div className="v num">{value}</div>
-      {delta ? <span className={String(delta).includes('−') ? 'chip down' : 'chip'}>{String(delta).includes('−') ? '↓' : '↑'} {delta}</span> : null}
+      {delta ? <span className={down ? 'chip down' : 'chip'}>{down ? '↓' : '↑'} {delta} <em>vs last month</em></span> : <span className="no-prior">{note || 'No prior month'}</span>}
     </article>
   );
 }

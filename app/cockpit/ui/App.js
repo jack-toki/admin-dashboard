@@ -255,6 +255,7 @@ export default function App({ role, areas, client, fixture = false }) {
             <button type="button" className={theme === 'dark' ? 'on' : undefined} aria-label="Dark" aria-pressed={theme === 'dark'} onClick={() => setThemeMode('dark')}><MoonIcon /></button>
           </div>
           <nav id="cockpit-nav" className="rail-group">
+            <span className="rail-apps" aria-hidden="true"><GridIcon /></span>
             {items.map((item) => (
               <Fragment key={item.id}>
                 <a
@@ -367,6 +368,10 @@ function LogoutIcon() {
 
 function ChevronIcon() {
   return <Stroke><path d="M7 10l5 5 5-5" /></Stroke>;
+}
+
+function GridIcon() {
+  return <Stroke><rect x="4" y="4" width="6" height="6" rx="1.2" /><rect x="14" y="4" width="6" height="6" rx="1.2" /><rect x="4" y="14" width="6" height="6" rx="1.2" /><rect x="14" y="14" width="6" height="6" rx="1.2" /></Stroke>;
 }
 
 function RegisterForm() {

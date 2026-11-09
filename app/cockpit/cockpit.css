@@ -526,7 +526,10 @@
   .jrl-root .fx-signout, .jrl-root .fx-theme { display: flex; }
   .jrl-root .fx-signout { display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 50%; background: var(--glass); color: var(--ink); cursor: pointer; }
   .jrl-root .toki-section-switch { display: none !important; }
-  .jrl-root .fx-canvas { height: calc(100dvh - 92px); overflow: auto; margin-bottom: 78px; padding-bottom: 20px; }
+  .jrl-root .fx-shell { height: 100dvh; overflow: hidden; box-sizing: border-box; padding: 12px 12px calc(84px + env(safe-area-inset-bottom, 0px)); }
+  .jrl-root .fx-canvas { flex: 1; height: auto; min-height: 0; max-height: none; overflow: auto; margin: 0; padding: 14px 12px 20px; }
+  .bento-stats { grid-template-columns: minmax(0, 1fr); }
+  .jrl-root .toki-months button { width: auto; height: auto; min-width: 52px; min-height: 36px; border-radius: 999px; }
   .jrl-root .fx-tabs { flex-wrap: nowrap; }
   .jrl-root .fx-tabs button { white-space: nowrap; flex: none; }
   .col-slot:not([data-index="0"]):not([data-index="2"]):not([data-index="4"]):not([data-index="6"]):not([data-index="8"]):not([data-index="10"]) .col-label { visibility: hidden; }
@@ -540,12 +543,38 @@
 .stat-ico svg { width: 16px; height: 16px; }
 .card.hero .stat-ico { background: rgba(255,255,255,.22); color: #fff; }
 .chip.down { background: var(--neg-bg); color: var(--neg); }
-.bento { display: grid; grid-template-columns: minmax(220px, .9fr) minmax(280px, 1.05fr) minmax(360px, 1.35fr); gap: 14px; align-items: start; }
-.bento-summary { grid-column: 1; }
-.bento-stats { grid-column: 2; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.jrl-root, .jrl-root .fx-shell, .jrl-root .fx-canvas, .jrl-root .main { max-width: 100%; }
+.jrl-root { overflow-x: clip; }
+.jrl-root .fx-shell { padding: 22px 24px 22px 28px; gap: 22px; }
+.rail-apps { width: 42px; height: 42px; display: grid; place-items: center; color: var(--muted); }
+.bento { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.05fr) minmax(0, 1.35fr); gap: 14px; align-items: stretch; }
+.bento > * { min-width: 0; }
+.bento-summary { grid-column: 1; grid-row: 1; }
+.bento-progress { grid-column: 1; grid-row: 2; }
+.bento-stats { grid-column: 2; grid-row: 1 / span 2; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-content: start; }
 .bento-chart { grid-column: 3; grid-row: 1 / span 2; min-width: 0; }
-.bento-table { grid-column: 1 / span 2; }
-.bento-progress { grid-column: 3; }
+.bento-table { grid-column: 1 / -1; }
+.chart-sub { margin: 2px 0 0; color: var(--muted); font-size: .8rem; font-weight: 400; }
+.chart-well { background: var(--control); border-radius: 16px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.chart-well .year-legend { position: static; align-self: flex-end; }
+.card.hero .no-prior, .card.hero .chip { color: #fff; }
+.card.hero .chip { background: rgba(255,255,255,.22); }
+.limit-track { width: 100%; }
+.chart-readout { margin: 12px 0 0; }
+.no-prior { display: inline-block; margin-top: 8px; color: var(--muted); font-size: .72rem; }
+.chip em { font-style: normal; margin-left: 4px; }
+.limit-track { height: 10px; border-radius: 99px; overflow: hidden; background: repeating-linear-gradient(-45deg, var(--track) 0 4px, var(--glass-2) 4px 8px); }
+.limit-track i { display: block; height: 100%; background: var(--orange); border-radius: 99px; }
+.spend-line { margin: 8px 0; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.jrl-root tbody tr:hover td { background: rgba(235, 70, 38, .06); }
+.status-dot.ok::before { background: var(--pos); }
+.status-dot.warn::before { background: #e0a106; }
+.status-dot.miss::before { background: #b5b5b5; }
+.col-grid { background: none; border-top: 1px dotted rgba(23,23,23,.35); border-bottom: 1px dotted rgba(23,23,23,.35); }
+.col-grid::before, .col-grid::after { content: ""; position: absolute; left: 0; right: 0; border-top: 1px dotted rgba(23,23,23,.35); }
+.col-grid::before { top: 33%; }
+.col-grid::after { top: 66%; }
 .bento-span { grid-column: 1 / -1; }
 .bento-contents { display: contents; }
 .bento .pot-card { grid-column: 1; grid-row: 1 / span 2; margin: 0; }
@@ -577,8 +606,22 @@
 .col-average::after { content: "Avg"; background: var(--surface); color: var(--muted); font-size: 11px; padding: 0 4px; top: -14px; }
 .income-col table { width: 100%; border-collapse: collapse; }
 .income-col th, .income-col td { text-align: left; padding: 10px 8px; }
-.jrl-root .toki-months button { min-width: 44px; }
+.jrl-root .toki-months button { min-width: 52px; padding: 0 12px; overflow: visible; }
 @media (max-width: 1100px) {
-  .bento { grid-template-columns: 1fr; }
+  .bento { grid-template-columns: minmax(0, 1fr); }
   .bento-summary, .bento-stats, .bento-chart, .bento-table, .bento-progress, .bento .pot-card { grid-column: 1; grid-row: auto; }
+  .bento-stats { grid-template-columns: minmax(0, 1fr); }
+  .bento-stats .card .v { font-size: 1.35rem; overflow-wrap: anywhere; }
+}
+@media (max-width: 820px) {
+  .jrl-root .fx-shell {
+    height: 100dvh; overflow: hidden; box-sizing: border-box;
+    padding: 12px 12px calc(88px + env(safe-area-inset-bottom, 0px));
+  }
+  .jrl-root .fx-canvas { flex: 1; min-height: 0; height: auto; overflow: auto; padding: 14px 12px 16px; }
+  .jrl-root table { min-width: 0; }
+  .ledger-scroll { overflow-x: auto; max-width: 100%; }
+  .toki-months, .fx-tabs { max-width: 100%; }
+  .bento-stats { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .bento-stats .card { min-width: 0; }
 }

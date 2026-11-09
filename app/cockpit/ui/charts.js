@@ -275,7 +275,7 @@ function linePhrase(line, format) {
   return `${kind} · ${line.name} · ${moneyText(line.minor, format)}`;
 }
 
-export function YearColumns({ name, months, selectedId, onOpen, format, tabs = null }) {
+export function YearColumns({ name, months, selectedId, onOpen, format, tabs = null, subtitle = '' }) {
   const [hidden, setHidden] = useState({});
   const [showAverage, setShowAverage] = useState(true);
   const [focusId, setFocusId] = useState('');
@@ -307,9 +307,14 @@ export function YearColumns({ name, months, selectedId, onOpen, format, tabs = n
     <figure className="finance-plot" data-chart={name}>
       <figcaption>
         <div className="chart-card-head">
-          <strong>{name}</strong>
+          <div>
+            <strong>{name}</strong>
+            {subtitle ? <p className="chart-sub">{subtitle}</p> : null}
+          </div>
           {tabs}
         </div>
+      </figcaption>
+      <div className="chart-well">
         <span className="year-legend">
           <ChartLegend name={name} series={legend} hidden={hidden} setHidden={setHidden} ready={ready} />
           <button type="button" className="chart-key" aria-pressed={showAverage} title="Average of known months. Missing months are left out. A stored zero is included." onClick={() => setShowAverage((current) => !current)}>
@@ -317,7 +322,6 @@ export function YearColumns({ name, months, selectedId, onOpen, format, tabs = n
             Average
           </button>
         </span>
-      </figcaption>
       <div className="col-chart">
         <div className="col-axis" aria-hidden="true">
           <span>{axisText(max)}</span>
@@ -366,22 +370,23 @@ export function YearColumns({ name, months, selectedId, onOpen, format, tabs = n
           ))}
         </div>
       </div>
+      </div>
+      <div className="chart-readout" role="status" aria-live="polite">
+        <div><span>{active?.label || 'Month'}</span><b>{moneyText(active?.total, format)}</b></div>
+        <div><span>Actual</span>{active?.actual == null ? <em className="miss-pill" title="Missing information, not zero.">Missing</em> : <b>{moneyText(active.actual, format)}</b>}</div>
+        <div><span>Average</span><b>{average == null ? '—' : moneyText(average, format)}</b></div>
+        {shownLines.length > 0 && (
+          <ul>
+            {shownLines.map((line) => (
+              <li key={`${line.type}-${line.name}`} data-income-line={line.name}>
+                <span>{line.name}</span>
+                {line.minor == null ? <em className="miss-pill">Missing</em> : <b>{moneyText(line.minor, format)}</b>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </figure>
-    <div className="chart-readout" role="status" aria-live="polite">
-      <div><span>{active?.label || 'Month'}</span><b>{moneyText(active?.total, format)}</b></div>
-      <div><span>Actual</span>{active?.actual == null ? <em className="miss-pill" title="Missing information, not zero.">Missing</em> : <b>{moneyText(active.actual, format)}</b>}</div>
-      <div><span>Average</span><b>{average == null ? '—' : moneyText(average, format)}</b></div>
-      {shownLines.length > 0 && (
-        <ul>
-          {shownLines.map((line) => (
-            <li key={`${line.type}-${line.name}`} data-income-line={line.name}>
-              <span>{line.name}</span>
-              {line.minor == null ? <em className="miss-pill">Missing</em> : <b>{moneyText(line.minor, format)}</b>}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
     </div>
   );
 }
