@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('http');
+const path = require('path');
 const { spawn } = require('child_process');
 const { verifyJrlEmailCode } = require('../lib/jrl/emailOtp');
 const { ownerLinkStore } = require('../lib/jrl/ownerLink');
@@ -209,6 +210,7 @@ function redirectFetch(port, previous) {
   };
 }
 
+const ROOT = path.join(__dirname, '..');
 const CHILD = `
 const port = process.env.PORT;
 const previous = global.fetch;
@@ -238,11 +240,11 @@ const env = {
   NODE_ENV: 'test',
 };
 (async () => {
-  const { signSession, cookieName } = require('/workspace/lib/auth');
+  const { signSession, cookieName } = require(${JSON.stringify(path.join(ROOT, 'lib', 'auth'))});
   const cockpit = signSession({ role: 'admin', areas: ['jrl'] }, env);
   const headers = { cookie: cookieName() + '=' + cockpit };
   if (process.env.PHASE === 'pots') {
-    const { potGet } = require('/workspace/lib/cockpit/http');
+    const { potGet } = require(${JSON.stringify(path.join(ROOT, 'lib', 'cockpit', 'http'))});
     const res = await potGet(new Request('http://localhost/api/cockpit/jrl/pots', { headers }), { env });
     const body = await res.json();
     process.stdout.write(JSON.stringify({
@@ -256,7 +258,7 @@ const env = {
     }));
     return;
   }
-  const { jrlGet } = require('/workspace/lib/jrl/http');
+  const { jrlGet } = require(${JSON.stringify(path.join(ROOT, 'lib', 'jrl', 'http'))});
   const res = await jrlGet(new Request('http://localhost/api/cockpit/jrl', { headers }), { env, now: Date.now() });
   const body = await res.json();
   const packed = JSON.stringify(body);

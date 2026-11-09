@@ -64,16 +64,28 @@ test('a private sheet read refreshes the cache and leaves a published link alone
   const gross = live.cells.find((cell) => cell.label === 'Gross Profit' && cell.month === '2026-01');
   assert.equal(gross.formula, true);
   assert.equal(isInputCell(gross), false);
+  assert.equal(retained.sourceCell, 'B3');
   let saved = null;
+  const storedOne = [{
+    id: 'baseline:10sGcVQcgKCJfuy7BDLV_UzxIly-vF4aU5tRjmZumGLk:1455407915:B3:2026-01-01',
+    label: 'Retained Clients',
+    sourceCell: 'B3',
+    period: '2026-01-01',
+    enteredMinor: 100,
+    amountMinor: 100,
+    snapshotHash: 'hash',
+  }];
   const applied = await applyLiveRead({
-    stored: [{ label: 'Retained Clients', period: '2026-01-01', enteredMinor: 100, amountMinor: 100 }],
+    stored: storedOne,
     live,
     save: async (cells) => { saved = cells; },
   });
   assert.equal(applied.sheetRuntime, true);
   assert.equal(applied.sheetFallback, false);
-  assert.equal(applied.cells.filter((cell) => cell.label === 'Retained Clients' && (cell.month === '2026-01' || String(cell.period || '').startsWith('2026-01'))).length, 1);
-  assert.equal(saved.length, live.cells.length);
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].id, storedOne[0].id);
+  assert.equal(saved[0].enteredMinor, 900);
+  assert.equal(saved.some((cell) => cell.label === 'Gross Profit'), false);
   const fallback = await applyLiveRead({
     stored: [{ label: 'Retained Clients', period: '2026-01-01', enteredMinor: 100 }],
     live: { ok: false, cells: [] },
@@ -81,6 +93,82 @@ test('a private sheet read refreshes the cache and leaves a published link alone
   assert.equal(fallback.sheetRuntime, false);
   assert.equal(fallback.sheetFallback, true);
   assert.equal(fallback.cells[0].enteredMinor, 100);
+});
+
+test('a live read updates the 377 stored rows in place and does not double November', async () => {
+  const periods = [];
+  for (let month = 1; month <= 12; month += 1) periods.push(`2026-${String(month).padStart(2, '0')}-01`);
+  periods.push('2027-01-01');
+  const labels = [
+    ['Retained Clients', 'revenue', 3],
+    ['Project Work', 'revenue', 4],
+  ];
+  for (let row = 5; row <= 31; row += 1) labels.push([`Cost ${row}`, 'cost', row]);
+  assert.equal(labels.length * periods.length, 377);
+  const column = (period) => {
+    const month = Number(period.slice(5, 7));
+    const year = Number(period.slice(0, 4));
+    const index = year === 2027 ? 13 : month;
+    let n = index + 1;
+    let letters = '';
+    while (n > 0) {
+      const rem = (n - 1) % 26;
+      letters = String.fromCharCode(65 + rem) + letters;
+      n = Math.floor((n - 1) / 26);
+    }
+    return letters;
+  };
+  const stored = [];
+  for (const [label, kind, row] of labels) {
+    for (const period of periods) {
+      const sourceCell = `${column(period)}${row}`;
+      stored.push({
+        id: `baseline:sheet:1455407915:${sourceCell}:${period}`,
+        label,
+        kind,
+        rowNumber: row,
+        sourceCell,
+        period,
+        enteredMinor: 0,
+        amountMinor: 0,
+        cellState: 'zero',
+        nullState: 'zero',
+        snapshotHash: 'stored-hash',
+      });
+    }
+  }
+  const live = [
+    { label: 'Retained Clients', kind: 'revenue', sourceCell: `${column('2026-11-01')}3`, month: '2026-11', period: '2026-11-01', enteredMinor: 890000, amountMinor: 890000, id: 'wrong:3:2026-11' },
+    { label: 'Project Work', kind: 'revenue', sourceCell: `${column('2026-11-01')}4`, month: '2026-11', period: '2026-11-01', enteredMinor: 540000, amountMinor: 540000, id: 'wrong:4:2026-11' },
+    { label: 'Cost 5', kind: 'cost', sourceCell: `${column('2026-11-01')}5`, month: '2026-11', period: '2026-11-01', enteredMinor: 218040, amountMinor: 218040, id: 'wrong:5:2026-11' },
+    { label: 'Gross Profit', kind: 'metric', formula: true, sourceCell: 'B40', month: '2026-11', period: '2026-11-01', enteredMinor: 1430000, id: 'formula-row' },
+    { label: '', kind: 'cost', sourceCell: 'B41', month: '2026-11', period: '2026-11-01', enteredMinor: 100, id: 'blank-label' },
+    { label: '2027', kind: 'cost', sourceCell: 'B42', month: '2026-11', period: '2026-11-01', enteredMinor: 100, id: 'year-row' },
+  ];
+  let cache = null;
+  let recorded = null;
+  const first = await applyLiveRead({
+    stored,
+    live: { ok: true, cells: live },
+    save: async (cells) => { cache = cells; },
+    recordRead: async (row) => { recorded = row; },
+  });
+  const november = (cells, kind) => cells.filter((cell) => String(cell.period).startsWith('2026-11') && cell.kind === kind).reduce((sum, cell) => sum + (cell.enteredMinor || 0), 0);
+  assert.equal(first.cells.length, 377);
+  assert.equal(cache.length, 377);
+  assert.equal(new Set(cache.map((cell) => cell.id)).size, 377);
+  assert.equal(cache.some((cell) => cell.id === 'formula-row' || cell.id === 'blank-label' || cell.id === 'year-row'), false);
+  assert.equal(november(cache, 'revenue'), 1430000);
+  assert.equal(november(cache, 'cost'), 218040);
+  assert.equal(recorded.cellKey, 'forecast-live-read');
+  assert.equal(recorded.sourceCell, 'service_account');
+  assert.equal(recorded.lastValue, '377');
+  assert.match(recorded.readAt, /^20/);
+  const fallback = await applyLiveRead({ stored: cache, live: { ok: false, cells: live } });
+  assert.equal(fallback.sheetFallback, true);
+  assert.equal(fallback.cells.length, 377);
+  assert.equal(november(fallback.cells, 'revenue'), 1430000);
+  assert.equal(november(fallback.cells, 'cost'), 218040);
 });
 
 test('an automatic task hides for this period and returns next period', () => {

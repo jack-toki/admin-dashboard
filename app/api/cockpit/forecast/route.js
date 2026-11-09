@@ -57,6 +57,7 @@ export async function GET(req) {
     stored: cells,
     live,
     save: live.ok && typeof opened.store.saveBaseline === 'function' ? (next) => opened.store.saveBaseline(next) : null,
+    recordRead: live.ok && typeof opened.store.saveSyncState === 'function' ? (row) => opened.store.saveSyncState(row) : null,
   });
   return Response.json({
     ok: true,
