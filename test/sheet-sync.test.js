@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { decideSheetWrite, findForecastInput, isInputCell } = require('../lib/forecast/sheetSync');
+const { applyLiveRead, readForecastSheet } = require('../lib/forecast/liveSheet');
 const { pushForecastValue } = require('../lib/forecast/pushSheet');
 const { deriveAutoTasks } = require('../lib/planning/autoTasks');
 const { minutesForZap, moneySaved, savingsFromZaps } = require('../lib/automations/savings');
@@ -12,6 +13,11 @@ test('a sheet write waits when the cell changed, and formulas are left alone', (
   assert.deepEqual(decideSheetWrite({ current: '15', lastSynced: '10', stored: '10', next: '12' }).action, 'conflict');
   assert.equal(decideSheetWrite({ current: '10', lastSynced: '10', stored: '10', next: '12' }).action, 'write');
   assert.equal(decideSheetWrite({ current: '=A1+B1', lastSynced: '10', stored: '10', next: '12' }).reason, 'formula');
+  assert.equal(decideSheetWrite({ current: '£9.00', lastSynced: '9', stored: '9', next: '12' }).action, 'write');
+  assert.equal(decideSheetWrite({ current: '£2,180.40', lastSynced: '2180.4', stored: '2180.4', next: '3000' }).action, 'write');
+  assert.equal(decideSheetWrite({ current: '£15.00', lastSynced: '9', stored: '9', next: '12' }).action, 'conflict');
+  assert.equal(decideSheetWrite({ current: 'Northwind', lastSynced: 'Louise', stored: 'Louise', next: 'Harbour' }).action, 'conflict');
+  assert.equal(decideSheetWrite({ current: 'Louise', lastSynced: 'Louise', stored: 'Louise', next: 'Harbour' }).action, 'write');
   assert.equal(isInputCell({ label: 'Gross Profit', kind: 'metric', sourceCell: 'B5' }), false);
   assert.equal(isInputCell({ label: 'Retained Clients', kind: 'revenue', sourceCell: 'B3' }), true);
   const sql = fs.readFileSync(path.join(__dirname, '../supabase/cockpit_sheet_sync.sql'), 'utf8');
@@ -19,6 +25,62 @@ test('a sheet write waits when the cell changed, and formulas are left alone', (
   assert.match(sql, /create table cockpit.automation_rates/);
   assert.equal(/alter table cockpit.income_detail_lines/i.test(sql), false);
   assert.equal(/grant delete/i.test(sql), false);
+});
+
+test('a private sheet read refreshes the cache and leaves a published link alone', async () => {
+  const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const env = {
+    GOOGLE_SERVICE_ACCOUNT_JSON: JSON.stringify({
+      client_email: 'writer@example.iam.gserviceaccount.com',
+      private_key: privateKey.export({ type: 'pkcs8', format: 'pem' }),
+    }),
+    FORECAST_SPREADSHEET_ID: '10sGcVQcgKCJfuy7BDLV_UzxIly-vF4aU5tRjmZumGLk',
+    FORECAST_SHEET_CSV_URL: 'https://example.invalid/published.csv',
+  };
+  const values = [
+    ['', 'January 2026'],
+    ['Billing', ''],
+    ['Retained Clients', 9],
+    ['Gross Profit', 9],
+  ];
+  const formulas = [
+    ['', 'January 2026'],
+    ['Billing', ''],
+    ['Retained Clients', 9],
+    ['Gross Profit', '=B3'],
+  ];
+  const urls = [];
+  const live = await readForecastSheet(env, async (url) => {
+    urls.push(String(url));
+    if (String(url).includes('oauth2.googleapis.com')) return { ok: true, json: async () => ({ access_token: 'token' }) };
+    if (String(url).includes('FORMULA')) return { ok: true, json: async () => ({ values: formulas }) };
+    return { ok: true, json: async () => ({ values }) };
+  });
+  assert.equal(urls.some((url) => url.includes('example.invalid')), false);
+  assert.equal(live.ok, true);
+  const retained = live.cells.find((cell) => cell.label === 'Retained Clients' && cell.month === '2026-01');
+  assert.equal(retained.enteredMinor, 900);
+  assert.equal(retained.formula, undefined);
+  const gross = live.cells.find((cell) => cell.label === 'Gross Profit' && cell.month === '2026-01');
+  assert.equal(gross.formula, true);
+  assert.equal(isInputCell(gross), false);
+  let saved = null;
+  const applied = await applyLiveRead({
+    stored: [{ label: 'Retained Clients', period: '2026-01-01', enteredMinor: 100, amountMinor: 100 }],
+    live,
+    save: async (cells) => { saved = cells; },
+  });
+  assert.equal(applied.sheetRuntime, true);
+  assert.equal(applied.sheetFallback, false);
+  assert.equal(applied.cells.filter((cell) => cell.label === 'Retained Clients' && (cell.month === '2026-01' || String(cell.period || '').startsWith('2026-01'))).length, 1);
+  assert.equal(saved.length, live.cells.length);
+  const fallback = await applyLiveRead({
+    stored: [{ label: 'Retained Clients', period: '2026-01-01', enteredMinor: 100 }],
+    live: { ok: false, cells: [] },
+  });
+  assert.equal(fallback.sheetRuntime, false);
+  assert.equal(fallback.sheetFallback, true);
+  assert.equal(fallback.cells[0].enteredMinor, 100);
 });
 
 test('an automatic task hides for this period and returns next period', () => {
