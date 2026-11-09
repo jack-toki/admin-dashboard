@@ -7,7 +7,7 @@ import { HorizontalBars, YearColumns } from './charts';
 import { IncomeBoard } from './IncomeBoard';
 import { DetailDrawer, DetailFields } from './DetailDrawer';
 import { deriveAutoTasks } from '../../../lib/planning/autoTasks';
-import { DEFAULT_HOURLY_RATE, minutesForZap, moneySaved } from '../../../lib/automations/savings';
+import { priceZaps, savingsFromZaps } from '../../../lib/automations/savings';
 
 const MONTHS = [
   ['01', 'Jan', 'January'], ['02', 'Feb', 'February'], ['03', 'Mar', 'March'], ['04', 'Apr', 'April'],
@@ -542,25 +542,19 @@ export function AutomationsScreen({ board, error }) {
   const rows = board?.accountRows || [];
   const zaps = board?.zapRows || [];
   const ready = board?.posts != null;
-  function clientRate(name) {
-    const saved = rates.find((row) => row.id === `client:${name}`);
-    return saved?.hourlyRateMinor ? saved.hourlyRateMinor / 100 : DEFAULT_HOURLY_RATE;
-  }
-  function zapMinutes(zap) {
-    const saved = rates.find((row) => row.id === `zap:${zap.zapId}`);
-    return minutesForZap(zap.title, saved?.minutesPerRun);
-  }
-  const priced = rows.map((row) => {
-    const saved = moneySaved({ runs: row.runs, minutes: 7, hourlyRate: clientRate(row.name) });
-    return { ...row, ...saved };
-  });
-  const pricedZaps = zaps.map((zap) => {
-    const minutes = zapMinutes(zap);
-    const saved = moneySaved({ runs: zap.runs, minutes: minutes.minutes, hourlyRate: clientRate(zap.account) });
-    return { ...zap, ...saved, minuteNote: minutes.formula };
-  });
-  const totalPounds = priced.reduce((sum, row) => sum + row.pounds, 0);
-  const totalHours = priced.reduce((sum, row) => sum + row.hours, 0);
+  const pricedZaps = priceZaps(zaps, rates);
+  const totals = savingsFromZaps(zaps, rates);
+  const priced = [...pricedZaps.reduce((accounts, zap) => {
+    const current = accounts.get(zap.account) || { name: zap.account, runs: 0, pounds: 0, hours: 0 };
+    current.runs += zap.runs;
+    current.pounds += zap.pounds;
+    current.hours += zap.hours;
+    current.formula = `${current.runs} runs across Zaps · £${current.pounds}`;
+    accounts.set(zap.account, current);
+    return accounts;
+  }, new Map()).values()];
+  const totalPounds = totals.pounds;
+  const totalHours = totals.hours;
   const max = Math.max(1, ...priced.map((row) => row.pounds || 0));
   return (
     <section className="bento">
@@ -631,7 +625,7 @@ export function AutomationsScreen({ board, error }) {
                 <b>£{row.pounds}</b>
               </button>
             ))}
-            {!rows.length && <p className="sub">No posts to chart this month.</p>}
+            {!priced.length && <p className="sub">No posts to chart this month.</p>}
           </div>
         </div>
       )}
