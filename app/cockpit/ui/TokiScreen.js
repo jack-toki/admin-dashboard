@@ -28,7 +28,7 @@ const COST_GROUPS = [
 ];
 
 function showMoney(minor) {
-  if (minor == null || !Number.isFinite(minor)) return 'Missing information';
+  if (minor == null || !Number.isFinite(minor)) return '—';
   return formatPounds(minor);
 }
 
@@ -305,7 +305,7 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
           </div>
           <div className="bento-chart">
             {board === 'month' && <HorizontalBars name="This month" tabs={<ChartTabs board={board} setBoard={setBoard} />} points={chartSeries.compare.points} series={chartSeries.compare.series} format={formatPounds} onOpen={(id) => { const point = chartSeries.compare.points.find((item) => item.id === id); setDetail({ title: point?.label || 'This month', fields: (point?.lines || []).map((line) => ({ label: line.name, value: line.minor == null ? 'Missing' : formatPounds(line.minor) })) }); }} />}
-            {board === 'year' && <YearColumns name="Income" subtitle="Retainer and project income by month" tabs={<ChartTabs board={board} setBoard={setBoard} />} months={chartSeries.year} selectedId={month} onOpen={(key) => { const item = chartSeries.year.find((entry) => entry.id === key); setMonth(key); setDetail({ title: item?.label || key, fields: [{ label: 'Income', value: showMoney(item?.total) }, ...(item?.lines || []).map((line) => ({ label: line.name, value: line.minor == null ? 'Missing' : formatPounds(line.minor) }))] }); }} format={formatPounds} />}
+            {board === 'year' && <YearColumns name="Income" subtitle="Retainer and project income by month" tabs={<ChartTabs board={board} setBoard={setBoard} />} months={chartSeries.year} selectedId={month} onOpen={(key) => { const item = chartSeries.year.find((entry) => entry.id === key); setMonth(key); setDetail({ title: item?.label || key, fields: [{ label: 'Income', value: showMoney(item?.total) }, ...(item?.lines || []).map((line) => ({ label: line.name, value: line.minor == null ? '—' : formatPounds(line.minor) }))] }); }} format={formatPounds} />}
             {board === 'groups' && <HorizontalBars name="Cost groups" tabs={<ChartTabs board={board} setBoard={setBoard} />} points={chartSeries.groups.points} series={chartSeries.groups.series} format={formatPounds} onOpen={(id) => { const point = chartSeries.groups.points.find((item) => item.id === id); setDetail({ title: point?.label || 'Cost group', fields: [{ label: 'Amount', value: showMoney(point?.segments?.[0]?.value ?? point?.lines?.[0]?.minor) }] }); }} />}
           </div>
           <div className="quick-row">
@@ -564,26 +564,27 @@ export function AutomationsScreen({ board, error }) {
   const max = Math.max(1, ...priced.map((row) => row.pounds || 0));
   return (
     <section className="bento">
-      <div className="card glass bento-span" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+      <div className="card glass bento-span auto-head">
         <div>
-          <h2 style={{ margin: 0 }}>Automations</h2>
-          <p className="sub">{ready ? 'Posts, time saved, and money saved this month.' : (error === 'run_log_not_configured' ? 'The run log is not configured on this server.' : error ? 'The run log could not be read.' : 'No runs in this month.')}</p>
+          <h2>Automations</h2>
+          <p className="sub">{ready ? 'Posts, time saved, and money saved this month.' : 'No runs in this month.'}</p>
         </div>
-        <button type="button" className="btn btn-ghost" onClick={() => setSettings(true)}>Rates</button>
-        <div className="auto-switch" role="tablist" aria-label="Automations view">
-          {[['cards', 'Cards'], ['table', 'Table'], ['graph', 'Graph']].map(([id, label]) => (
-            <button key={id} type="button" role="tab" aria-pressed={view === id} onClick={() => setView(id)}>{label}</button>
-          ))}
+        <div className="auto-tools">
+          <div className="auto-switch" role="tablist" aria-label="Automations view">
+            {[['cards', 'Cards'], ['table', 'Table'], ['graph', 'Graph']].map(([id, label]) => (
+              <button key={id} type="button" role="tab" aria-pressed={view === id} onClick={() => setView(id)}>{label}</button>
+            ))}
+          </div>
+          <button type="button" className="btn btn-ghost" onClick={() => setSettings(true)}>Rates</button>
         </div>
       </div>
-      {ready && (
-        <div className="bento-stats">
-          <Tile icon="posts" label="Posts" value={String(board.posts)} onOpen={() => setDetail({ title: 'Posts', fields: [{ label: 'Posts', value: String(board.posts) }] })} />
-          <Tile icon="accounts" label="Accounts" value={String(board.accounts)} />
-          <Tile icon="year" label="Time saved" value={`${totalHours.toFixed(1)} h`} />
-          <Tile icon="value" label="£ saved" value={`£${totalPounds.toLocaleString('en-GB')}`} onOpen={() => setDetail({ title: '£ saved', fields: pricedZaps.map((zap) => ({ label: zap.title, value: `£${zap.pounds} · ${zap.formula}` })) })} />
-        </div>
-      )}
+      <div className="kpi-row">
+        <Tile icon="posts" label="Posts this month" value={ready ? String(board.posts) : '—'} />
+        <Tile icon="zap" label="Active Zaps" value={ready ? String(zaps.length || board.reportingZapIds || 0) : '—'} />
+        <Tile icon="cost" label="Failures" value="—" />
+        <Tile icon="year" label="Time saved" value={ready ? `${totalHours.toFixed(1)} h` : '—'} />
+        <Tile icon="value" label="£ saved" value={ready ? `£${totalPounds.toLocaleString('en-GB')}` : '—'} onOpen={() => setDetail({ title: '£ saved', fields: pricedZaps.map((zap) => ({ label: zap.title, value: `£${zap.pounds} · ${zap.formula}` })) })} />
+      </div>
       {view === 'cards' && (
         <div className="auto-cards bento-span">
           {rows.map((row) => (
@@ -591,7 +592,7 @@ export function AutomationsScreen({ board, error }) {
               {runFields(row).map((field) => <p key={field.label} className="sub"><b style={{ color: 'inherit' }}>{field.label}.</b> {field.value}</p>)}
             </button>
           ))}
-          {!rows.length && <p className="sub">No accounts posted this month.</p>}
+          {!rows.length && <article className="card glass"><p className="sub">No accounts posted this month.</p></article>}
         </div>
       )}
       {view === 'table' && (
@@ -755,7 +756,7 @@ export function Tile({ label, value, icon = 'income', highlight = false, delta =
     <article className={highlight ? 'card glass hero' : 'card glass'} role={onOpen ? 'button' : undefined} tabIndex={onOpen ? 0 : undefined} onClick={onOpen} onKeyDown={(event) => { if (onOpen && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); onOpen(); } }}>
       <StatIcon name={icon} />
       <div className="k">{label}</div>
-      <div className="v num">{value}</div>
+      <div className={value === '—' ? 'v num no-data' : 'v num'}>{value}</div>
       {delta ? <span className={down ? 'chip down' : 'chip'}>{down ? '↓' : '↑'} {delta} <em>vs last month</em></span> : <span className="no-prior">{note || 'No prior month'}</span>}
     </article>
   );
@@ -771,9 +772,9 @@ function GroupTable({ groups }) {
             <tr key={group.groupId}>
               <td>{group.label}</td>
               <td>{showMoney(group.shownForecast ?? group.forecast.minor)}</td>
-              <td>{group.actual.known ? showMoney(group.actual.minor) : group.groupId === 'people' ? 'Missing information. People actuals are not on record.' : group.actual.coverage === 'partial' ? 'Missing information. Partial export.' : 'Missing information'}</td>
-              <td>{group.rawDifference == null ? 'Missing information' : formatPounds(group.rawDifference)}</td>
-              <td>{group.judgement === 'unknown' ? 'Missing information' : group.judgement === 'incomplete' ? 'Incomplete' : group.direction}</td>
+              <td>{group.actual.known ? showMoney(group.actual.minor) : <span className="no-data">No data</span>}</td>
+              <td>{group.rawDifference == null ? <span className="no-data">No data</span> : formatPounds(group.rawDifference)}</td>
+              <td>{group.judgement === 'unknown' ? <span className="no-data">No data</span> : group.judgement === 'incomplete' ? 'Incomplete' : group.direction}</td>
             </tr>
           ))}
         </tbody>

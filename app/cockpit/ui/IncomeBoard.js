@@ -4,7 +4,7 @@ import { formatPounds } from '../../../lib/money';
 import { reconcileKind, scheduleFor, shownInMonth } from '../../../lib/planning/incomeDetail';
 
 function money(minor) {
-  if (minor == null || !Number.isFinite(minor)) return 'Missing information';
+  if (minor == null || !Number.isFinite(minor)) return '—';
   return formatPounds(minor);
 }
 

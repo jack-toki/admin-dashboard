@@ -127,7 +127,7 @@ export function InteractiveSeriesChart({
                 <td>{point.label}</td>
                 {series.map((item) => {
                   const value = item.values.find((entry) => entry.id === point.id);
-                  return <td key={item.id}>{value?.value == null ? 'Missing information' : format(value.value)}</td>;
+                  return <td key={item.id}>{value?.value == null ? '—' : format(value.value)}</td>;
                 })}
               </tr>
             ))}
@@ -156,7 +156,7 @@ export function CompactColumns({ name, points, series, selectedId, onSelect, for
   const slot = innerW / Math.max(points.length, 1);
 
   function money(value) {
-    if (value == null || !Number.isFinite(value)) return 'Missing information';
+    if (value == null || !Number.isFinite(value)) return '—';
     return format(value);
   }
 
@@ -228,7 +228,7 @@ export function CompactColumns({ name, points, series, selectedId, onSelect, for
 }
 
 function moneyText(value, format) {
-  if (value == null || !Number.isFinite(value)) return 'Missing information';
+  if (value == null || !Number.isFinite(value)) return '—';
   return format(value);
 }
 
@@ -379,7 +379,7 @@ export function YearColumns({ name, months, selectedId, onOpen, format, tabs = n
       </div>
       <div className="chart-readout" role="status" aria-live="polite">
         <div><span>{active?.label || 'Month'}</span><b>{moneyText(active?.total, format)}</b></div>
-        <div><span>Actual received</span>{active?.actual == null ? <em className="miss-pill" title="Missing information, not zero.">Missing</em> : <b>{moneyText(active.actual, format)}</b>}</div>
+        <div><span>Actual received</span>{active?.actual == null ? <em className="no-data" title="Missing information, not zero.">No data</em> : <b className="num">{moneyText(active.actual, format)}</b>}</div>
         <div><span>Average</span><b>{average == null ? '—' : moneyText(average, format)}</b></div>
         {shownLines.length > 0 && (
           <ul>
@@ -505,7 +505,7 @@ export function ComparisonBars({ name, items, format, caption, onOpen }) {
         <caption className="sub">{name} values</caption>
         <tbody>
           {items.map((item) => (
-            <tr key={item.id}><td>{item.label}</td><td>{item.value == null ? 'Missing information' : format(item.value)}</td><td>{item.status}</td></tr>
+            <tr key={item.id}><td>{item.label}</td><td>{item.value == null ? '—' : format(item.value)}</td><td>{item.status}</td></tr>
           ))}
         </tbody>
       </table>
