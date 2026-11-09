@@ -4,7 +4,9 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { decideSheetWrite, findForecastInput, isInputCell } = require('../lib/forecast/sheetSync');
-const { applyLiveRead, readForecastSheet } = require('../lib/forecast/liveSheet');
+const { applyLiveRead, readForecastSheet, refreshStoredBaseline } = require('../lib/forecast/liveSheet');
+const { sourceHash } = require('../lib/forecast/import');
+const { forecastBaselineRow } = require('../lib/store');
 const { pushForecastValue } = require('../lib/forecast/pushSheet');
 const { deriveAutoTasks } = require('../lib/planning/autoTasks');
 const { minutesForZap, moneySaved, savingsFromZaps } = require('../lib/automations/savings');
@@ -169,6 +171,74 @@ test('a live read updates the 377 stored rows in place and does not double Novem
   assert.equal(fallback.cells.length, 377);
   assert.equal(november(fallback.cells, 'revenue'), 1430000);
   assert.equal(november(fallback.cells, 'cost'), 218040);
+});
+
+test('a live read keeps entered text and includes Jack Salary and Target', async () => {
+  const periods = [];
+  for (let month = 1; month <= 13; month += 1) periods.push(month === 13 ? '2027-01-01' : `2026-${String(month).padStart(2, '0')}-01`);
+  const rows = [
+    ['Jack Salary', 37],
+    ['Target', 47],
+  ];
+  const stored = [];
+  for (const [label, rowNumber] of rows) {
+    for (const period of periods) {
+      stored.push({
+        id: `baseline:sheet:1455407915:B${rowNumber}:${period}`,
+        label,
+        kind: 'metric',
+        rowNumber,
+        sheetId: 1455407915,
+        spreadsheetId: 'sheet',
+        sourceCell: `B${rowNumber}`,
+        period,
+        enteredMinor: 100,
+        amountMinor: 100,
+        cellState: 'value',
+        nullState: 'amount',
+        userEntered: { numberValue: 1 },
+        displayed: '£1.00',
+        sourceHash: 'old-hash',
+      });
+    }
+  }
+  assert.equal(stored.length, 26);
+  const live = stored.map((cell) => ({
+    ...cell,
+    enteredMinor: cell.label === 'Jack Salary' ? 300000 : 500000,
+    formula: true,
+    id: `wrong:${cell.rowNumber}:${cell.period}`,
+  }));
+  const next = refreshStoredBaseline(stored, live);
+  assert.equal(next.length, 26);
+  assert.equal(next.every((cell) => cell.userEntered.numberValue === 1 && cell.displayed === '£1.00'), true);
+  assert.equal(next.filter((cell) => cell.label === 'Jack Salary').every((cell) => cell.enteredMinor === 300000), true);
+  assert.equal(next.filter((cell) => cell.label === 'Target').every((cell) => cell.enteredMinor === 500000), true);
+  const changed = next[0];
+  assert.notEqual(changed.sourceHash, 'old-hash');
+  assert.equal(changed.sourceHash, sourceHash({
+    workbookRef: 'sheet',
+    tabRef: 'Forecast Profit & Loss#1455407915',
+    cellRef: `R37C1`,
+    period: changed.period,
+    label: changed.label,
+    nullState: changed.nullState,
+    enteredMinor: changed.enteredMinor,
+  }));
+  const written = forecastBaselineRow(changed, 'hash');
+  assert.deepEqual(written.user_entered, { numberValue: 1 });
+  assert.equal(written.displayed, '£1.00');
+  const untouched = forecastBaselineRow({ ...changed, userEntered: undefined, displayed: undefined }, 'hash');
+  assert.equal(Object.hasOwn(untouched, 'user_entered'), false);
+  assert.equal(Object.hasOwn(untouched, 'displayed'), false);
+  const recorded = await applyLiveRead({
+    stored,
+    live: { ok: true, cells: live },
+    save: async () => {},
+    recordRead: async () => { throw new Error('sync state down'); },
+  });
+  assert.equal(recorded.sheetRuntime, true);
+  assert.equal(recorded.cells.length, 26);
 });
 
 test('an automatic task hides for this period and returns next period', () => {
