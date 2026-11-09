@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { decideSheetWrite, findForecastInput, isInputCell } = require('../lib/forecast/sheetSync');
-const { applyLiveRead, readForecastSheet, refreshStoredBaseline } = require('../lib/forecast/liveSheet');
+const { applyLiveRead, baselineSourceHash, readForecastSheet, refreshStoredBaseline } = require('../lib/forecast/liveSheet');
 const { sourceHash } = require('../lib/forecast/import');
 const { forecastBaselineRow } = require('../lib/store');
 const { pushForecastValue } = require('../lib/forecast/pushSheet');
@@ -209,25 +209,34 @@ test('a live read keeps entered text and includes Jack Salary and Target', async
     formula: true,
     id: `wrong:${cell.rowNumber}:${cell.period}`,
   }));
+  live[0].displayed = '£3,000.00';
+  live[0].userEntered = { stringValue: '3000' };
   const next = refreshStoredBaseline(stored, live);
   assert.equal(next.length, 26);
-  assert.equal(next.every((cell) => cell.userEntered.numberValue === 1 && cell.displayed === '£1.00'), true);
+  assert.equal(next[0].displayed, '£3,000.00');
+  assert.deepEqual(next[0].userEntered, { stringValue: '3000' });
+  assert.equal(next.slice(1).every((cell) => cell.userEntered.numberValue === 1 && cell.displayed === '£1.00'), true);
   assert.equal(next.filter((cell) => cell.label === 'Jack Salary').every((cell) => cell.enteredMinor === 300000), true);
   assert.equal(next.filter((cell) => cell.label === 'Target').every((cell) => cell.enteredMinor === 500000), true);
   const changed = next[0];
   assert.notEqual(changed.sourceHash, 'old-hash');
   assert.equal(changed.sourceHash, sourceHash({
     workbookRef: 'sheet',
-    tabRef: 'Forecast Profit & Loss#1455407915',
-    cellRef: `R37C1`,
-    period: changed.period,
+    tabRef: '1455407915',
+    cellRef: 'B37',
+    period: String(changed.period).slice(0, 10),
     label: changed.label,
-    nullState: changed.nullState,
+    nullState: 'value',
     enteredMinor: changed.enteredMinor,
   }));
+  assert.equal(baselineSourceHash(changed), changed.sourceHash);
+  const kept = { ...stored[1], sourceHash: baselineSourceHash(stored[1]) };
+  const unchanged = refreshStoredBaseline([kept], [{ ...kept, kind: 'metric', month: String(kept.period).slice(0, 7), enteredMinor: 100 }]);
+  assert.equal(unchanged[0].sourceHash, kept.sourceHash);
+  assert.equal(baselineSourceHash(unchanged[0]), kept.sourceHash);
   const written = forecastBaselineRow(changed, 'hash');
-  assert.deepEqual(written.user_entered, { numberValue: 1 });
-  assert.equal(written.displayed, '£1.00');
+  assert.deepEqual(written.user_entered, { stringValue: '3000' });
+  assert.equal(written.displayed, '£3,000.00');
   const untouched = forecastBaselineRow({ ...changed, userEntered: undefined, displayed: undefined }, 'hash');
   assert.equal(Object.hasOwn(untouched, 'user_entered'), false);
   assert.equal(Object.hasOwn(untouched, 'displayed'), false);
