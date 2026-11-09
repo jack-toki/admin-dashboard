@@ -31,7 +31,7 @@ export function DetailFields({ fields }) {
       {(fields || []).map((field) => (
         <div key={field.label}>
           <dt>{field.label}</dt>
-          <dd>{field.value == null || field.value === '' ? 'Missing' : field.value}</dd>
+          <dd className={field.value == null || field.value === '' ? 'no-data' : undefined}>{field.value == null || field.value === '' ? '—' : field.value}</dd>
         </div>
       ))}
     </dl>

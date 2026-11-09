@@ -386,7 +386,7 @@ export function YearColumns({ name, months, selectedId, onOpen, format, tabs = n
             {shownLines.map((line) => (
               <li key={`${line.type}-${line.name}`} data-income-line={line.name}>
                 <span>{line.name}</span>
-                {line.minor == null ? <em className="miss-pill">Missing</em> : <b>{moneyText(line.minor, format)}</b>}
+                {line.minor == null ? <em className="miss-pill no-data">No data</em> : <b className="num">{moneyText(line.minor, format)}</b>}
               </li>
             ))}
           </ul>

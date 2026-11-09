@@ -591,7 +591,8 @@ button.rail-apps.on { color: var(--ink); }
 .chart-readout ul { grid-column: 1 / -1; list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .chart-readout span { color: var(--muted); font-size: .78rem; }
 .chart-readout b { font-weight: 500; letter-spacing: -.03em; }
-.miss-pill { font-style: normal; font-size: .72rem; font-weight: 600; color: var(--muted); background: var(--track); border-radius: 999px; padding: 2px 8px; }
+.miss-pill { font-style: normal; font-size: .72rem; font-weight: 400; color: var(--muted); background: var(--track); border-radius: 999px; padding: 2px 8px; }
+.status-dot.miss { color: var(--muted); font-weight: 400; }
 .status-dot::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--pos); display: inline-block; margin-right: 6px; }
 .table-tools { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
 .table-tools h2 { margin: 0 auto 0 0; font-size: 1rem; }
@@ -811,8 +812,11 @@ button.quick-card { padding: 18px 18px 16px; }
 .jrl-root .forecast-table td { text-align: left; white-space: normal; }
 .jrl-root .forecast-table th.num,
 .jrl-root .forecast-table td.num { text-align: right; }
-.jrl-root .forecast-table .check,
-.jrl-root .forecast-table td:first-child { width: 36px; padding-left: 12px; padding-right: 4px; text-align: center; }
+.jrl-root .forecast-table .check { width: 36px; padding-left: 12px; padding-right: 4px; text-align: center; }
+.jrl-root .client-report th:first-child,
+.jrl-root .client-report td:first-child { width: auto; text-align: left; }
+.jrl-root .client-report th.num,
+.jrl-root .client-report td.num { text-align: right; }
 .jrl-root,
 .jrl-root button,
 .jrl-root input,

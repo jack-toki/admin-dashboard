@@ -304,7 +304,7 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
             <Tile icon="year" label="Known months" value={String(chartSeries.year.filter((item) => item.total != null).length)} delta={null} note="No prior month" onOpen={() => setDetail({ title: 'Known months', fields: [{ label: 'Year', value: year }, { label: 'Known months', value: String(chartSeries.year.filter((item) => item.total != null).length) }] })} />
           </div>
           <div className="bento-chart">
-            {board === 'month' && <HorizontalBars name="This month" tabs={<ChartTabs board={board} setBoard={setBoard} />} points={chartSeries.compare.points} series={chartSeries.compare.series} format={formatPounds} onOpen={(id) => { const point = chartSeries.compare.points.find((item) => item.id === id); setDetail({ title: point?.label || 'This month', fields: (point?.lines || []).map((line) => ({ label: line.name, value: line.minor == null ? 'Missing' : formatPounds(line.minor) })) }); }} />}
+            {board === 'month' && <HorizontalBars name="This month" tabs={<ChartTabs board={board} setBoard={setBoard} />} points={chartSeries.compare.points} series={chartSeries.compare.series} format={formatPounds} onOpen={(id) => { const point = chartSeries.compare.points.find((item) => item.id === id); setDetail({ title: point?.label || 'This month', fields: (point?.lines || []).map((line) => ({ label: line.name, value: line.minor == null ? '—' : formatPounds(line.minor) })) }); }} />}
             {board === 'year' && <YearColumns name="Income" subtitle="Retainer and project income by month" tabs={<ChartTabs board={board} setBoard={setBoard} />} months={chartSeries.year} selectedId={month} onOpen={(key) => { const item = chartSeries.year.find((entry) => entry.id === key); setMonth(key); setDetail({ title: item?.label || key, fields: [{ label: 'Income', value: showMoney(item?.total) }, ...(item?.lines || []).map((line) => ({ label: line.name, value: line.minor == null ? '—' : formatPounds(line.minor) }))] }); }} format={formatPounds} />}
             {board === 'groups' && <HorizontalBars name="Cost groups" tabs={<ChartTabs board={board} setBoard={setBoard} />} points={chartSeries.groups.points} series={chartSeries.groups.series} format={formatPounds} onOpen={(id) => { const point = chartSeries.groups.points.find((item) => item.id === id); setDetail({ title: point?.label || 'Cost group', fields: [{ label: 'Amount', value: showMoney(point?.segments?.[0]?.value ?? point?.lines?.[0]?.minor) }] }); }} />}
           </div>
@@ -372,11 +372,11 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
                 <tbody>
                   {lines.filter((line) => (lineKind === 'all' || line.kind === lineKind) && String(line.party || '').toLowerCase().includes(lineQuery.toLowerCase())).map((line) => (
                     <tr key={line.key} className="click-row" onClick={() => setDetail({ title: line.party, fields: [{ label: 'Kind', value: line.kind === 'sale' ? (line.workType || 'Income') : 'Cost' }, { label: 'Amount', value: showMoney(line.minor) }, { label: 'Month', value: month }] })}>
-                      <td><input type="checkbox" aria-label={`Select ${line.party}`} onClick={(event) => event.stopPropagation()} /></td>
+                      <td className="check"><input type="checkbox" aria-label={`Select ${line.party}`} onClick={(event) => event.stopPropagation()} /></td>
                       <td>{line.party}</td>
                       <td>{line.kind === 'sale' ? (line.workType === 'project' ? 'Project' : line.workType === 'retainer' ? 'Retainer' : 'Income') : 'Cost'}</td>
                       <td className="num">{showMoney(line.minor)}</td>
-                      <td>{line.minor == null ? <span className="status-dot miss">Missing</span> : <span className={line.kind === 'cost' ? 'status-dot warn' : 'status-dot ok'}>In forecast</span>}</td>
+                      <td>{line.minor == null ? <span className="status-dot miss">No data</span> : <span className={line.kind === 'cost' ? 'status-dot warn' : 'status-dot ok'}>In forecast</span>}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -398,7 +398,7 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
             month={month}
             records={details}
             stored={detailStored}
-            onOpen={(row) => setDetail({ title: row.party, fields: [{ label: 'Kind', value: row.kind }, { label: 'Services', value: row.services || 'Missing' }, { label: 'Amount', value: row.amountMinor == null ? 'Missing' : formatPounds(row.amountMinor) }, { label: 'First payment', value: row.firstPaymentMonth || 'Missing' }, { label: 'Contract end', value: row.contractEndUnknown ? 'Unknown' : (row.contractEndDate || 'Missing') }, { label: 'Comment', value: row.comment || 'None' }] })}
+            onOpen={(row) => setDetail({ title: row.party, fields: [{ label: 'Kind', value: row.kind }, { label: 'Services', value: row.services || '—' }, { label: 'Amount', value: row.amountMinor == null ? '—' : formatPounds(row.amountMinor) }, { label: 'First payment', value: row.firstPaymentMonth || '—' }, { label: 'Contract end', value: row.contractEndUnknown ? 'Unknown' : (row.contractEndDate || '—') }, { label: 'Comment', value: row.comment || 'None' }] })}
             baselineRetainer={incomeBreakdown(lines).retainer}
             baselineProject={incomeBreakdown(lines).project}
             onSave={onSaveDetail}
@@ -511,7 +511,7 @@ function Summary({ billing, costs }) {
 function runFields(row) {
   return [
     { label: 'Account', value: row.name },
-    { label: 'Log label', value: row.logAccount || 'Missing' },
+    { label: 'Log label', value: row.logAccount || '—' },
     { label: 'Ingest slug', value: row.ingestSlug || 'Not linked' },
     { label: 'Posts', value: String(row.runs) },
     { label: 'Zap ids that posted', value: String(row.reportingZapIds) },
@@ -639,7 +639,7 @@ export function AutomationsScreen({ board, error }) {
         <h2>Client report</h2>
         <p className="sub">Runs and outcomes for this month.</p>
         <div className="ledger-scroll">
-          <table className="forecast-table">
+          <table className="forecast-table client-report">
             <thead><tr><th>Client</th><th className="num">Runs</th><th className="num">Emails</th><th className="num">Quotes</th><th className="num">Invoices</th><th className="num">Leads</th></tr></thead>
             <tbody>
               {(clients || []).map((client) => (

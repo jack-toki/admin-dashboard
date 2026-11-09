@@ -72,8 +72,8 @@ export function IncomeBoard({ month, records, stored, baselineRetainer, baseline
                 <tr key={row.id} className="click-row" onClick={() => onOpen?.(row)}>
                   <td><input type="checkbox" aria-label={`Select ${row.party}`} onClick={(event) => event.stopPropagation()} /></td>
                   <td><strong>{row.party}</strong></td>
-                  <td>{row.amountMinor == null ? <span className="status-dot miss">Missing</span> : formatPounds(row.amountMinor)}</td>
-                  <td><span className={`status-dot ${tone}`}>{schedule.state === 'unknown' ? 'Missing' : schedule.label}</span>{row.contractEndDate ? ` · ends ${row.contractEndDate}` : ''}</td>
+                  <td>{row.amountMinor == null ? <span className="status-dot miss">No data</span> : formatPounds(row.amountMinor)}</td>
+                  <td><span className={`status-dot ${tone}`}>{schedule.state === 'unknown' ? 'No data' : schedule.label}</span>{row.contractEndDate ? ` · ends ${row.contractEndDate}` : ''}</td>
                   <td>{stored && (
                     <div className="income-row-actions">
                       <button type="button" onClick={() => start(nextKind, row)}>Edit</button>
@@ -98,7 +98,7 @@ export function IncomeBoard({ month, records, stored, baselineRetainer, baseline
         <select aria-label="Filter schedule" value={scheduleFilter} onChange={(event) => setScheduleFilter(event.target.value)}>
           <option value="all">All</option>
           <option value="scheduled">Scheduled</option>
-          <option value="missing">Missing</option>
+          <option value="missing">No data</option>
         </select>
       </div>
       <div className="income-tabs" role="tablist" aria-label="Income or costs">

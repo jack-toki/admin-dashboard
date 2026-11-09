@@ -68,7 +68,7 @@ export function OverviewScreen({ forecast, details = [], jrl, runs, outstanding 
         <p className="k">Net {latest?.period || 'this month'}</p>
         <Spark points={jrlSpark} />
         <div className="overview-rows">
-          <p><span>Ledger</span><b>{latest ? 'In' : '—'}</b></p>
+          <p><span>Ledger</span><b className="num">{latest ? `${ledger.length} ${ledger.length === 1 ? 'month' : 'months'}` : '—'}</b></p>
           <p><span>Savings</span><b className="num">{latest ? `£${Math.round(latest.savings_total || 0).toLocaleString('en-GB')}` : '—'}</b></p>
           <p><span>Outstanding</span><b className="num">{auto.filter((task) => task.taskKey === 'jrl-month' || task.taskKey === 'pots-stale').length}</b></p>
         </div>
