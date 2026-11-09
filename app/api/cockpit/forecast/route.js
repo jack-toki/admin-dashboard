@@ -1,6 +1,7 @@
 import { canAccess, readSession } from '../../../../lib/auth.js';
 import { importBaseline, importNormalized } from '../../../../lib/forecast/import.js';
 import { modelFromStoredCells, DELETION_AUDIT } from '../../../../lib/forecast/model.js';
+import { mergeForecastCells, readForecastSheet } from '../../../../lib/forecast/liveSheet.js';
 import { validateAdditionalPacket, evidenceView } from '../../../../lib/forecast/additional.js';
 import { openAppStore, supabaseGuard } from '../../../../lib/store/index.js';
 
@@ -51,16 +52,20 @@ export async function GET(req) {
     if (closedRead) return closedRead;
     throw error;
   }
+  const live = await readForecastSheet().catch(() => ({ ok: false, configured: false, cells: [] }));
+  const merged = live.ok ? mergeForecastCells(cells, live.cells) : cells;
   return Response.json({
     ok: true,
     connected: true,
     storedCount: cells.length,
     testedAgainstPreview: false,
-    cells,
-    model: modelFromStoredCells(cells),
+    cells: merged,
+    model: modelFromStoredCells(merged),
     actuals: evidence?.actuals || null,
     evidence,
-    sheetRuntime: false,
+    sheetRuntime: live.ok === true,
+    sheetConfigured: live.configured === true,
+    sheetMonths: live.months || [],
     sheetFallback: false,
     workbookRequiredAtRuntime: false,
     allSheetsSafeToDelete: DELETION_AUDIT.allGoogleSheetsSafeToDelete,

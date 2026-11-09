@@ -11,6 +11,8 @@ export async function GET(req) {
   const session = readSession(req);
   if (!session) return Response.json({ error: 'unauthenticated' }, { status: 401, headers });
   if (!canAccess(session, 'automations')) return Response.json({ error: 'forbidden' }, { status: 403, headers });
+  // Same credentials as /api/dashboard. public.runs is read with the service key.
+  // SUPABASE_URL and SUPABASE_SERVICE_KEY. ACCOUNTS is optional display-name JSON.
   if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
     return Response.json({ ok: false, error: 'run_log_not_configured', summary: null }, { status: 503, headers });
   }

@@ -44,7 +44,6 @@ export default function App({ role, areas, client, fixture = false }) {
     ]);
     setDetailStored(true);
     setJrl({ status: 200, body: { entries: exampleEntries(), source: { connected: true, ledger: 'readable' }, auth: { supabaseUser: true, ownerLink: true } } });
-    setRunError('run_log_not_configured');
   }, [fixture]);
 
   useEffect(() => {
@@ -65,7 +64,7 @@ export default function App({ role, areas, client, fixture = false }) {
   }, [area]);
 
   useEffect(() => {
-    if (fixture || area !== 'automations') return;
+    if (area !== 'automations') return;
     fetch('/api/cockpit/automations').then(async (res) => {
       const body = await res.json().catch(() => ({}));
       if (!res.ok || !body.summary) {

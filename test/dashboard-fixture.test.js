@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { syntheticDashboard, syntheticDashboardActuals, SYNTHETIC_BANNER } = require('../lib/fixtures/synthetic');
+const { previewFixtureEnabled } = require('../lib/cockpit/preview');
 const { workingMonthLines, sumLines, incomeBreakdown } = require('../lib/planning/entries');
 
 test('example dashboard data varies, keeps zero and missing distinct, and stays synthetic', () => {
@@ -46,4 +47,10 @@ test('example dashboard data varies, keeps zero and missing distinct, and stays 
   assert.equal(withManual.retainer, 2850000 + 10000);
   assert.equal(withManual.lines.find((line) => line.name === 'Example client North').aggregate, false);
   assert.equal(withManual.lines.find((line) => line.name === 'Example client North').type, 'retainer');
+});
+
+test('production ignores the preview fixture flag', () => {
+  assert.equal(previewFixtureEnabled({ NODE_ENV: 'production', COCKPIT_PREVIEW_FIXTURE: '1' }), false);
+  assert.equal(previewFixtureEnabled({ NODE_ENV: 'development', COCKPIT_PREVIEW_FIXTURE: '1' }), true);
+  assert.equal(previewFixtureEnabled({ NODE_ENV: 'development', COCKPIT_PREVIEW_FIXTURE: '0' }), false);
 });

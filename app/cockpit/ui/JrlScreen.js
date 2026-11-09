@@ -140,12 +140,31 @@ export default function JrlScreen({ gate }) {
               <button key={id} type="button" className={section === id ? 'tgt-mode on' : 'tgt-mode'} onClick={() => setSection(id)}>{label}</button>
             ))}
           </div>
+          {auth?.pinRequired ? (
+            <form className="panel glass" onSubmit={async (event) => {
+              event.preventDefault();
+              const input = event.currentTarget.elements.pin;
+              const res = await fetch('/api/cockpit/jrl/pin', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pin: input.value }) });
+              if (res.ok) window.location.assign('/cockpit#jrl');
+              else setSaveNote('That PIN was not accepted.');
+            }}>
+              <h2>JRL PIN</h2>
+              <p className="sub">This cockpit sign-in is enough. Enter the PIN you set. There is no separate JRL login.</p>
+              <label className="entry-row"><span>PIN</span><span className="entry-input"><input name="pin" aria-label="JRL PIN" inputMode="numeric" autoComplete="off" /></span></label>
+              {saveNote ? <p className="entry-err">{saveNote}</p> : null}
+              <button className="btn" type="submit">Open JRL</button>
+            </form>
+          ) : (
           <div className="nudge glass">
               <span className="nudge-dot" />
-              <span>{auth?.expired ? 'The JRL session expired. Sign in again. The ledger was not filled in.' : auth?.supabaseUser ? `Signed in to JRL. The session expires ${auth.expiresAt ? new Date(auth.expiresAt).toLocaleString('en-GB') : 'on its own'}.` : auth?.ownerLink ? 'The owner link is on. The ledger was not opened from the stored connection.' : (!auth?.configured ? `JRL sign-in needs ${(auth?.missing || ['JRL_SUPABASE_URL', 'JRL_SUPABASE_ANON_KEY']).join(' and ')} on this server. The legacy anon key is accepted. No service role is used.` : 'Sign in with the JRL account. The cockpit password does not open the ledger.')}</span>
-              {auth?.supabaseUser ? <button type="button" className="nudge-btn" onClick={async () => { await fetch('/api/cockpit/jrl/session', { method: 'DELETE', headers: { 'x-cockpit-link': '1' } }); window.location.assign('/cockpit#jrl'); }}>Sign out of JRL</button> : auth?.configured && !auth?.ownerLink ? <a className="nudge-btn" href={auth?.handoff || '/cockpit/jrl/login?return=/cockpit%23jrl'}>JRL sign-in</a> : null}
+              <span>{auth?.supabaseUser ? `Opened from this cockpit sign-in. The ledger session expires ${auth.expiresAt ? new Date(auth.expiresAt).toLocaleString('en-GB') : 'on its own'}.` : 'Nothing is loaded from the ledger yet. A gap stays empty. No email code is requested.'}</span>
+              {auth?.supabaseUser ? <button type="button" className="nudge-btn" onClick={async () => { await fetch('/api/cockpit/jrl/session', { method: 'DELETE', headers: { 'x-cockpit-link': '1' } }); window.location.assign('/cockpit#jrl'); }}>Clear stored connection</button> : null}
           </div>
-          {section === 'overview' && (
+          )}
+          {!auth?.pinRequired && section === 'overview' && !auth?.supabaseUser && (
+            <section className="panel glass"><h2>Nothing here yet</h2><p className="sub">Pots and the ledger appear when the stored connection can read them. Missing months stay blank.</p></section>
+          )}
+          {!auth?.pinRequired && section === 'overview' && (
             <div className="bento">
               <PotCard record={potRecord} ledger={ledger} portfolioAvailable={Boolean(latestPortfolioValue(ledger))} onChange={onPots} editable={potStored} />
               {auth?.supabaseUser && <Overview ledger={ledger} targets={targets} />}

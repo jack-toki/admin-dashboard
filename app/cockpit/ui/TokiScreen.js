@@ -1,5 +1,5 @@
 'use client';
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { formatPounds } from '../../../lib/money';
 import { workingMonthLines, sumLines, incomeBreakdown } from '../../../lib/planning/entries';
 import { TOKI_VIEWS } from '../../../lib/nav/sidebar';
@@ -251,6 +251,7 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
       </div>
       {page === 'toki' && chartSeries && (
         <div className="bento">
+          <div className="bento-left">
           <article className="card glass bento-summary">
             <div className="k">This month</div>
             <div className="v num">{showMoney(billingShown == null || costShown == null ? null : billingShown - costShown)}</div>
@@ -260,6 +261,28 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
               <button type="button" className="btn btn-ghost" onClick={() => setBoard('groups')}>Groups</button>
             </div>
           </article>
+          <section className="card glass bento-progress">
+            <div className="k">Costs against income</div>
+            <p className="spend-line"><b>{showMoney(costShown)}</b> spent out of <b>{showMoney(billingShown)}</b></p>
+            <div className="limit-track" aria-hidden="true"><i style={{ width: billingShown && costShown != null ? `${Math.min(100, Math.round((costShown / billingShown) * 100))}%` : '0%' }} /></div>
+            <ul className="cost-split">
+              {COST_GROUPS.map(([id, label]) => {
+                const groupLines = lines.filter((line) => line.kind === 'cost' && line.groupId === id);
+                const seen = groupLines.some((line) => line.minor != null);
+                const value = seen ? groupLines.reduce((sum, line) => sum + (line.minor || 0), 0) : null;
+                const width = value != null && costShown ? `${Math.min(100, Math.round((value / costShown) * 100))}%` : '0%';
+                return (
+                  <li key={id}>
+                    <span>{label}</span>
+                    <span className="cost-meter" aria-hidden="true"><i style={{ width }} /></span>
+                    <b className="num">{showMoney(value)}</b>
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="sub">A missing side stays missing. It is not treated as zero.</p>
+          </section>
+          </div>
           <div className="bento-stats">
             <Tile icon="income" label="Income" value={showMoney(billingShown)} delta={monthDelta(chartSeries.year, month, 'total')} onOpen={() => setDetail({ title: 'Income', fields: [{ label: 'Month', value: `${monthName} ${year}` }, { label: 'Income', value: showMoney(billingShown) }] })} />
             <Tile icon="cost" label="Costs" value={showMoney(costShown)} delta={null} note="No prior month" onOpen={() => setDetail({ title: 'Costs', fields: [{ label: 'Month', value: `${monthName} ${year}` }, { label: 'Costs', value: showMoney(costShown) }] })} />
@@ -273,20 +296,27 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
           </div>
           <div className="quick-row">
             <button type="button" className="card glass quick-card" onClick={() => { setDetail(null); setQuick({ kind: 'additional_cost', party: '', amount: '', firstPaymentMonth: month, contractEndDate: '' }); }}>
+              <QuickMark name="cost" />
               <h3>Add a cost</h3>
               <p className="sub">Saved with this month’s costs. Not added to the forecast.</p>
+              <span className="btn quick-foot">Add a cost</span>
             </button>
             <button type="button" className="card glass quick-card" onClick={() => { setDetail(null); setQuick({ kind: 'project', party: '', amount: '', services: '', firstPaymentMonth: month, contractEndDate: '' }); }}>
+              <QuickMark name="project" />
               <h3>Add a project</h3>
               <p className="sub">A project line in the private income store.</p>
+              <span className="btn quick-foot">Add a project</span>
             </button>
             <button type="button" className="card glass quick-card" onClick={() => { setDetail(null); setQuick({ kind: 'retainer', party: '', amount: '', services: '', firstPaymentMonth: month, contractEndDate: '' }); }}>
+              <QuickMark name="retainer" />
               <h3>Add a retainer</h3>
               <p className="sub">A retainer needs a contract end. It is not added to the forecast.</p>
+              <span className="btn quick-foot">Add a retainer</span>
             </button>
             <article className="card glass quick-card">
+              <QuickMark name="todo" />
               <h3>Outstanding</h3>
-              {!outstandingStored && <p className="sub">Outstanding items are not saved on this server yet.</p>}
+              <p className="sub">{outstandingStored ? 'Tick an item when it is done.' : 'Outstanding items are not saved on this server yet.'}</p>
               <ul className="todo-list">
                 {outstanding.map((item) => (
                   <li key={item.id}>
@@ -298,7 +328,7 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
                 ))}
                 {!outstanding.length && <li className="sub">Nothing outstanding.</li>}
               </ul>
-              <form className="quick-add" onSubmit={(event) => { event.preventDefault(); if (!todoTitle.trim() || !outstandingStored) return; onAddOutstanding?.(todoTitle.trim()); setTodoTitle(''); }}>
+              <form className="quick-add quick-foot" onSubmit={(event) => { event.preventDefault(); if (!todoTitle.trim() || !outstandingStored) return; onAddOutstanding?.(todoTitle.trim()); setTodoTitle(''); }}>
                 <input aria-label="New outstanding item" placeholder="Add an item" value={todoTitle} onChange={(event) => setTodoTitle(event.target.value)} />
                 <button type="submit" className="btn" disabled={!outstandingStored}>Add</button>
               </form>
@@ -315,8 +345,8 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
               </select>
             </header>
             <div className="ledger-scroll">
-              <table>
-                <thead><tr><th><span className="sr">Select</span></th><th>Line</th><th>Kind</th><th>Amount</th><th>Status</th></tr></thead>
+              <table className="forecast-table">
+                <thead><tr><th className="check"><span className="sr">Select</span></th><th>Line</th><th>Kind</th><th className="num">Amount</th><th>Status</th></tr></thead>
                 <tbody>
                   {lines.filter((line) => (lineKind === 'all' || line.kind === lineKind) && String(line.party || '').toLowerCase().includes(lineQuery.toLowerCase())).map((line) => (
                     <tr key={line.key} className="click-row" onClick={() => setDetail({ title: line.party, fields: [{ label: 'Kind', value: line.kind === 'sale' ? (line.workType || 'Income') : 'Cost' }, { label: 'Amount', value: showMoney(line.minor) }, { label: 'Month', value: month }] })}>
@@ -330,12 +360,6 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
                 </tbody>
               </table>
             </div>
-          </section>
-          <section className="card glass bento-progress">
-            <div className="k">Costs against income</div>
-            <p className="spend-line"><b>{showMoney(costShown)}</b> spent out of <b>{showMoney(billingShown)}</b></p>
-            <div className="limit-track" aria-hidden="true"><i style={{ width: billingShown && costShown != null ? `${Math.min(100, Math.round((costShown / billingShown) * 100))}%` : '0%' }} /></div>
-            <p className="sub">A missing side stays missing. It is not treated as zero.</p>
           </section>
         </div>
       )}
@@ -477,6 +501,15 @@ function runFields(row) {
 export function AutomationsScreen({ board, error }) {
   const [view, setView] = useState('cards');
   const [detail, setDetail] = useState(null);
+  const [clients, setClients] = useState(null);
+  useEffect(() => {
+    let cancel = false;
+    fetch('/api/dashboard?period=this-month').then(async (res) => {
+      const body = await res.json().catch(() => ({}));
+      if (!cancel) setClients(Array.isArray(body.clients) ? body.clients : []);
+    }).catch(() => { if (!cancel) setClients([]); });
+    return () => { cancel = true; };
+  }, []);
   const rows = board?.accountRows || [];
   const ready = board?.posts != null;
   const max = Math.max(1, ...rows.map((row) => row.runs || 0));
@@ -552,6 +585,28 @@ export function AutomationsScreen({ board, error }) {
         </div>
       )}
       {ready && <p className="sub bento-span">{board.registry?.note}</p>}
+      <section className="card glass bento-span">
+        <h2>Client report</h2>
+        <p className="sub">The same run log and profile sheet the public dashboard reads. A client with no posts stays off this list.</p>
+        <div className="ledger-scroll">
+          <table className="forecast-table">
+            <thead><tr><th>Client</th><th className="num">Runs</th><th className="num">Emails</th><th className="num">Quotes</th><th className="num">Invoices</th><th className="num">Leads</th></tr></thead>
+            <tbody>
+              {(clients || []).map((client) => (
+                <tr key={client.client} className="click-row" onClick={() => setDetail({ title: client.client, fields: [{ label: 'Runs', value: String(client.runs ?? 0) }, { label: 'Emails', value: String(client.emailsSent ?? 0) }, { label: 'Quotes', value: String(client.quotesSent ?? 0) }, { label: 'Invoices', value: String(client.invoicesSent ?? 0) }, { label: 'Leads', value: String(client.leads ?? 0) }, { label: 'Most-run', value: client.mostRunAutomation?.title || 'None' }] })}>
+                  <td>{client.client}</td>
+                  <td className="num">{client.runs ?? 0}</td>
+                  <td className="num">{client.emailsSent ?? 0}</td>
+                  <td className="num">{client.quotesSent ?? 0}</td>
+                  <td className="num">{client.invoicesSent ?? 0}</td>
+                  <td className="num">{client.leads ?? 0}</td>
+                </tr>
+              ))}
+              {clients && !clients.length && <tr><td colSpan="6">No client posts this month.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </section>
       <DetailDrawer title={detail?.title || ''} onClose={() => setDetail(null)}>
         {detail && <DetailFields fields={detail.fields} />}
       </DetailDrawer>
@@ -571,6 +626,22 @@ function ChartTabs({ board, setBoard }) {
         <button key={id} type="button" role="tab" aria-selected={board === id} onClick={() => setBoard(id)}>{label}</button>
       ))}
     </div>
+  );
+}
+
+function QuickMark({ name }) {
+  const paths = {
+    cost: 'M12 5v14M5 12h14',
+    project: 'M4 7h16v12H4zM4 11h16',
+    retainer: 'M7 7h10v4H7zM6 11h12v6H6z',
+    todo: 'M5 7h14M5 12h14M5 17h9',
+  };
+  return (
+    <span className="quick-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <path d={paths[name] || paths.cost} />
+      </svg>
+    </span>
   );
 }
 
