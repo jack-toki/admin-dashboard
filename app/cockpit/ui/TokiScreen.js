@@ -6,6 +6,8 @@ import { TOKI_VIEWS } from '../../../lib/nav/sidebar';
 import { HorizontalBars, YearColumns } from './charts';
 import { IncomeBoard } from './IncomeBoard';
 import { DetailDrawer, DetailFields } from './DetailDrawer';
+import { deriveAutoTasks } from '../../../lib/planning/autoTasks';
+import { DEFAULT_HOURLY_RATE, minutesForZap, moneySaved } from '../../../lib/automations/savings';
 
 const MONTHS = [
   ['01', 'Jan', 'January'], ['02', 'Feb', 'February'], ['03', 'Mar', 'March'], ['04', 'Apr', 'April'],
@@ -30,7 +32,7 @@ function showMoney(minor) {
   return formatPounds(minor);
 }
 
-export function TokiScreen({ example, baseline, actuals, evidence, plan, planNote, onSave, onRemove, formError, forecastError, section = 'toki', onSection, details = [], detailStored = false, onSaveDetail, onRemoveDetail, outstanding = [], outstandingStored = false, onAddOutstanding, onCompleteOutstanding }) {
+export function TokiScreen({ example, baseline, actuals, evidence, plan, planNote, onSave, onRemove, formError, forecastError, section = 'toki', onSection, details = [], detailStored = false, onSaveDetail, onRemoveDetail, outstanding = [], outstandingStored = false, onAddOutstanding, onCompleteOutstanding, jrlEntries = [], automationPosts = null, dismissals = [], potsUpdated = true, onDismissAuto }) {
   const [month, setMonth] = useState('2026-01');
   const [board, setBoard] = useState('year');
   const [editAll, setEditAll] = useState(false);
@@ -121,6 +123,18 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
       },
     };
   }, [baseline, actuals, plan, month, yearPoints, lines, billingShown, costShown]);
+
+  const autoTasks = deriveAutoTasks({
+    period: month,
+    cells: (baseline?.rows || []).flatMap((row) => Object.entries(row.cells || {}).map(([key, cell]) => ({
+      label: row.label, kind: row.kind, month: key, enteredMinor: cell.blank ? null : cell.minor, amountMinor: cell.blank ? null : cell.minor, nullState: cell.blank ? 'blank' : 'amount',
+    }))),
+    details,
+    entries: jrlEntries,
+    posts: automationPosts,
+    potsUpdated,
+    dismissals,
+  });
 
   if (!baseline) {
     return (
@@ -326,7 +340,15 @@ export function TokiScreen({ example, baseline, actuals, evidence, plan, planNot
                     </label>
                   </li>
                 ))}
-                {!outstanding.length && <li className="sub">Nothing outstanding.</li>}
+                {!outstanding.length && !autoTasks.length && <li className="sub">Nothing outstanding.</li>}
+                {autoTasks.map((task) => (
+                  <li key={task.id}>
+                    <label>
+                      <input type="checkbox" aria-label={`Dismiss: ${task.title}`} onChange={() => onDismissAuto?.(task)} />
+                      <a href={task.href}>{task.title}</a>
+                    </label>
+                  </li>
+                ))}
               </ul>
               <form className="quick-add quick-foot" onSubmit={(event) => { event.preventDefault(); if (!todoTitle.trim() || !outstandingStored) return; onAddOutstanding?.(todoTitle.trim()); setTodoTitle(''); }}>
                 <input aria-label="New outstanding item" placeholder="Add an item" value={todoTitle} onChange={(event) => setTodoTitle(event.target.value)} />
@@ -501,6 +523,9 @@ function runFields(row) {
 export function AutomationsScreen({ board, error }) {
   const [view, setView] = useState('cards');
   const [detail, setDetail] = useState(null);
+  const [settings, setSettings] = useState(false);
+  const [rates, setRates] = useState([]);
+  const [rateForm, setRateForm] = useState({ client: '', hourly: '50', zap: '', minutes: '7' });
   const [clients, setClients] = useState(null);
   useEffect(() => {
     let cancel = false;
@@ -508,18 +533,43 @@ export function AutomationsScreen({ board, error }) {
       const body = await res.json().catch(() => ({}));
       if (!cancel) setClients(Array.isArray(body.clients) ? body.clients : []);
     }).catch(() => { if (!cancel) setClients([]); });
+    fetch('/api/cockpit/rates').then(async (res) => {
+      const body = await res.json().catch(() => ({}));
+      if (!cancel && Array.isArray(body.rows)) setRates(body.rows);
+    }).catch(() => {});
     return () => { cancel = true; };
   }, []);
   const rows = board?.accountRows || [];
+  const zaps = board?.zapRows || [];
   const ready = board?.posts != null;
-  const max = Math.max(1, ...rows.map((row) => row.runs || 0));
+  function clientRate(name) {
+    const saved = rates.find((row) => row.id === `client:${name}`);
+    return saved?.hourlyRateMinor ? saved.hourlyRateMinor / 100 : DEFAULT_HOURLY_RATE;
+  }
+  function zapMinutes(zap) {
+    const saved = rates.find((row) => row.id === `zap:${zap.zapId}`);
+    return minutesForZap(zap.title, saved?.minutesPerRun);
+  }
+  const priced = rows.map((row) => {
+    const saved = moneySaved({ runs: row.runs, minutes: 7, hourlyRate: clientRate(row.name) });
+    return { ...row, ...saved };
+  });
+  const pricedZaps = zaps.map((zap) => {
+    const minutes = zapMinutes(zap);
+    const saved = moneySaved({ runs: zap.runs, minutes: minutes.minutes, hourlyRate: clientRate(zap.account) });
+    return { ...zap, ...saved, minuteNote: minutes.formula };
+  });
+  const totalPounds = priced.reduce((sum, row) => sum + row.pounds, 0);
+  const totalHours = priced.reduce((sum, row) => sum + row.hours, 0);
+  const max = Math.max(1, ...priced.map((row) => row.pounds || 0));
   return (
     <section className="bento">
       <div className="card glass bento-span" style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
         <div>
-          <h2 style={{ margin: 0 }}>Runs</h2>
-          <p className="sub">{ready ? 'Logged posts for this month. A missing post is not a failure.' : (error === 'run_log_not_configured' ? 'The run log is not configured on this server.' : error ? 'The run log could not be read.' : 'No runs in this month.')}</p>
+          <h2 style={{ margin: 0 }}>Automations</h2>
+          <p className="sub">{ready ? 'Posts, time saved, and money saved this month.' : (error === 'run_log_not_configured' ? 'The run log is not configured on this server.' : error ? 'The run log could not be read.' : 'No runs in this month.')}</p>
         </div>
+        <button type="button" className="btn btn-ghost" onClick={() => setSettings(true)}>Rates</button>
         <div className="auto-switch" role="tablist" aria-label="Automations view">
           {[['cards', 'Cards'], ['table', 'Table'], ['graph', 'Graph']].map(([id, label]) => (
             <button key={id} type="button" role="tab" aria-pressed={view === id} onClick={() => setView(id)}>{label}</button>
@@ -528,10 +578,10 @@ export function AutomationsScreen({ board, error }) {
       </div>
       {ready && (
         <div className="bento-stats">
-          <Tile icon="posts" label="Logged posts" value={String(board.posts)} onOpen={() => setDetail({ title: 'Logged posts', fields: [{ label: 'Posts', value: String(board.posts) }, { label: 'Last 7 days', value: String(board.postsLast7Days) }, { label: 'Without a zap id', value: String(board.postsWithoutZapId) }] })} />
-          <Tile icon="accounts" label="Accounts" value={String(board.accounts)} onOpen={() => setDetail({ title: 'Accounts', fields: [{ label: 'Accounts', value: String(board.accounts) }] })} />
-          <Tile icon="zap" label="Zap ids" value={String(board.reportingZapIds)} onOpen={() => setDetail({ title: 'Zap ids', fields: [{ label: 'Zap ids that posted', value: String(board.reportingZapIds) }, { label: 'Meaning', value: board.reportingZapIdsMeaning }] })} />
-          <Tile icon="value" label="Estimated value" value={`£${Number(board.estimate?.value || 0).toLocaleString('en-GB')}`} onOpen={() => setDetail({ title: 'Estimated value', fields: [{ label: 'Value', value: `£${Number(board.estimate?.value || 0).toLocaleString('en-GB')}` }, { label: 'Note', value: board.estimate?.label }] })} />
+          <Tile icon="posts" label="Posts" value={String(board.posts)} onOpen={() => setDetail({ title: 'Posts', fields: [{ label: 'Posts', value: String(board.posts) }] })} />
+          <Tile icon="accounts" label="Accounts" value={String(board.accounts)} />
+          <Tile icon="year" label="Time saved" value={`${totalHours.toFixed(1)} h`} />
+          <Tile icon="value" label="£ saved" value={`£${totalPounds.toLocaleString('en-GB')}`} onOpen={() => setDetail({ title: '£ saved', fields: pricedZaps.map((zap) => ({ label: zap.title, value: `£${zap.pounds} · ${zap.formula}` })) })} />
         </div>
       )}
       {view === 'cards' && (
@@ -571,23 +621,22 @@ export function AutomationsScreen({ board, error }) {
       )}
       {view === 'graph' && (
         <div className="card glass bento-span">
-          <h2>Posts per account</h2>
+          <h2>£ saved by account</h2>
           <div className="run-bars">
-            {rows.map((row) => (
-              <button key={row.logAccount || row.name} type="button" className="run-bar" onClick={() => setDetail({ title: row.name, fields: runFields(row) })}>
+            {priced.map((row) => (
+              <button key={row.logAccount || row.name} type="button" className="run-bar" title={row.formula} onClick={() => setDetail({ title: row.name, fields: [{ label: 'Posts', value: String(row.runs) }, { label: '£ saved', value: `£${row.pounds}` }, { label: 'Formula', value: row.formula }] })}>
                 <span>{row.name}</span>
-                <i style={{ width: `${Math.max(4, Math.round((row.runs / max) * 100))}%` }} />
-                <b>{row.runs}</b>
+                <i style={{ width: `${Math.max(4, Math.round((row.pounds / max) * 100))}%` }} />
+                <b>£{row.pounds}</b>
               </button>
             ))}
             {!rows.length && <p className="sub">No posts to chart this month.</p>}
           </div>
         </div>
       )}
-      {ready && <p className="sub bento-span">{board.registry?.note}</p>}
       <section className="card glass bento-span">
         <h2>Client report</h2>
-        <p className="sub">The same run log and profile sheet the public dashboard reads. A client with no posts stays off this list.</p>
+        <p className="sub">Runs and outcomes for this month.</p>
         <div className="ledger-scroll">
           <table className="forecast-table">
             <thead><tr><th>Client</th><th className="num">Runs</th><th className="num">Emails</th><th className="num">Quotes</th><th className="num">Invoices</th><th className="num">Leads</th></tr></thead>
@@ -607,8 +656,29 @@ export function AutomationsScreen({ board, error }) {
           </table>
         </div>
       </section>
-      <DetailDrawer title={detail?.title || ''} onClose={() => setDetail(null)}>
-        {detail && <DetailFields fields={detail.fields} />}
+      <DetailDrawer title={settings ? 'Rates' : (detail?.title || '')} onClose={() => { setSettings(false); setDetail(null); }}>
+        {settings ? (
+          <form className="drawer-form" onSubmit={async (event) => {
+            event.preventDefault();
+            if (rateForm.client) {
+              await fetch('/api/cockpit/rates', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'client', id: rateForm.client, hourlyRate: rateForm.hourly }) });
+            }
+            if (rateForm.zap) {
+              await fetch('/api/cockpit/rates', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'zap', id: rateForm.zap, minutes: rateForm.minutes }) });
+            }
+            const again = await fetch('/api/cockpit/rates');
+            const body = await again.json().catch(() => ({}));
+            if (Array.isArray(body.rows)) setRates(body.rows);
+          }}>
+            <p className="sub">Hourly rate defaults to £50. Minutes default from the Zap title, or 7 minutes a run.</p>
+            <label>Client<input aria-label="Client name" value={rateForm.client} onChange={(event) => setRateForm({ ...rateForm, client: event.target.value })} /></label>
+            <label>Hourly rate<input aria-label="Hourly rate" inputMode="decimal" value={rateForm.hourly} onChange={(event) => setRateForm({ ...rateForm, hourly: event.target.value })} /></label>
+            <label>Zap id<input aria-label="Zap id" value={rateForm.zap} onChange={(event) => setRateForm({ ...rateForm, zap: event.target.value })} /></label>
+            <label>Minutes a run<input aria-label="Minutes a run" inputMode="numeric" value={rateForm.minutes} onChange={(event) => setRateForm({ ...rateForm, minutes: event.target.value })} /></label>
+            <button type="submit" className="btn">Save rates</button>
+            <ul className="todo-list">{rates.map((row) => <li key={row.id}>{row.id} {row.hourlyRateMinor ? `£${row.hourlyRateMinor / 100}/hour` : `${row.minutesPerRun} min`}</li>)}</ul>
+          </form>
+        ) : (detail && <DetailFields fields={detail.fields} />)}
       </DetailDrawer>
     </section>
   );
