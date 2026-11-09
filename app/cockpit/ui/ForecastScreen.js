@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useState } from 'react';
 import { formatPounds } from '../../../lib/money';
-import { pipelineView } from '../../../lib/forecast/pipelinePlan';
+import { pipelineInputEdit, pipelineView } from '../../../lib/forecast/pipelinePlan';
 
 function money(minor) {
   if (minor == null || !Number.isFinite(Number(minor))) return '—';
@@ -114,12 +114,14 @@ export function ForecastScreen() {
   }, []);
 
   async function save(cell, text) {
-    const pounds = Number(String(text).replace(/£/g, '').replace(/,/g, ''));
-    if (!Number.isFinite(pounds)) return;
+    const edit = pipelineInputEdit(cell.minor, text);
+    if (edit.action === 'skip') return;
     const res = await fetch('/api/cockpit/forecast-plan', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ a1: cell.a1, minor: Math.round(pounds * 100), stored: poundsInput(cell.minor) }),
+      body: JSON.stringify(edit.action === 'clear'
+        ? { a1: cell.a1, clear: true, stored: poundsInput(cell.minor) }
+        : { a1: cell.a1, minor: edit.minor, stored: poundsInput(cell.minor) }),
     });
     const body = await res.json().catch(() => ({}));
     setNote(body.status === 'written' ? `${cell.a1} saved.` : body.status === 'conflict' ? `${cell.a1} changed in the Sheet. Not written.` : body.reason === 'formula' ? `${cell.a1} is a formula. Left unchanged.` : 'Not written.');

@@ -42,6 +42,7 @@ export async function POST(req) {
     a1: String(body.a1 || ''),
     minor: body.minor,
     stored: body.stored,
+    clear: body.clear === true,
     log: store && typeof store.appendSheetLog === 'function' ? (row) => store.appendSheetLog(row) : null,
   });
   const status = result.status === 'written' ? 200 : result.status === 'conflict' ? 409 : result.status === 'skip' ? 400 : 502;

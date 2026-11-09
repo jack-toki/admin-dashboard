@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { parsePipelinePlan, pipelineView, preparePipelineWrite } = require('../lib/forecast/pipelinePlan');
+const { parsePipelinePlan, pipelineView, preparePipelineWrite, pipelineInputEdit } = require('../lib/forecast/pipelinePlan');
 
 const values = [
   [],
@@ -43,6 +43,21 @@ test('the pipeline plan keeps the Sheet labels and leaves formulas read-only', (
   assert.equal(preparePipelineWrite(active, { current: '4000', stored: '4000', next: 500000 }).action, 'skip');
   assert.equal(preparePipelineWrite(target, { current: '6000', stored: '6000', next: 650000 }).action, 'write');
   assert.equal(preparePipelineWrite(target, { current: '8000', stored: '6000', next: 650000 }).action, 'conflict');
+  assert.deepEqual(pipelineInputEdit(null, ''), { action: 'skip', reason: 'blank' });
+  assert.deepEqual(pipelineInputEdit(null, '   '), { action: 'skip', reason: 'blank' });
+  const cleared = pipelineInputEdit(400000, '');
+  assert.equal(cleared.action, 'clear');
+  assert.equal(cleared.next, '');
+  assert.notEqual(cleared.next, 0);
+  assert.notEqual(cleared.next, '0');
+  assert.equal(pipelineInputEdit(400000, '4000').action, 'skip');
+  assert.equal(pipelineInputEdit(null, '0').action, 'save');
+  assert.equal(pipelineInputEdit(null, '0').minor, 0);
+  const blankCell = { ...target, minor: null };
+  assert.equal(preparePipelineWrite(blankCell, { current: '', stored: '', next: 0, clear: true }).action, 'skip');
+  const clearedWrite = preparePipelineWrite(target, { current: '4000', stored: '4000', next: '', clear: true });
+  assert.equal(clearedWrite.action, 'write');
+  assert.equal(clearedWrite.next, '');
   const line = plan.rows.find((row) => row.label === 'Like Zero');
   assert.equal(line.cells[0].input, true);
   assert.equal(line.cells[0].minor, null);
