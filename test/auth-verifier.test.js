@@ -5,7 +5,7 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-const { authConfigStatus, authenticatePassword, clearCookie, createPasswordVerifier, signSession } = require('../lib/auth');
+const { authConfigStatus, authenticatePassword, clearCookie, createPasswordVerifier, signInRequired, signSession } = require('../lib/auth');
 const { POST, DELETE } = require('../app/api/cockpit/login/route');
 const { resetProcessThrottle } = require('../lib/auth/throttle');
 
@@ -84,6 +84,21 @@ test('login and logout keep the session guard and the cookie contract', async ()
       else process.env[key] = value;
     }
   }
+});
+
+test('preview opens without sign-in and production stays locked', () => {
+  assert.equal(signInRequired({ VERCEL_ENV: 'production' }), true);
+  assert.equal(signInRequired({ VERCEL_ENV: 'preview' }), false);
+  assert.equal(signInRequired({ VERCEL_ENV: 'preview', COCKPIT_PREVIEW_AUTH: 'on' }), true);
+  assert.equal(signInRequired({}), true);
+  const page = fs.readFileSync(path.join(__dirname, '../app/cockpit/page.js'), 'utf8');
+  assert.match(page, /signInRequired/);
+  assert.match(page, /previewAdminSession/);
+  const login = fs.readFileSync(path.join(__dirname, '../app/api/cockpit/login/route.js'), 'utf8');
+  assert.equal(login.includes('DASHBOARD_PIN_HASH'), false);
+  assert.equal(login.includes('activePinHash'), false);
+  const form = fs.readFileSync(path.join(__dirname, '../app/cockpit/login/LoginForm.js'), 'utf8');
+  assert.equal(form.includes('4-digit'), false);
 });
 
 test('the generator writes a mode 0600 verifier and does not print it', () => {

@@ -439,7 +439,7 @@ export default function App({ role, areas, client, fixture = false }) {
             {area === 'automations' && (
               <>
                 <AutomationsScreen board={runBoard} error={runError} focus={focus} onFocusApplied={() => setFocus(null)} />
-                {status?.coverage && <p className="caveat">The ingest alias was not called. The last export snapshot recorded {status.coverage.clientOnWithIngest} of {status.coverage.clientOn} client workflows on, and {status.coverage.jackOwnOnWithIngest} of {status.coverage.jackOwnOn} on Jack’s own account. Louise was {status.coverage.louise}.</p>}
+                {status?.coverage && <p className="caveat">The reporting link was not called. The last export recorded {status.coverage.clientOnWithIngest} of {status.coverage.clientOn} client workflows on, and {status.coverage.jackOwnOnWithIngest} of {status.coverage.jackOwnOn} on Jack’s own account. Louise was {status.coverage.louise === 'not_in_snapshot' ? 'not in that export' : status.coverage.louise}.</p>}
               </>
             )}
             {area === 'jrl' && <JrlScreen gate={jrl} />}

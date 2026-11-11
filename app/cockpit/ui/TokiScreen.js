@@ -5,6 +5,7 @@ import { workingMonthLines, sumLines, incomeBreakdown } from '../../../lib/plann
 import { TOKI_VIEWS } from '../../../lib/nav/sidebar';
 import { HorizontalBars, YearColumns } from './charts';
 import { IncomeBoard } from './IncomeBoard';
+import { AUTOMATION_RANGES } from '../../../lib/automations/range';
 import { DetailDrawer, DetailFields } from './DetailDrawer';
 import { currentTokiMonth, deriveAutoTasks, forecastCellsFromRows, openOutstandingItems } from '../../../lib/planning/autoTasks';
 import { priceZaps, savingsFromZaps } from '../../../lib/automations/savings';
@@ -527,13 +528,19 @@ function Summary({ billing, costs }) {
 function runFields(row) {
   return [
     { label: 'Account', value: row.name },
-    { label: 'Log label', value: row.logAccount || '—' },
-    { label: 'Ingest slug', value: row.ingestSlug || 'Not linked' },
+    { label: 'Name in the run log', value: row.logAccount || '—' },
+    { label: 'Tracking key', value: row.ingestSlug || 'Not linked' },
     { label: 'Posts', value: String(row.runs) },
-    { label: 'Zap ids that posted', value: String(row.reportingZapIds) },
-    { label: 'Posts without a zap id', value: String(row.postsWithoutZapId) },
+    { label: 'Zap references', value: String(row.reportingZapIds) },
+    { label: 'Posts with no Zap reference', value: String(row.postsWithoutZapId) },
     { label: 'Latest', value: row.latest ? row.latest.slice(0, 16).replace('T', ' ') : 'None' },
   ];
+}
+
+function rangeFromLocation() {
+  if (typeof window === 'undefined') return 'this-month';
+  const value = new URLSearchParams(window.location.search).get('range');
+  return AUTOMATION_RANGES.some(([, id]) => id === value) ? value : 'this-month';
 }
 
 export function AutomationsScreen({ board, error, focus = null, onFocusApplied }) {
@@ -543,9 +550,33 @@ export function AutomationsScreen({ board, error, focus = null, onFocusApplied }
   const [rates, setRates] = useState([]);
   const [rateForm, setRateForm] = useState({ client: '', hourly: '50', zap: '', minutes: '7' });
   const [clients, setClients] = useState(null);
+  const [range, setRange] = useState('this-month');
+  const [ranged, setRanged] = useState(null);
+  const [rangeError, setRangeError] = useState('');
+  useEffect(() => {
+    const initial = rangeFromLocation();
+    if (initial !== 'this-month') setRange(initial);
+  }, []);
   useEffect(() => {
     let cancel = false;
-    fetch('/api/dashboard?period=this-month').then(async (res) => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      params.set('range', range);
+      const next = `${window.location.pathname}?${params.toString()}${window.location.hash}`;
+      window.history.replaceState(null, '', next);
+    }
+    setRangeError('');
+    fetch(`/api/cockpit/automations?range=${encodeURIComponent(range)}`).then(async (res) => {
+      const body = await res.json().catch(() => ({}));
+      if (cancel) return;
+      if (!res.ok || !body.summary) {
+        setRanged(null);
+        setRangeError(body.error || 'run_log_unreadable');
+        return;
+      }
+      setRanged(body.summary);
+    }).catch(() => { if (!cancel) setRangeError('run_log_unreadable'); });
+    fetch(`/api/dashboard?period=${encodeURIComponent(range)}`).then(async (res) => {
       const body = await res.json().catch(() => ({}));
       if (!cancel) setClients(Array.isArray(body.clients) ? body.clients : []);
     }).catch(() => { if (!cancel) setClients([]); });
@@ -554,15 +585,18 @@ export function AutomationsScreen({ board, error, focus = null, onFocusApplied }
       if (!cancel && Array.isArray(body.rows)) setRates(body.rows);
     }).catch(() => {});
     return () => { cancel = true; };
-  }, []);
+  }, [range]);
   useEffect(() => {
     if (!focus || focus.area !== 'automations') return;
     if (focus.detail) setDetail(focus.detail);
     onFocusApplied?.();
   }, [focus]);
-  const rows = board?.accountRows || [];
-  const zaps = board?.zapRows || [];
-  const ready = board?.posts != null;
+  const shown = ranged || (range === 'this-month' ? board : null);
+  const rangeLabel = AUTOMATION_RANGES.find(([, id]) => id === range)?.[0] || 'This month';
+  const rows = shown?.accountRows || [];
+  const zaps = shown?.zapRows || [];
+  const ready = shown?.posts != null;
+  const empty = ready && shown.posts === 0;
   const pricedZaps = priceZaps(zaps, rates);
   const totals = savingsFromZaps(zaps, rates);
   const priced = [...pricedZaps.reduce((accounts, zap) => {
@@ -582,8 +616,14 @@ export function AutomationsScreen({ board, error, focus = null, onFocusApplied }
       <div className="card glass bento-span auto-head">
         <div>
           <h2>Automations</h2>
-          <p className="sub">{ready ? 'Posts, time saved, and money saved this month.' : 'No runs in this month.'}</p>
+          <p className="sub">{empty ? `No runs in ${rangeLabel.toLowerCase()}.` : ready ? `Posts, time saved, and money saved. ${rangeLabel}.` : 'Reading the run log.'}</p>
         </div>
+        <div className="auto-ranges" role="group" aria-label="Date range">
+          {AUTOMATION_RANGES.map(([label, id]) => (
+            <button key={id} type="button" aria-pressed={range === id} onClick={() => setRange(id)}>{label}</button>
+          ))}
+        </div>
+        {(rangeError || error) ? <p role="alert">{rangeError || error}</p> : null}
         <div className="auto-tools">
           <div className="auto-switch" role="tablist" aria-label="Automations view">
             {[['cards', 'Cards'], ['table', 'Table'], ['graph', 'Graph']].map(([id, label]) => (
@@ -594,11 +634,11 @@ export function AutomationsScreen({ board, error, focus = null, onFocusApplied }
         </div>
       </div>
       <div className="kpi-row">
-        <Tile icon="posts" label="Posts this month" value={ready ? String(board.posts) : '—'} note="This month" />
-        <Tile icon="zap" label="Active Zaps" value={ready ? String(zaps.length || board.reportingZapIds || 0) : '—'} note="This month" />
-        <Tile icon="cost" label="Failures" value="—" note="This month" />
-        <Tile icon="year" label="Time saved" value={ready ? `${totalHours.toFixed(1)} h` : '—'} note="This month" />
-        <Tile icon="value" label="£ saved" value={ready ? `£${totalPounds.toLocaleString('en-GB')}` : '—'} note="This month" onOpen={() => setDetail({ title: '£ saved', fields: pricedZaps.map((zap) => ({ label: zap.title, value: `£${zap.pounds} · ${zap.formula}` })) })} />
+        <Tile icon="posts" label="Posts" value={ready ? String(shown.posts) : '—'} note={rangeLabel} />
+        <Tile icon="zap" label="Active Zaps" value={ready ? String(zaps.length || shown.reportingZapIds || 0) : '—'} note={rangeLabel} />
+        <Tile icon="cost" label="Failures" value="—" note="Not in the run log" />
+        <Tile icon="year" label="Time saved" value={ready ? `${totalHours.toFixed(1)} h` : '—'} note={rangeLabel} />
+        <Tile icon="value" label="£ saved" value={ready ? `£${totalPounds.toLocaleString('en-GB')}` : '—'} note={rangeLabel} onOpen={() => setDetail({ title: '£ saved', fields: pricedZaps.map((zap) => ({ label: zap.title, value: `£${zap.pounds} · ${zap.formula}` })) })} />
       </div>
       {view === 'cards' && (
         <div className="auto-cards bento-span">
@@ -607,7 +647,7 @@ export function AutomationsScreen({ board, error, focus = null, onFocusApplied }
               {runFields(row).map((field) => <p key={field.label} className="sub"><b style={{ color: 'inherit' }}>{field.label}.</b> {field.value}</p>)}
             </button>
           ))}
-          {!rows.length && <article className="card glass"><p className="sub">No accounts posted this month.</p></article>}
+          {!rows.length && <article className="card glass"><p className="sub">{empty ? `No runs in ${rangeLabel.toLowerCase()}.` : 'No accounts in this range.'}</p></article>}
         </div>
       )}
       {view === 'table' && (
@@ -616,11 +656,11 @@ export function AutomationsScreen({ board, error, focus = null, onFocusApplied }
             <thead>
               <tr>
                 <th style={th}>Account</th>
-                <th style={th}>Log label</th>
-                <th style={th}>Ingest slug</th>
+                <th style={th}>Name in the run log</th>
+                <th style={th}>Tracking key</th>
                 <th style={th}>Posts</th>
-                <th style={th}>Zap ids that posted</th>
-                <th style={th}>Posts without a zap id</th>
+                <th style={th}>Zap references</th>
+                <th style={th}>Posts with no Zap reference</th>
                 <th style={th}>Latest</th>
               </tr>
             </thead>
@@ -630,7 +670,7 @@ export function AutomationsScreen({ board, error, focus = null, onFocusApplied }
                   {runFields(row).map((field) => <td key={field.label} style={td}>{field.value}</td>)}
                 </tr>
               ))}
-              {!rows.length && <tr><td style={td} colSpan="7">No accounts posted this month.</td></tr>}
+              {!rows.length && <tr><td style={td} colSpan="7">{empty ? `No runs in ${rangeLabel.toLowerCase()}.` : 'No accounts in this range.'}</td></tr>}
             </tbody>
           </table>
         </div>
@@ -646,13 +686,13 @@ export function AutomationsScreen({ board, error, focus = null, onFocusApplied }
                 <b>£{row.pounds}</b>
               </button>
             ))}
-            {!priced.length && <p className="sub">No posts to chart this month.</p>}
+            {!priced.length && <p className="sub">{empty ? `No runs in ${rangeLabel.toLowerCase()}.` : 'No posts to chart in this range.'}</p>}
           </div>
         </div>
       )}
       <section className="card glass bento-span">
         <h2>Client report</h2>
-        <p className="sub">Runs and outcomes for this month.</p>
+        <p className="sub">Runs and outcomes for {rangeLabel.toLowerCase()}.</p>
         <div className="ledger-scroll">
           <table className="forecast-table client-report">
             <thead><tr><th>Client</th><th className="num">Runs</th><th className="num">Emails</th><th className="num">Quotes</th><th className="num">Invoices</th><th className="num">Leads</th></tr></thead>
@@ -667,7 +707,7 @@ export function AutomationsScreen({ board, error, focus = null, onFocusApplied }
                   <td className="num">{client.leads ?? 0}</td>
                 </tr>
               ))}
-              {clients && !clients.length && <tr><td colSpan="6">No client posts this month.</td></tr>}
+              {clients && !clients.length && <tr><td colSpan="6">{empty ? `No runs in ${rangeLabel.toLowerCase()}.` : 'No client posts in this range.'}</td></tr>}
             </tbody>
           </table>
         </div>
@@ -689,7 +729,7 @@ export function AutomationsScreen({ board, error, focus = null, onFocusApplied }
             <p className="sub">Hourly rate defaults to £50. Minutes default from the Zap title, or 7 minutes a run.</p>
             <label>Client<input aria-label="Client name" value={rateForm.client} onChange={(event) => setRateForm({ ...rateForm, client: event.target.value })} /></label>
             <label>Hourly rate<input aria-label="Hourly rate" inputMode="decimal" value={rateForm.hourly} onChange={(event) => setRateForm({ ...rateForm, hourly: event.target.value })} /></label>
-            <label>Zap id<input aria-label="Zap id" value={rateForm.zap} onChange={(event) => setRateForm({ ...rateForm, zap: event.target.value })} /></label>
+            <label>Zap reference<input aria-label="Zap reference" value={rateForm.zap} onChange={(event) => setRateForm({ ...rateForm, zap: event.target.value })} /></label>
             <label>Minutes a run<input aria-label="Minutes a run" inputMode="numeric" value={rateForm.minutes} onChange={(event) => setRateForm({ ...rateForm, minutes: event.target.value })} /></label>
             <button type="submit" className="btn">Save rates</button>
             <ul className="todo-list">{rates.map((row) => <li key={row.id}>{row.id} {row.hourlyRateMinor ? `£${row.hourlyRateMinor / 100}/hour` : `${row.minutesPerRun} min`}</li>)}</ul>
