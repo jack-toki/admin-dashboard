@@ -478,8 +478,3 @@
   .jrl-root .toki-subnav { display: none; }
   .jrl-root .toki-section-switch { display: flex; }
 }
-.jrl-root .pin-pad { display: flex; flex-direction: column; gap: 12px; }
-.jrl-root .pin-dots { margin: 0; letter-spacing: .45em; font-size: 1.5rem; }
-.jrl-root .pin-pad input { width: 100%; box-sizing: border-box; min-height: 48px; border-radius: 12px; border: 1px solid var(--hair); font: inherit; font-size: 1.4rem; letter-spacing: .4em; text-align: center; }
-.jrl-root .pin-keys { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.jrl-root .pin-keys button { min-height: 52px; border: 0; border-radius: 12px; background: var(--control); color: var(--ink); font: inherit; font-size: 1.2rem; cursor: pointer; }

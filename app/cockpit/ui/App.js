@@ -37,9 +37,6 @@ export default function App({ role, areas, client, fixture = false }) {
   const [jrlLoading, setJrlLoading] = useState(!fixture);
   const [runsLoading, setRunsLoading] = useState(!fixture);
   const [focus, setFocus] = useState(null);
-  const [pinOpen, setPinOpen] = useState(false);
-  const [pinForm, setPinForm] = useState({ current: '', next: '', confirm: '' });
-  const [pinNote, setPinNote] = useState('');
 
   function openSpace(target) {
     if (!target || typeof target === 'string') {
@@ -427,37 +424,6 @@ export default function App({ role, areas, client, fixture = false }) {
               <div className="fx-menu">
                 <button type="button" onClick={() => setThemeMode('light')}>Light</button>
                 <button type="button" onClick={() => setThemeMode('dark')}>Dark</button>
-                <button type="button" onClick={() => { setPinOpen((open) => !open); setPinNote(''); }}>Change code</button>
-                {pinOpen && (
-                  <form className="pin-change" onSubmit={async (event) => {
-                    event.preventDefault();
-                    setPinNote('');
-                    const res = await fetch('/api/cockpit/pin', {
-                      method: 'POST',
-                      headers: { 'content-type': 'application/json' },
-                      body: JSON.stringify(pinForm),
-                    });
-                    const body = await res.json().catch(() => ({}));
-                    if (res.ok) {
-                      setPinNote('Code saved.');
-                      setPinForm({ current: '', next: '', confirm: '' });
-                      return;
-                    }
-                    setPinNote(body.error === 'pin_store_not_ready'
-                      ? 'The code store is not ready yet. The existing password still works.'
-                      : body.error === 'mismatch'
-                        ? 'The new code and the confirmation do not match.'
-                        : body.error === 'invalid_current'
-                          ? 'The current code or password was not accepted.'
-                          : 'The code was not saved.');
-                  }}>
-                    <label>Current code or password<input aria-label="Current code or password" inputMode="text" autoComplete="current-password" value={pinForm.current} onChange={(event) => setPinForm({ ...pinForm, current: event.target.value })} /></label>
-                    <label>New 4-digit code<input aria-label="New 4-digit code" inputMode="numeric" maxLength={4} value={pinForm.next} onChange={(event) => setPinForm({ ...pinForm, next: event.target.value.replace(/\D/g, '').slice(0, 4) })} /></label>
-                    <label>Confirm code<input aria-label="Confirm code" inputMode="numeric" maxLength={4} value={pinForm.confirm} onChange={(event) => setPinForm({ ...pinForm, confirm: event.target.value.replace(/\D/g, '').slice(0, 4) })} /></label>
-                    <button type="submit" className="btn">Save code</button>
-                    {pinNote ? <p role="status">{pinNote}</p> : null}
-                  </form>
-                )}
                 <button type="button" onClick={onSignOut}>Sign out</button>
               </div>
             </details>
