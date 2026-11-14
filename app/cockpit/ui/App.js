@@ -365,7 +365,7 @@ export default function App({ role, areas, client, fixture = false }) {
             <button type="button" className={theme === 'dark' ? 'on' : undefined} aria-label="Dark" aria-pressed={theme === 'dark'} onClick={() => setThemeMode('dark')}><MoonIcon /></button>
           </div>
           <nav id="cockpit-nav" className="rail-group">
-            <button type="button" className={area === 'overview' ? 'rail-apps on' : 'rail-apps'} aria-label="Overview" aria-pressed={area === 'overview'} onClick={() => setArea('overview')}><GridIcon /></button>
+            <button type="button" className={area === 'overview' ? 'rail-apps on' : 'rail-apps'} aria-label="Overview" aria-pressed={area === 'overview'} onClick={() => setArea('overview')}><GridIcon /><span className="lbl">Overview</span></button>
             {items.map((item) => (
               <Fragment key={item.id}>
                 <a

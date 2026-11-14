@@ -131,8 +131,11 @@ export default function JrlScreen({ gate }) {
   return (
     <>
           <div className="tgt-modes" role="tablist" aria-label="JRL pages">
-            {LINKS.map(([id, label]) => (
-              <button key={id} type="button" className={section === id ? 'tgt-mode on' : 'tgt-mode'} onClick={() => setSection(id)}>{label}</button>
+            {LINKS.map(([id, label, short]) => (
+              <button key={id} type="button" className={section === id ? 'tgt-mode on' : 'tgt-mode'} onClick={() => setSection(id)} aria-label={label}>
+                <span className="desk">{label}</span>
+                <span className="mob">{short}</span>
+              </button>
             ))}
             {auth?.supabaseUser ? (
               <details className="jrl-menu">
