@@ -988,10 +988,22 @@ button.quick-card { padding: 18px 18px 16px; }
   .jrl-root .fx-greet p { font-size: 1rem; line-height: 1.4; }
   .jrl-root .fx-tabs { display: none; }
   .jrl-root .side nav a.phone-nav { display: flex; }
-  .jrl-root .side nav { flex-wrap: wrap; row-gap: 2px; }
+  .jrl-root .side {
+    left: 8px; right: 8px; width: auto; transform: none;
+  }
+  .jrl-root .side nav { flex-wrap: nowrap; flex-direction: row; width: 100%; gap: 0; }
   .jrl-root .side nav a,
-  .jrl-root .side .rail-apps { flex: 1 1 30%; max-width: 33%; min-width: 0; }
-  .jrl-root .fx-shell { padding-bottom: calc(148px + env(safe-area-inset-bottom, 0px)); }
+  .jrl-root .side .rail-apps,
+  .jrl-root .side nav a.on,
+  .jrl-root .side .rail-apps.on,
+  .jrl-root .side .rail-apps[aria-pressed="true"] {
+    flex: 1 1 0; max-width: none; min-width: 0; width: auto; height: auto;
+    min-height: 44px; border-radius: 12px; padding: 2px 0; background: transparent; color: var(--ink);
+  }
+  .jrl-root .side nav a.on .ic,
+  .jrl-root .side .rail-apps.on,
+  .jrl-root .side .rail-apps[aria-pressed="true"] { color: var(--orange); }
+  .jrl-root .fx-shell { padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px)); }
   .jrl-root .fx-tabs button {
     white-space: normal;
     flex: 1 1 calc(50% - 8px);
@@ -1008,8 +1020,9 @@ button.quick-card { padding: 18px 18px 16px; }
   .jrl-root .side[data-collapsed="true"] nav a .lbl,
   .jrl-root .side .rail-apps .lbl,
   .jrl-root .side[data-collapsed="true"] .rail-apps .lbl {
-    position: static; display: block; width: auto; height: auto; margin: 2px 0 0; padding: 0;
-    overflow: visible; clip: unset; font-size: 11px; line-height: 1.1; white-space: normal;
+    position: static; display: block; width: 100%; height: auto; margin: 2px 0 0; padding: 0;
+    overflow: hidden; clip: unset; font-size: 10px; line-height: 1.1; white-space: nowrap;
+    letter-spacing: -0.04em; text-overflow: clip;
   }
   .jrl-root .side .rail-apps { width: auto; height: auto; min-width: 44px; min-height: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
   .jrl-root .fx-shell { padding-bottom: calc(108px + env(safe-area-inset-bottom, 0px)); }
