@@ -142,8 +142,7 @@ test('a deal moves to an empty line in the next stage and clears the old line', 
   const added = dealSheetWrites(plan, { name: 'Inbox Club', source: 'Nath', work: 'Proposal', stage: '50' });
   assert.equal(added.ok, true);
   assert.equal(added.writes[0].value, 'Inbox Club');
-  assert.equal(standingDelta({ actual: 100, pipeline: 40, target: 120 }, true), 20);
-  assert.equal(standingDelta({ actual: 100, pipeline: 40, target: 120 }, false), -20);
+  assert.equal(standingDelta({ actual: 100, pipeline: 40, target: 120 }), -20);
 });
 
 test('December on Pipeline Forecast V2 is the retainer and project lines, and the filters keep the current month', () => {

@@ -242,13 +242,14 @@
   --chart-hover: var(--chart-electric);
   --chart-surface: #ffffff;
   --series-retainer: var(--chart-orange);
-  --series-project: var(--chart-electric);
+  --series-project: #1A1A1A;
   --series-open: var(--chart-beige);
   --series-actual: var(--chart-ciel);
   --series-cost: var(--chart-orange);
   --series-forecast: var(--chart-electric);
 }
 .jrl-root[data-theme="dark"] {
+  --series-project: #FFE6D0;
   --chart-charcoal-70: color-mix(in srgb, #1A1A1A 35%, #FFE6D0);
   --chart-ciel-45: color-mix(in srgb, #007BFF 55%, #1A1A1A);
   --chart-label: var(--chart-beige);
@@ -638,6 +639,9 @@ button.rail-apps.on { color: var(--ink); }
 .col-stack { width: 26px; gap: 4px; }
 .col-stack i { border-radius: 7px; }
 .col-stack i[data-state="missing"] { height: 16%; background: repeating-linear-gradient(135deg, transparent 0 3px, rgba(23,23,23,.28) 3px 4px) !important; }
+.col-stack, .ov-stack { gap: 3px; }
+.col-stack > i, .ov-stack .ov-seg i { border-radius: 8px; }
+.col-stack > i:first-child, .ov-stack .ov-seg:first-child i { border-radius: 8px 8px 0 0; }
 .col-average::after { content: "Avg"; background: var(--surface); color: var(--muted); font-size: 11px; padding: 0 4px; top: -14px; }
 .income-col table { width: 100%; border-collapse: collapse; }
 .income-col th, .income-col td { text-align: left; padding: 10px 8px; }
@@ -945,11 +949,12 @@ button.quick-card { padding: 18px 18px 16px; }
 .fs-y { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; color: var(--chart-label, var(--ink)); font-size: 12px; line-height: 1; padding-bottom: 22px; }
 .fs-cols { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; align-items: end; min-width: 0; }
 .fs-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; height: 100%; }
-.fs-track { position: relative; height: 180px; }
-.fs-seg { position: absolute; left: 8%; right: 8%; width: auto; min-height: 2px; border: 0; padding: 0; border-radius: 3px 3px 0 0; cursor: pointer; }
+.fs-track { position: relative; height: 180px; display: flex; flex-direction: column-reverse; align-items: center; gap: 3px; }
+.fs-seg { position: relative; left: auto; right: auto; width: 72%; min-height: 2px; border: 0; padding: 0; border-radius: 10px; cursor: pointer; flex: none; }
+.fs-seg.fs-base { border-radius: 10px 10px 0 0; }
 .fs-x { height: 16px; font-size: 12px; line-height: 16px; text-align: center; color: var(--chart-label, var(--ink)); white-space: nowrap; }
 .forecast-stack .chart-key i[data-seg="actual-retainer"], .fs-seg[data-seg="actual-retainer"] { background: var(--chart-orange); }
-.forecast-stack .chart-key i[data-seg="actual-project"], .fs-seg[data-seg="actual-project"] { background: var(--chart-charcoal); }
+.forecast-stack .chart-key i[data-seg="actual-project"], .fs-seg[data-seg="actual-project"] { background: #1A1A1A; }
 .forecast-stack .chart-key i[data-seg="potential-75"], .fs-seg[data-seg="potential-75"] { background: var(--chart-electric); }
 .forecast-stack .chart-key i[data-seg="potential-50"], .fs-seg[data-seg="potential-50"] { background: var(--chart-ciel); }
 .forecast-stack .chart-key i[data-seg="potential-25"], .fs-seg[data-seg="potential-25"] { background: var(--chart-ciel-45); }

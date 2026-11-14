@@ -20,8 +20,8 @@ function worthCount(minor, count) {
   return `${money(minor)} (${count})`;
 }
 
-function standingText(month, pipelineOn) {
-  const delta = standingDelta(month, pipelineOn);
+function standingText(month) {
+  const delta = standingDelta(month);
   if (delta == null) return 'No target this month';
   if (delta > 0) return `Over target by ${money(delta)}`;
   if (delta < 0) return `Under target by ${money(-delta)}`;
@@ -67,11 +67,12 @@ function PlanChart({ chart, pipelineOn, onToggle, hover, onHover }) {
                     const height = (segment.minor / max) * 100;
                     const stage = column.stages.find((item) => item.id === segment.id);
                     const detail = segment.family === 'potential' && stage ? worthCount(stage.minor, stage.count) : money(segment.minor);
+                    const base = state.nodes.length === 0;
                     state.nodes.push(
                       <button
                         key={segment.id}
                         type="button"
-                        className="fs-seg"
+                        className={base ? 'fs-seg fs-base' : 'fs-seg'}
                         data-seg={segment.id}
                         aria-label={`${column.label}. ${segment.legend || segment.label}. ${detail}`}
                         style={{ bottom: `${state.bottom}%`, height: `${height}%` }}
@@ -90,7 +91,7 @@ function PlanChart({ chart, pipelineOn, onToggle, hover, onHover }) {
             ))}
           </div>
         </div>
-        <p className="caveat">Retainers and projects are the solid stack. The dashed line is the target. Pipeline adds the 75%, 50%, 25%, and 10% sections when it is on.</p>
+        <p className="caveat">Retainers and projects are the stack. The dashed line is the target, compared with those actual figures only. Pipeline sits above them when it is on.</p>
       </figure>
       <aside className="forecast-readout panel glass" aria-live="polite">
         {month ? (
@@ -103,10 +104,10 @@ function PlanChart({ chart, pipelineOn, onToggle, hover, onHover }) {
             {month.stages.map((stage) => (
               <p key={stage.id} className={hover?.stageId === stage.id ? 'on' : undefined}><span>{stage.label}</span><b>{worthCount(stage.minor, stage.count)}</b></p>
             ))}
-            <p className="forecast-standing"><b>{standingText(month, pipelineOn)}</b></p>
+            <p className="forecast-standing"><b>{standingText(month)}</b></p>
           </>
         ) : <p className="sub">Hover a month.</p>}
-        <span id={tipId} className="sr">{month ? standingText(month, pipelineOn) : ''}</span>
+        <span id={tipId} className="sr">{month ? standingText(month) : ''}</span>
       </aside>
     </div>
   );
