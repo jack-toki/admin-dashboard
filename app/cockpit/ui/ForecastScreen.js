@@ -3,7 +3,7 @@
 import { useEffect, useId, useState } from 'react';
 import { cursorPoint } from './CursorTooltip';
 import { formatPounds } from '../../../lib/money';
-import { pipelineInputEdit, pipelineChart, focusPlan, standingDelta, PIPELINE_STAGES } from '../../../lib/forecast/pipelinePlan';
+import { pipelineInputEdit, pipelineChart, focusPlan, standingDelta, currentMonthKey, PIPELINE_STAGES } from '../../../lib/forecast/pipelinePlan';
 
 function money(minor) {
   if (minor == null || !Number.isFinite(Number(minor))) return '—';
@@ -28,7 +28,15 @@ function standingText(month) {
   return 'On target';
 }
 
-function PlanChart({ chart, pipelineOn, onToggle, hover, onHover }) {
+function shownMonth(months, keys, hover) {
+  if (hover?.monthId && months.some((month) => month.id === hover.monthId)) {
+    return months.find((month) => month.id === hover.monthId) || null;
+  }
+  const index = (keys || []).indexOf(currentMonthKey());
+  return months[index] || months[months.length - 1] || null;
+}
+
+function PlanChart({ chart, pipelineOn, onToggle, hover, onHover, monthKeys }) {
   const tipId = useId();
   const months = chart?.months || [];
   const visibleSegments = (column) => column.segments.filter((segment) => segment.minor > 0 && (pipelineOn || segment.family === 'actual'));
@@ -36,7 +44,7 @@ function PlanChart({ chart, pipelineOn, onToggle, hover, onHover }) {
     const stacked = visibleSegments(column).reduce((sum, segment) => sum + segment.minor, 0);
     return Math.max(stacked, column.target || 0);
   }));
-  const month = months.find((item) => item.id === hover?.monthId) || null;
+  const month = shownMonth(months, monthKeys, hover);
   const points = months.map((column, index) => {
     const y = column.target == null ? null : 100 - (column.target / max) * 100;
     return y == null ? null : `${index + 0.5},${y}`;
@@ -61,7 +69,7 @@ function PlanChart({ chart, pipelineOn, onToggle, hover, onHover }) {
               <polyline points={points} fill="none" stroke="currentColor" strokeDasharray="4 3" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
             </svg>
             {months.map((column) => (
-              <div key={column.id} className="fs-col" onMouseEnter={() => onHover({ monthId: column.id, stageId: hover?.monthId === column.id ? hover.stageId : '' })}>
+              <div key={column.id} className={column.id === month?.id ? 'fs-col on' : 'fs-col'} onMouseEnter={() => onHover({ monthId: column.id, stageId: hover?.monthId === column.id ? hover.stageId : '' })} onClick={() => onHover({ monthId: column.id, stageId: '' })}>
                 <div className="fs-track">
                   {visibleSegments(column).reduce((state, segment) => {
                     const height = (segment.minor / max) * 100;
@@ -76,6 +84,7 @@ function PlanChart({ chart, pipelineOn, onToggle, hover, onHover }) {
                         data-seg={segment.id}
                         aria-label={`${column.label}. ${segment.legend || segment.label}. ${detail}`}
                         style={{ bottom: `${state.bottom}%`, height: `${height}%` }}
+                        onClick={() => onHover({ monthId: column.id, stageId: segment.family === 'potential' ? segment.id : '' })}
                         onMouseEnter={(event) => {
                           onHover({ monthId: column.id, stageId: segment.family === 'potential' ? segment.id : '', cursor: cursorPoint(event) });
                         }}
@@ -106,7 +115,7 @@ function PlanChart({ chart, pipelineOn, onToggle, hover, onHover }) {
             ))}
             <p className="forecast-standing"><b>{standingText(month)}</b></p>
           </>
-        ) : <p className="sub">Hover a month.</p>}
+        ) : <p className="sub">Tap a month.</p>}
         <span id={tipId} className="sr">{month ? standingText(month) : ''}</span>
       </aside>
     </div>
@@ -263,7 +272,7 @@ export function ForecastScreen() {
         {chart.tiles.map((tile) => <div key={tile.label} className="ov-tile" role="group"><span>{tile.label}</span><b className="num">{money(tile.minor)}</b></div>)}
       </div>
       <div className="panel glass">
-        {chart.months.length ? <PlanChart chart={chart} pipelineOn={pipelineOn} onToggle={() => setPipelineOn((on) => !on)} hover={hover} onHover={setHover} /> : <p className="sub">None of the months fall in this range.</p>}
+        {chart.months.length ? <PlanChart chart={chart} monthKeys={focused.monthKeys} pipelineOn={pipelineOn} onToggle={() => setPipelineOn((on) => !on)} hover={hover} onHover={setHover} /> : <p className="sub">None of the months fall in this range.</p>}
       </div>
       <DealEditor plan={plan} onSave={saveDeal} note={note} />
       <div className="ledger glass ledger-scroll">
