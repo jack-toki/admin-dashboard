@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { parsePipelinePlan, pipelineView, pipelineStack, preparePipelineWrite, pipelineInputEdit } = require('../lib/forecast/pipelinePlan');
+const { parsePipelinePlan, pipelineView, pipelineStack, pipelineChart, standingDelta, dealSheetWrites, preparePipelineWrite, pipelineInputEdit } = require('../lib/forecast/pipelinePlan');
 
 const values = [
   [],
@@ -103,10 +103,46 @@ test('the forecast stack uses section headers for actual and potential', () => {
   assert.equal(stack.segments.find((segment) => segment.id === 'potential-75').legend, 'Potential 75% (High side, waiting for approval)');
   assert.equal(stack.segments.find((segment) => segment.id === 'potential-75').legend.includes('Potential · 75% ·'), false);
   const screen = fs.readFileSync(path.join(__dirname, '../app/cockpit/ui/ForecastScreen.js'), 'utf8');
-  assert.match(screen, /pipelineStack/);
+  assert.match(screen, /pipelineChart/);
   assert.match(screen, /fs-seg/);
-  assert.match(screen, /CursorTooltip/);
-  assert.equal(screen.includes('<polyline'), false);
+  assert.match(screen, /fs-target/);
+  assert.match(screen, /forecast-readout/);
+  assert.match(screen, /aria-pressed=\{pipelineOn\}/);
+  assert.match(screen, /save-deal/);
+  const chart = pipelineChart(plan);
+  assert.equal(chart.months[0].retainers, 60000);
+  assert.equal(chart.months[0].projects, 50000);
+  assert.equal(chart.months[0].pipeline, 200000);
+  assert.equal(chart.months[0].stages.find((stage) => stage.id === 'potential-75').count, 1);
+  assert.equal(chart.tiles.find((tile) => tile.label === 'Actual').minor, 150000);
+});
+
+test('a deal moves to an empty line in the next stage and clears the old line', () => {
+  const values = [
+    [],
+    ['', 'Source', 'Work', 'TOTAL', 'Dec-26'],
+    ['75% High Side', '', '', '', ''],
+    ['Like Zero', 'ClickUp', 'Build', 2000, 2000],
+    ['', '', '', '', ''],
+    ['50% Low Side', '', '', '', ''],
+    ['', '', '', '', ''],
+  ];
+  const plan = parsePipelinePlan(values, values.map(() => []));
+  assert.equal(plan.stages['75'].deals[0].name, 'Like Zero');
+  assert.equal(plan.stages['50'].slots.length, 1);
+  const moved = dealSheetWrites(plan, { row: plan.stages['75'].deals[0].row, name: 'Like Zero', source: 'ClickUp', work: 'Build', stage: '50' });
+  assert.equal(moved.ok, true);
+  assert.equal(moved.writes.find((item) => item.range.endsWith('A7')).value, 'Like Zero');
+  assert.equal(moved.writes.find((item) => item.range.endsWith('A4')).value, '');
+  assert.equal(moved.writes.find((item) => item.range.endsWith('E7')).value, '2000');
+  const full = dealSheetWrites(plan, { row: plan.stages['75'].deals[0].row, name: 'Like Zero', stage: '25' });
+  assert.equal(full.ok, false);
+  assert.equal(full.error, 'stage_full');
+  const added = dealSheetWrites(plan, { name: 'Inbox Club', source: 'Nath', work: 'Proposal', stage: '50' });
+  assert.equal(added.ok, true);
+  assert.equal(added.writes[0].value, 'Inbox Club');
+  assert.equal(standingDelta({ actual: 100, pipeline: 40, target: 120 }, true), 20);
+  assert.equal(standingDelta({ actual: 100, pipeline: 40, target: 120 }, false), -20);
 });
 
 test('the overview drops the duplicate Toki tiles and the nav says Revenue Split', () => {

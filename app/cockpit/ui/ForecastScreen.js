@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useId, useState } from 'react';
-import { CursorTooltip, cursorPoint } from './CursorTooltip';
+import { cursorPoint } from './CursorTooltip';
 import { formatPounds } from '../../../lib/money';
-import { pipelineInputEdit, pipelineStack, pipelineView } from '../../../lib/forecast/pipelinePlan';
+import { pipelineInputEdit, pipelineChart, standingDelta, PIPELINE_STAGES } from '../../../lib/forecast/pipelinePlan';
 
 function money(minor) {
   if (minor == null || !Number.isFinite(Number(minor))) return '—';
@@ -16,76 +16,151 @@ function compactPounds(minor) {
   return `${minor < 0 ? '-' : ''}£${compact}`;
 }
 
-function PlanChart({ stack }) {
-  const [hidden, setHidden] = useState({});
-  const [tip, setTip] = useState(null);
-  const tipId = useId();
-  const months = stack?.months || [];
-  const keys = stack?.segments || [];
-  const visible = (column) => column.segments.filter((segment) => !hidden[segment.id] && segment.minor > 0);
-  const max = Math.max(1, ...months.map((column) => visible(column).reduce((sum, segment) => sum + segment.minor, 0)));
+function worthCount(minor, count) {
+  return `${money(minor)} (${count})`;
+}
 
-  function show(column, segment, event) {
-    const clients = segment.clients.length
-      ? segment.clients.map((client) => `${client.name} · ${formatPounds(client.minor)} · ${client.type || 'Type not stored'}`)
-      : ['No client lines'];
-    const text = [
-      column.label,
-      segment.label,
-      formatPounds(segment.minor),
-      ...clients,
-      `Month actual ${formatPounds(column.actual)}`,
-      `Month potential ${formatPounds(column.potential)}`,
-    ].join('\n');
-    setTip({ id: `${column.id}:${segment.id}`, ...cursorPoint(event), text });
-  }
+function standingText(month, pipelineOn) {
+  const delta = standingDelta(month, pipelineOn);
+  if (delta == null) return 'No target this month';
+  if (delta > 0) return `Over target by ${money(delta)}`;
+  if (delta < 0) return `Under target by ${money(-delta)}`;
+  return 'On target';
+}
+
+function PlanChart({ chart, pipelineOn, onToggle, hover, onHover }) {
+  const tipId = useId();
+  const months = chart?.months || [];
+  const visibleSegments = (column) => column.segments.filter((segment) => segment.minor > 0 && (pipelineOn || segment.family === 'actual'));
+  const max = Math.max(1, ...months.map((column) => {
+    const stacked = visibleSegments(column).reduce((sum, segment) => sum + segment.minor, 0);
+    return Math.max(stacked, column.target || 0);
+  }));
+  const month = months.find((item) => item.id === hover?.monthId) || null;
+  const points = months.map((column, index) => {
+    const y = column.target == null ? null : 100 - (column.target / max) * 100;
+    return y == null ? null : `${index + 0.5},${y}`;
+  }).filter(Boolean).join(' ');
 
   return (
-    <figure className="chart-card forecast-stack" data-chart="forecast-plan">
-      <div className="cl" role="group" aria-label="Forecast segments">
-        {keys.map((item) => (
-          <button key={item.id} type="button" className="chart-key" aria-pressed={!hidden[item.id]} title={item.sheet || item.label} onClick={() => setHidden((current) => ({ ...current, [item.id]: !current[item.id] }))}>
-            <i data-seg={item.id} />
-            {item.legend || item.label}
-          </button>
-        ))}
-      </div>
-      <div className="fs-plot" onMouseLeave={() => setTip(null)}>
-        <div className="fs-y" aria-hidden="true">
-          <span>{compactPounds(max)}</span>
-          <span>{compactPounds(max / 2)}</span>
-          <span>£0</span>
+    <div className="forecast-board">
+      <figure className="chart-card forecast-stack" data-chart="forecast-plan">
+        <div className="cl" role="group" aria-label="Forecast layers">
+          <span className="chart-key"><i data-seg="actual-retainer" />Retainers</span>
+          <span className="chart-key"><i data-seg="actual-project" />Projects</span>
+          <button type="button" className="chart-key" aria-pressed={pipelineOn} onClick={onToggle}><i data-seg="potential-75" />Pipeline</button>
         </div>
-        <div className="fs-cols" role="img" aria-label="Stacked actual and potential by month">
-          {months.map((column) => (
-            <div key={column.id} className="fs-col">
-              <div className="fs-track">
-                {visible(column).reduce((state, segment) => {
-                  const height = (segment.minor / max) * 100;
-                  state.nodes.push(
-                    <button
-                      key={segment.id}
-                      type="button"
-                      className="fs-seg"
-                      data-seg={segment.id}
-                      aria-label={`${column.label}. ${segment.label}. ${formatPounds(segment.minor)}`}
-                      style={{ bottom: `${state.bottom}%`, height: `${height}%` }}
-                      onMouseEnter={(event) => show(column, segment, event)}
-                      onMouseMove={(event) => show(column, segment, event)}
-                    />,
-                  );
-                  state.bottom += height;
-                  return state;
-                }, { nodes: [], bottom: 0 }).nodes}
+        <div className="fs-plot">
+          <div className="fs-y" aria-hidden="true">
+            <span>{compactPounds(max)}</span>
+            <span>{compactPounds(max / 2)}</span>
+            <span>£0</span>
+          </div>
+          <div className="fs-cols" role="img" aria-label="Retainers and projects, with the target as a dashed line">
+            <svg className="fs-target" viewBox={`0 0 ${Math.max(months.length, 1)} 100`} preserveAspectRatio="none" aria-hidden="true">
+              <polyline points={points} fill="none" stroke="currentColor" strokeDasharray="4 3" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+            </svg>
+            {months.map((column) => (
+              <div key={column.id} className="fs-col" onMouseEnter={() => onHover({ monthId: column.id, stageId: hover?.monthId === column.id ? hover.stageId : '' })}>
+                <div className="fs-track">
+                  {visibleSegments(column).reduce((state, segment) => {
+                    const height = (segment.minor / max) * 100;
+                    const stage = column.stages.find((item) => item.id === segment.id);
+                    const detail = segment.family === 'potential' && stage ? worthCount(stage.minor, stage.count) : money(segment.minor);
+                    state.nodes.push(
+                      <button
+                        key={segment.id}
+                        type="button"
+                        className="fs-seg"
+                        data-seg={segment.id}
+                        aria-label={`${column.label}. ${segment.legend || segment.label}. ${detail}`}
+                        style={{ bottom: `${state.bottom}%`, height: `${height}%` }}
+                        onMouseEnter={(event) => {
+                          onHover({ monthId: column.id, stageId: segment.family === 'potential' ? segment.id : '', cursor: cursorPoint(event) });
+                        }}
+                        onMouseMove={(event) => onHover((current) => ({ ...current, monthId: column.id, cursor: cursorPoint(event) }))}
+                      />,
+                    );
+                    state.bottom += height;
+                    return state;
+                  }, { nodes: [], bottom: 0 }).nodes}
+                </div>
+                <span className="fs-x">{column.label}</span>
               </div>
-              <span className="fs-x">{column.label}</span>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-        {tip ? <CursorTooltip id={tipId} text={tip.text} cursor={tip} className="chart-tip" /> : null}
-      </div>
-      <p className="caveat">Actual is the Retainers and Projects sections. Potential is the 75%, 50%, 25%, and 10% sections, in that order above the actual. A line has no probability of its own. Hosting, Backburner, and the Active formula are not drawn.</p>
-    </figure>
+        <p className="caveat">Retainers and projects are the solid stack. The dashed line is the target. Pipeline adds the 75%, 50%, 25%, and 10% sections when it is on.</p>
+      </figure>
+      <aside className="forecast-readout panel glass" aria-live="polite">
+        {month ? (
+          <>
+            <h3>{month.label}</h3>
+            <p><span>Projects</span><b>{money(month.projects)}</b></p>
+            <p><span>Retainers</span><b>{money(month.retainers)}</b></p>
+            <p><span>Target</span><b>{money(month.target)}</b></p>
+            <p><span>Pipeline</span><b>{worthCount(month.pipeline, month.pipelineCount)}</b></p>
+            {month.stages.map((stage) => (
+              <p key={stage.id} className={hover?.stageId === stage.id ? 'on' : undefined}><span>{stage.label}</span><b>{worthCount(stage.minor, stage.count)}</b></p>
+            ))}
+            <p className="forecast-standing"><b>{standingText(month, pipelineOn)}</b></p>
+          </>
+        ) : <p className="sub">Hover a month.</p>}
+        <span id={tipId} className="sr">{month ? standingText(month, pipelineOn) : ''}</span>
+      </aside>
+    </div>
+  );
+}
+
+function DealEditor({ plan, onSave, note }) {
+  const [draft, setDraft] = useState({ name: '', source: '', work: '', stage: '75' });
+  const stages = plan?.stages || {};
+  return (
+    <div className="panel glass pipeline-editor">
+      <h3>Pipeline</h3>
+      <p className="sub">Add a deal or move one up a stage. The sheet keeps the monthly amounts. A stage with no empty line cannot take another deal.</p>
+      <form className="pipeline-add" onSubmit={(event) => { event.preventDefault(); onSave(draft); setDraft({ name: '', source: '', work: '', stage: draft.stage }); }}>
+        <label>Name<input aria-label="New deal name" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label>
+        <label>Source<input aria-label="New deal source" value={draft.source} onChange={(event) => setDraft({ ...draft, source: event.target.value })} /></label>
+        <label>What we are doing<input aria-label="New deal work" value={draft.work} onChange={(event) => setDraft({ ...draft, work: event.target.value })} /></label>
+        <label>Stage
+          <select aria-label="New deal stage" value={draft.stage} onChange={(event) => setDraft({ ...draft, stage: event.target.value })}>
+            {PIPELINE_STAGES.map((stage) => <option key={stage.id} value={stage.id}>{stage.id}%</option>)}
+          </select>
+        </label>
+        <button type="submit" className="btn">Add deal</button>
+      </form>
+      {PIPELINE_STAGES.map((stage) => (
+        <div key={stage.id}>
+          <h4>{stage.id}%</h4>
+          {(stages[stage.id]?.deals || []).map((deal) => (
+            <DealRow key={deal.row} deal={deal} onSave={onSave} />
+          ))}
+          {!(stages[stage.id]?.deals || []).length ? <p className="sub">No deals in this stage.</p> : null}
+        </div>
+      ))}
+      {note ? <p className="caveat">{note}</p> : null}
+    </div>
+  );
+}
+
+function DealRow({ deal, onSave }) {
+  const [name, setName] = useState(deal.name);
+  const [source, setSource] = useState(deal.source);
+  const [work, setWork] = useState(deal.work);
+  const [stage, setStage] = useState(deal.stage);
+  return (
+    <form className="pipeline-deal" onSubmit={(event) => { event.preventDefault(); onSave({ row: deal.row, name, source, work, stage }); }}>
+      <label>Name<input aria-label={`${deal.name} name`} value={name} onChange={(event) => setName(event.target.value)} /></label>
+      <label>Source<input aria-label={`${deal.name} source`} value={source} onChange={(event) => setSource(event.target.value)} /></label>
+      <label>What we are doing<input aria-label={`${deal.name} work`} value={work} onChange={(event) => setWork(event.target.value)} /></label>
+      <label>Stage
+        <select aria-label={`${deal.name} stage`} value={stage} onChange={(event) => setStage(event.target.value)}>
+          {PIPELINE_STAGES.map((item) => <option key={item.id} value={item.id}>{item.id}%</option>)}
+        </select>
+      </label>
+      <button type="submit" className="btn">Save</button>
+    </form>
   );
 }
 
@@ -100,6 +175,8 @@ export function ForecastScreen() {
   const [error, setError] = useState('');
   const [note, setNote] = useState('');
   const [drafts, setDrafts] = useState({});
+  const [pipelineOn, setPipelineOn] = useState(true);
+  const [hover, setHover] = useState(null);
 
   useEffect(() => {
     let cancel = false;
@@ -135,22 +212,36 @@ export function ForecastScreen() {
     }
   }
 
+  async function saveDeal(input) {
+    const res = await fetch('/api/cockpit/forecast-plan', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'save-deal', ...input }),
+    });
+    const body = await res.json().catch(() => ({}));
+    setNote(body.ok ? 'Deal saved.' : body.reason === 'stage_full' ? 'That stage has no empty line on the sheet.' : body.reason === 'name' ? 'A name is required.' : 'The deal was not saved.');
+    if (body.ok) {
+      const next = await fetch('/api/cockpit/forecast-plan').then((item) => item.json()).catch(() => null);
+      if (next?.plan) setPlan(next.plan);
+    }
+  }
+
   if (error) return <section className="panel glass"><h2>Forecast</h2><p className="sub">{error}</p></section>;
   if (!plan) return <section className="panel glass"><h2>Forecast</h2><p className="sub">Reading the private planning tab.</p></section>;
-  const view = pipelineView(plan);
+  const chart = pipelineChart(plan);
   return (
     <section className="forecast-plan" aria-label="Forecast">
       <header className="toki-section-head">
         <h2>Forecast</h2>
-        <p>{plan.tab}. Range {plan.range}. Bars use the Retainers, Projects, and percentage sections. Probability is the section header, not a field on each line.</p>
+        <p>{plan.tab}. Retainers and projects stack under the dashed target. Turn pipeline on to add the open stages.</p>
       </header>
       <div className="ov-tiles forecast-tiles">
-        {view.tiles.map((tile) => <div key={tile.label} className="ov-tile" role="group"><span>{tile.label}</span><b className="num">{money(tile.minor)}</b></div>)}
+        {chart.tiles.map((tile) => <div key={tile.label} className="ov-tile" role="group"><span>{tile.label}</span><b className="num">{money(tile.minor)}</b></div>)}
       </div>
       <div className="panel glass">
-        <PlanChart stack={pipelineStack(plan)} />
+        <PlanChart chart={chart} pipelineOn={pipelineOn} onToggle={() => setPipelineOn((on) => !on)} hover={hover} onHover={setHover} />
       </div>
-      {note ? <p className="caveat">{note}</p> : null}
+      <DealEditor plan={plan} onSave={saveDeal} note={note} />
       <div className="ledger glass ledger-scroll">
         <table className="forecast-table">
           <caption className="sub">{plan.tab}</caption>
