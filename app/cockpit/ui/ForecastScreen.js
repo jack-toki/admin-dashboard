@@ -5,6 +5,11 @@ import { cursorPoint } from './CursorTooltip';
 import { formatPounds } from '../../../lib/money';
 import { pipelineInputEdit, pipelineChart, focusPlan, standingDelta, currentMonthKey, PIPELINE_STAGES } from '../../../lib/forecast/pipelinePlan';
 
+function axisText(label) {
+  const named = String(label).match(/^([A-Za-z]{3}) (\d{4})$/);
+  return named ? `${named[1]} ${named[2].slice(2)}` : label;
+}
+
 function money(minor) {
   if (minor == null || !Number.isFinite(Number(minor))) return '—';
   return formatPounds(Math.round(Number(minor)));
@@ -64,7 +69,7 @@ function PlanChart({ chart, pipelineOn, onToggle, hover, onHover, monthKeys }) {
             <span>{compactPounds(max / 2)}</span>
             <span>£0</span>
           </div>
-          <div className="fs-cols" role="img" aria-label="Retainers and projects, with the target as a dashed line">
+          <div className="fs-cols" style={{ '--fs-months': months.length }} role="img" aria-label="Retainers and projects, with the target as a dashed line">
             <svg className="fs-target" viewBox={`0 0 ${Math.max(months.length, 1)} 100`} preserveAspectRatio="none" aria-hidden="true">
               <polyline points={points} fill="none" stroke="currentColor" strokeDasharray="4 3" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
             </svg>
@@ -95,7 +100,7 @@ function PlanChart({ chart, pipelineOn, onToggle, hover, onHover, monthKeys }) {
                     return state;
                   }, { nodes: [], bottom: 0 }).nodes}
                 </div>
-                <span className="fs-x">{column.label}</span>
+                <span className="fs-x">{axisText(column.label)}</span>
               </div>
             ))}
           </div>

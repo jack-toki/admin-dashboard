@@ -175,6 +175,9 @@ test('December on Pipeline Forecast V2 is the retainer and project lines, and th
     ['Oscar Bedford', 'Networking', 'ClickUp Build', 2500, ...beforeDec, 1250, 1250],
   ];
   const plan = parsePipelinePlan(values, values.map(() => []));
+  const asText = parsePipelinePlan([[], ['', '', '', '', '46260', '46382']], [[], []]);
+  assert.deepEqual(asText.months, ['Aug 2026', 'Dec 2026']);
+  assert.deepEqual(asText.monthKeys, ['2026-08', '2026-12']);
   const december = pipelineChart(plan).months.find((month) => month.id === 'Dec 2026');
   assert.equal(december.projects, 300000);
   assert.equal(december.retainers, 1086350);
