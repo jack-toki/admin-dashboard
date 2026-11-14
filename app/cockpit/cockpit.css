@@ -954,6 +954,9 @@ button.quick-card { padding: 18px 18px 16px; }
 .forecast-stack .chart-key i[data-seg="potential-50"], .fs-seg[data-seg="potential-50"] { background: var(--chart-ciel); }
 .forecast-stack .chart-key i[data-seg="potential-25"], .fs-seg[data-seg="potential-25"] { background: var(--chart-ciel-45); }
 .forecast-stack .chart-key i[data-seg="potential-10"], .fs-seg[data-seg="potential-10"] { background: var(--chart-beige); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--chart-charcoal) 35%, transparent); }
+.forecast-filters { display: flex; flex-wrap: wrap; gap: 12px; }
+.forecast-filters label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: .85rem; }
+.forecast-filters select { border: 0; background: var(--control); color: var(--ink); border-radius: 10px; min-height: 40px; padding: 0 10px; font: inherit; }
 .forecast-board { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; align-items: start; }
 .forecast-readout { display: flex; flex-direction: column; gap: 8px; padding: 16px; }
 .forecast-readout h3 { margin: 0; }

@@ -3,7 +3,7 @@
 import { useEffect, useId, useState } from 'react';
 import { cursorPoint } from './CursorTooltip';
 import { formatPounds } from '../../../lib/money';
-import { pipelineInputEdit, pipelineChart, standingDelta, PIPELINE_STAGES } from '../../../lib/forecast/pipelinePlan';
+import { pipelineInputEdit, pipelineChart, focusPlan, standingDelta, PIPELINE_STAGES } from '../../../lib/forecast/pipelinePlan';
 
 function money(minor) {
   if (minor == null || !Number.isFinite(Number(minor))) return '—';
@@ -177,6 +177,8 @@ export function ForecastScreen() {
   const [drafts, setDrafts] = useState({});
   const [pipelineOn, setPipelineOn] = useState(true);
   const [hover, setHover] = useState(null);
+  const [past, setPast] = useState('12');
+  const [future, setFuture] = useState('12');
 
   useEffect(() => {
     let cancel = false;
@@ -228,18 +230,39 @@ export function ForecastScreen() {
 
   if (error) return <section className="panel glass"><h2>Forecast</h2><p className="sub">{error}</p></section>;
   if (!plan) return <section className="panel glass"><h2>Forecast</h2><p className="sub">Reading the private planning tab.</p></section>;
-  const chart = pipelineChart(plan);
+  const focused = focusPlan(plan, { past, future });
+  const chart = pipelineChart(focused);
   return (
     <section className="forecast-plan" aria-label="Forecast">
       <header className="toki-section-head">
         <h2>Forecast</h2>
-        <p>{plan.tab}. Retainers and projects stack under the dashed target. Turn pipeline on to add the open stages.</p>
+        <p>{plan.tab}. Retainers and projects are the lines in those sections. Hosting is not in the stack. The dashed line is that month’s target.</p>
       </header>
+      <div className="forecast-filters">
+        <label>Past
+          <select aria-label="Past" value={past} onChange={(event) => setPast(event.target.value)}>
+            <option value="none">None</option>
+            <option value="3">Last 3 months</option>
+            <option value="6">Last 6 months</option>
+            <option value="12">Last 12 months</option>
+            <option value="year">Last year</option>
+          </select>
+        </label>
+        <label>Future
+          <select aria-label="Future" value={future} onChange={(event) => setFuture(event.target.value)}>
+            <option value="none">None</option>
+            <option value="3">Next 3 months</option>
+            <option value="6">Next 6 months</option>
+            <option value="12">Next 12 months</option>
+          </select>
+        </label>
+      </div>
+      <p className="sub">Totals for the months on the chart.</p>
       <div className="ov-tiles forecast-tiles">
         {chart.tiles.map((tile) => <div key={tile.label} className="ov-tile" role="group"><span>{tile.label}</span><b className="num">{money(tile.minor)}</b></div>)}
       </div>
       <div className="panel glass">
-        <PlanChart chart={chart} pipelineOn={pipelineOn} onToggle={() => setPipelineOn((on) => !on)} hover={hover} onHover={setHover} />
+        {chart.months.length ? <PlanChart chart={chart} pipelineOn={pipelineOn} onToggle={() => setPipelineOn((on) => !on)} hover={hover} onHover={setHover} /> : <p className="sub">None of the months fall in this range.</p>}
       </div>
       <DealEditor plan={plan} onSave={saveDeal} note={note} />
       <div className="ledger glass ledger-scroll">
