@@ -381,6 +381,30 @@ export default function App({ role, areas, client, fixture = false }) {
                 </a>
               </Fragment>
             ))}
+            {areas.includes('toki') && (
+              <a
+                href="#revenue"
+                className={`phone-nav${area === 'toki' && tokiView === 'sources' ? ' on' : ''}`}
+                aria-label="Revenue Split"
+                aria-current={area === 'toki' && tokiView === 'sources' ? 'page' : undefined}
+                onClick={(event) => { event.preventDefault(); setArea('toki'); setTokiView('sources'); }}
+              >
+                <span className="ic" aria-hidden="true"><span className="nav-mark jrl-mark">£</span></span>
+                <span className="lbl">Revenue</span>
+              </a>
+            )}
+            {areas.includes('toki') && (
+              <a
+                href="#forecast"
+                className={`phone-nav${area === 'forecast' ? ' on' : ''}`}
+                aria-label="Forecast"
+                aria-current={area === 'forecast' ? 'page' : undefined}
+                onClick={(event) => { event.preventDefault(); setArea('forecast'); }}
+              >
+                <span className="ic" aria-hidden="true"><span className="nav-mark jrl-mark">F</span></span>
+                <span className="lbl">Forecast</span>
+              </a>
+            )}
           </nav>
           <div className="rail-group rail-foot">
             <button type="button" aria-label={collapsed ? 'Expand menu' : 'Collapse menu'} title={`Press [ to collapse the menu (${NAV_STORAGE_KEY}).`} onClick={onToggleNav}><HelpIcon /></button>
