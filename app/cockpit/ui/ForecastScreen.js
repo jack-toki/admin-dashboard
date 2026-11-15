@@ -70,7 +70,8 @@ function PlanChart({ chart, pipelineOn, onToggle, hover, onHover, monthKeys }) {
             <span>{compactPounds(max / 2)}</span>
             <span>£0</span>
           </div>
-          <div className="fs-cols" role="img" aria-label="Retainers and projects, with the target as a dashed line">
+          <div className="fs-scroll">
+          <div className="fs-cols" style={{ '--fs-months': months.length }} role="img" aria-label="Retainers and projects, with the target as a dashed line">
             <svg className="fs-target" viewBox={`0 0 ${Math.max(months.length, 1)} 100`} preserveAspectRatio="none" aria-hidden="true">
               <polyline points={points} fill="none" stroke="currentColor" strokeDasharray="4 3" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
             </svg>
@@ -104,6 +105,7 @@ function PlanChart({ chart, pipelineOn, onToggle, hover, onHover, monthKeys }) {
                 <span className="fs-x"><span className="fs-x-full">{axisText(column.label).full}</span><span className="fs-x-short">{axisText(column.label).short}</span></span>
               </div>
             ))}
+          </div>
           </div>
         </div>
         <p className="caveat">Retainers and projects are the stack. The dashed line is the target, compared with those actual figures only. Pipeline sits above them when it is on.</p>

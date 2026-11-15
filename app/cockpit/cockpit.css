@@ -947,7 +947,8 @@ button.quick-card { padding: 18px 18px 16px; }
 .forecast-stack .chart-key i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; }
 .fs-plot { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; min-height: 220px; }
 .fs-y { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; color: var(--chart-label, var(--ink)); font-size: 12px; line-height: 1; padding-bottom: 22px; }
-.fs-cols { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; align-items: end; min-width: 0; max-width: 100%; overflow: hidden; }
+.fs-scroll { min-width: 0; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; }
+.fs-cols { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; align-items: end; width: max(100%, calc(var(--fs-months, 1) * 56px)); }
 .fs-x-short { display: none; }
 .fs-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; height: 100%; }
 .fs-track { position: relative; height: 180px; display: flex; flex-direction: column-reverse; align-items: center; gap: 3px; }
@@ -1030,18 +1031,15 @@ button.quick-card { padding: 18px 18px 16px; }
   .jrl-root .fx-shell { padding-bottom: calc(108px + env(safe-area-inset-bottom, 0px)); }
   .forecast-table input { min-height: 44px; width: 92px; font-size: 16px; }
   .forecast-table th, .forecast-table td { padding: 10px 8px; }
-  .jrl-root .fx-canvas { overflow-x: hidden; }
-  .forecast-plan, .forecast-board, .forecast-stack, .chart-card, .fs-plot, .fs-cols { width: 100%; max-width: 100%; min-width: 0; }
-  .fs-plot { overflow: hidden; grid-template-columns: 48px minmax(0, 1fr); }
-  .fs-cols { gap: 0; }
-  .fs-y { overflow: hidden; }
-  .fs-x-full { display: none; }
-  .fs-x-short { display: inline; }
+  .jrl-root .fx-shell, .jrl-root .fx-canvas { overflow-x: hidden; }
+  .forecast-plan, .forecast-board, .forecast-stack, .chart-card, .fs-plot, .fs-scroll { width: 100%; max-width: 100%; min-width: 0; }
+  .forecast-stack .caveat { max-width: 100%; overflow-wrap: anywhere; }
+  .fs-plot { overflow: hidden; }
+  .fs-scroll { -webkit-overflow-scrolling: touch; }
   .forecast-plan { padding-bottom: 12px; }
   .forecast-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .forecast-plan .toki-section-head p { display: none; }
-  .fs-x { height: 30px; font-size: 11px; line-height: 14px; overflow: visible; white-space: nowrap; }
-  .fs-col:nth-child(even) .fs-x { padding-top: 14px; }
+  .fs-x { font-size: 12px; }
   .ov-tile b, .forecast-tiles .ov-tile b { font-size: 1.35rem; }
 }
 .chart-axis { fill: var(--chart-label, var(--ink)); }
