@@ -108,7 +108,6 @@ function PlanChart({ chart, pipelineOn, onToggle, hover, onHover, monthKeys }) {
           </div>
           </div>
         </div>
-        <p className="caveat">Retainers and projects are the stack. The dashed line is the target, compared with those actual figures only. Pipeline sits above them when it is on.</p>
       </figure>
       <aside className="forecast-readout panel glass" aria-live="polite">
         {month ? (
@@ -279,7 +278,7 @@ export function ForecastScreen() {
       <div className="ov-tiles forecast-tiles">
         {chart.tiles.map((tile) => <div key={tile.label} className="ov-tile" role="group"><span>{tile.label}</span><b className="num">{money(tile.minor)}</b></div>)}
       </div>
-      <div className="panel glass">
+      <div className="panel glass forecast-chart-card">
         {chart.months.length ? <PlanChart chart={chart} monthKeys={focused.monthKeys} pipelineOn={pipelineOn} onToggle={() => setPipelineOn((on) => !on)} hover={hover} onHover={setHover} /> : <p className="sub">None of the months fall in this range.</p>}
       </div>
       <DealEditor plan={plan} onSave={saveDeal} note={note} />

@@ -61,7 +61,7 @@
 .theme-switch input:checked { background: var(--glass-strong); }
 .theme-switch input:checked::after { transform: translateX(18px); }
 .theme-switch input:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
-.chart-card { margin-top: 12px; }
+.chart-card { margin: 12px 0 0; }
 .chart-plot { position: relative; }
 .chart-svg { width: 100%; height: auto; display: block; }
 .chart-hit { cursor: pointer; }
@@ -947,7 +947,7 @@ button.quick-card { padding: 18px 18px 16px; }
 .forecast-stack .chart-key i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; }
 .fs-plot { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; min-height: 220px; }
 .fs-y { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; color: var(--chart-label, var(--ink)); font-size: 12px; line-height: 1; padding-bottom: 22px; }
-.fs-scroll { min-width: 0; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; }
+.fs-scroll { display: block; min-width: 0; max-width: 100%; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; }
 .fs-cols { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; align-items: end; width: max(100%, calc(var(--fs-months, 1) * 56px)); }
 .fs-x-short { display: none; }
 .fs-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; height: 100%; }
@@ -971,7 +971,8 @@ button.quick-card { padding: 18px 18px 16px; }
 .forecast-readout p.on b { color: var(--orange); }
 .forecast-standing { display: block !important; margin-top: 8px !important; }
 .fs-cols { position: relative; }
-.fs-target { position: absolute; left: 0; right: 0; top: 0; height: 180px; width: 100%; pointer-events: none; color: var(--ink); overflow: visible; }
+.fs-target { position: absolute; left: 0; right: 0; top: 0; height: 180px; width: 100%; pointer-events: none; color: var(--ink); overflow: hidden; }
+.forecast-chart-card { min-width: 0; max-width: 100%; overflow: hidden; }
 .pipeline-editor { display: flex; flex-direction: column; gap: 12px; }
 .pipeline-add, .pipeline-deal { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto; gap: 8px; align-items: end; }
 .pipeline-add label, .pipeline-deal label { display: flex; flex-direction: column; gap: 4px; font-size: .85rem; color: var(--muted); }
@@ -1032,10 +1033,15 @@ button.quick-card { padding: 18px 18px 16px; }
   .forecast-table input { min-height: 44px; width: 92px; font-size: 16px; }
   .forecast-table th, .forecast-table td { padding: 10px 8px; }
   .jrl-root .fx-shell, .jrl-root .fx-canvas { overflow-x: hidden; }
-  .forecast-plan, .forecast-board, .forecast-stack, .chart-card, .fs-plot, .fs-scroll { width: 100%; max-width: 100%; min-width: 0; }
-  .forecast-stack .caveat { max-width: 100%; overflow-wrap: anywhere; }
-  .fs-plot { overflow: hidden; }
-  .fs-scroll { -webkit-overflow-scrolling: touch; }
+  .forecast-plan { max-width: 100%; min-width: 0; }
+  .forecast-chart-card .forecast-board,
+  .forecast-chart-card .forecast-stack,
+  .forecast-chart-card .fs-plot,
+  .forecast-chart-card .cl {
+    width: 100%; max-width: 100%; min-width: 0; align-self: stretch; box-sizing: border-box;
+  }
+  .forecast-chart-card .fs-plot { display: grid; grid-template-columns: 52px minmax(0, 1fr); overflow: hidden; }
+  .forecast-chart-card .fs-scroll { width: auto; min-width: 0; max-width: none; justify-self: stretch; -webkit-overflow-scrolling: touch; }
   .forecast-plan { padding-bottom: 12px; }
   .forecast-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .forecast-plan .toki-section-head p { display: none; }
