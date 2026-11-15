@@ -16,6 +16,14 @@ function money(minor) {
   return formatPounds(Math.round(Number(minor)));
 }
 
+function chartTop(minor) {
+  const pounds = Math.max(0, Number(minor) || 0) / 100;
+  if (pounds <= 0) return 100;
+  const padded = pounds * 1.25;
+  const step = padded >= 20000 ? 5000 : padded >= 5000 ? 1000 : padded >= 1000 ? 250 : 50;
+  return Math.ceil(padded / step) * step * 100;
+}
+
 function compactPounds(minor) {
   const pounds = Math.abs(minor) / 100;
   const compact = pounds >= 1000 ? `${Math.round((pounds / 1000) * 10) / 10}k` : String(Math.round(pounds));
@@ -46,10 +54,11 @@ function PlanChart({ chart, pipelineOn, onToggle, hover, onHover, monthKeys }) {
   const tipId = useId();
   const months = chart?.months || [];
   const visibleSegments = (column) => column.segments.filter((segment) => segment.minor > 0 && (pipelineOn || segment.family === 'actual'));
-  const max = Math.max(1, ...months.map((column) => {
+  const peak = Math.max(1, ...months.map((column) => {
     const stacked = visibleSegments(column).reduce((sum, segment) => sum + segment.minor, 0);
     return Math.max(stacked, column.target || 0);
   }));
+  const max = chartTop(peak);
   const month = shownMonth(months, monthKeys, hover);
   const points = months.map((column, index) => {
     const y = column.target == null ? null : 100 - (column.target / max) * 100;
