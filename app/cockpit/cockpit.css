@@ -948,11 +948,11 @@ button.quick-card { padding: 18px 18px 16px; }
 .fs-plot { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; min-height: 220px; }
 .fs-y { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; color: var(--chart-label, var(--ink)); font-size: 12px; line-height: 1; padding-bottom: 22px; }
 .fs-scroll { display: block; min-width: 0; max-width: 100%; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; }
-.fs-cols { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; align-items: end; width: max(100%, calc(var(--fs-months, 1) * 56px)); }
+.fs-cols { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; align-items: end; width: max(100%, calc(var(--fs-months, 1) * 46px)); }
 .fs-x-short { display: none; }
 .fs-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; height: 100%; }
 .fs-track { position: relative; height: 180px; display: flex; flex-direction: column-reverse; align-items: center; gap: 3px; }
-.fs-seg { position: relative; left: auto; right: auto; width: 72%; min-height: 2px; border: 0; padding: 0; border-radius: 10px; cursor: pointer; flex: none; }
+.fs-seg { position: relative; left: auto; right: auto; width: 92%; min-height: 2px; border: 0; padding: 0; border-radius: 10px; cursor: pointer; flex: none; }
 .fs-seg.fs-base { border-radius: 10px 10px 0 0; }
 .fs-x { height: 16px; font-size: 12px; line-height: 16px; text-align: center; color: var(--chart-label, var(--ink)); white-space: nowrap; }
 .forecast-stack .chart-key i[data-seg="actual-retainer"], .fs-seg[data-seg="actual-retainer"] { background: var(--chart-orange); }
