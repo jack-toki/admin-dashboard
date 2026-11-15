@@ -967,9 +967,22 @@ button.quick-card { padding: 18px 18px 16px; }
 .forecast-board { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; align-items: start; }
 .forecast-readout { display: flex; flex-direction: column; gap: 8px; padding: 16px; }
 .forecast-readout h3 { margin: 0; }
-.forecast-readout p { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 0; white-space: nowrap; }
-.forecast-readout p span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.forecast-readout p b { flex: none; }
+.forecast-readout p,
+.forecast-readout button.readout-line { position: relative; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; width: 100%; margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; white-space: nowrap; cursor: default; }
+.forecast-readout button.readout-line { cursor: pointer; }
+.forecast-readout button.readout-line[aria-pressed="false"] .swatch { opacity: .35; }
+.forecast-readout p span,
+.forecast-readout button.readout-line span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.forecast-readout p b,
+.forecast-readout button.readout-line b { flex: none; }
+.forecast-readout .swatch { position: absolute; left: -14px; top: 0.28em; width: 8px; height: 8px; border-radius: 2px; }
+.forecast-readout .swatch-dash { top: 0.55em; height: 0; border-radius: 0; background: none; border-top: 2px dashed #1A1A1A; box-shadow: 0 -2px 0 #fff, 0 1px 0 #fff; }
+.forecast-readout i[data-seg="actual-retainer"] { background: var(--chart-orange); }
+.forecast-readout i[data-seg="actual-project"] { background: #1A1A1A; }
+.forecast-readout i[data-seg="potential-75"] { background: var(--chart-electric); }
+.forecast-readout i[data-seg="potential-50"] { background: var(--chart-ciel); }
+.forecast-readout i[data-seg="potential-25"] { background: var(--chart-ciel-45); }
+.forecast-readout i[data-seg="potential-10"] { background: var(--chart-beige); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--chart-charcoal) 35%, transparent); }
 .forecast-readout p.on b { color: var(--orange); }
 .forecast-standing { display: block !important; margin-top: 8px !important; }
 .fs-cols { position: relative; }

@@ -68,11 +68,6 @@ function PlanChart({ chart, pipelineOn, onToggle, hover, onHover, monthKeys }) {
   return (
     <div className="forecast-board">
       <figure className="chart-card forecast-stack" data-chart="forecast-plan">
-        <div className="cl" role="group" aria-label="Forecast layers">
-          <span className="chart-key"><i data-seg="actual-retainer" />Retainers</span>
-          <span className="chart-key"><i data-seg="actual-project" />Projects</span>
-          <button type="button" className="chart-key" aria-pressed={pipelineOn} onClick={onToggle}><i data-seg="potential-75" />Pipeline</button>
-        </div>
         <div className="fs-plot">
           <div className="fs-y" aria-hidden="true">
             <span>{compactPounds(max)}</span>
@@ -120,12 +115,12 @@ function PlanChart({ chart, pipelineOn, onToggle, hover, onHover, monthKeys }) {
         {month ? (
           <>
             <h3>{month.label}</h3>
-            <p><span>Projects</span><b>{money(month.projects)}</b></p>
-            <p><span>Retainers</span><b>{money(month.retainers)}</b></p>
-            <p><span>Target</span><b>{money(month.target)}</b></p>
-            <p><span>Pipeline</span><b>{worthCount(month.pipeline, month.pipelineCount)}</b></p>
+            <p><i className="swatch" data-seg="actual-project" aria-hidden="true" /><span>Projects</span><b>{money(month.projects)}</b></p>
+            <p><i className="swatch" data-seg="actual-retainer" aria-hidden="true" /><span>Retainers</span><b>{money(month.retainers)}</b></p>
+            <p><i className="swatch swatch-dash" aria-hidden="true" /><span>Target</span><b>{money(month.target)}</b></p>
+            <button type="button" className="readout-line" aria-pressed={pipelineOn} onClick={onToggle}><i className="swatch" data-seg="potential-75" aria-hidden="true" /><span>Pipeline</span><b>{worthCount(month.pipeline, month.pipelineCount)}</b></button>
             {month.stages.map((stage) => (
-              <p key={stage.id} className={hover?.stageId === stage.id ? 'on' : undefined}><span>{stage.label}</span><b>{worthCount(stage.minor, stage.count)}</b></p>
+              <p key={stage.id} className={hover?.stageId === stage.id ? 'on' : undefined}><i className="swatch" data-seg={stage.id} aria-hidden="true" /><span>{stage.label}</span><b>{worthCount(stage.minor, stage.count)}</b></p>
             ))}
             <p className="forecast-standing"><b>{standingText(month)}</b></p>
           </>
