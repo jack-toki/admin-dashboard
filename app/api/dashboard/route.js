@@ -1,32 +1,14 @@
 import { db } from '../../../lib/supabase';
 import { buildDashboard } from '../../../lib/aggregate';
 import { readRateRows } from '../../../lib/cockpit/rates';
+import { rangeWindow } from '../../../lib/automations/range';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-function windowFor(period) {
-  const now = new Date();
-  const y = now.getUTCFullYear(), m = now.getUTCMonth(), d = now.getUTCDate();
-  if (period === 'today') {
-    return { from: new Date(Date.UTC(y, m, d)), to: now };
-  }
-  if (period === 'this-week') {
-    const day = now.getUTCDay();
-    const daysToMon = (day === 0) ? 6 : day - 1;
-    const mon = new Date(Date.UTC(y, m, d - daysToMon));
-    return { from: mon, to: now };
-  }
-  if (period === 'last-month') {
-    return { from: new Date(Date.UTC(y, m - 1, 1)), to: new Date(Date.UTC(y, m, 1)) };
-  }
-  if (period === '90-days') {
-    return { from: new Date(now.getTime() - 90 * 864e5), to: now };
-  }
-  if (period === 'all-time') {
-    return { from: new Date(Date.UTC(2000, 0, 1)), to: now };
-  }
-  return { from: new Date(Date.UTC(y, m, 1)), to: now };
+function windowFor(period, now = new Date()) {
+  const window = rangeWindow(period, now);
+  return { from: window.from, to: window.to };
 }
 
 let sheetCache = { text: '', at: 0 };

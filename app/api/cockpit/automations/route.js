@@ -20,13 +20,14 @@ export async function GET(req) {
   let client;
   try { client = db(); } catch { return Response.json({ ok: false, error: 'run_log_not_configured', summary: null }, { status: 503, headers }); }
   const rates = await readRateRows();
+  const range = new URL(req.url).searchParams.get('range') || 'this-month';
   const loaded = await loadRunSummary(({ from, to, offset, pageSize }) => client
     .from('runs')
     .select('account,zap_id,zap_title,ts,counts')
     .gte('ts', from)
     .lt('ts', to)
     .order('ts', { ascending: true })
-    .range(offset, offset + pageSize - 1), new Date(), rates);
+    .range(offset, offset + pageSize - 1), new Date(), rates, range);
   if (!loaded.ok) return Response.json({ ok: false, error: loaded.error, summary: null }, { status: 502, headers });
   return Response.json({ ok: true, period: loaded.period, summary: loaded.summary }, { headers });
 }

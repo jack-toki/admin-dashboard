@@ -180,7 +180,7 @@
   .jrl-root .prow:first-child{border-top:none}
   .jrl-root .prow .yr{color:var(--muted); font-size:.88rem; font-variant-numeric:tabular-nums}
   .jrl-root .prow .bar{height:8px; border-radius:5px; background:var(--track); overflow:hidden}
-  .jrl-root .prow .bar i{display:block; height:100%; border-radius:5px; background:linear-gradient(90deg,var(--orange),var(--orange-2))}
+  .jrl-root .prow .bar i{display:block; height:100%; border-radius:5px; background:var(--series-retainer)}
   .jrl-root .prow .amt{font-weight:600; letter-spacing:-.03em; font-size:1.02rem; font-variant-numeric:tabular-nums}
 
   .jrl-root .ledger{border-radius:20px; overflow:hidden}

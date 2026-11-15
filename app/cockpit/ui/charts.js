@@ -87,9 +87,9 @@ export function InteractiveSeriesChart({
             const line = coords.map((spot) => `${spot.x},${spot.y}`).join(' ');
             return (
               <g key={item.id}>
-                {coords.length > 1 && <polyline data-kind={item.kind || 'history'} fill="none" stroke={item.color || 'currentColor'} strokeWidth="1.6" points={line} opacity={item.kind === 'forecast' ? 0.55 : (item.opacity ?? 1)} />}
+                {coords.length > 1 && <polyline data-kind={item.kind || 'history'} fill="none" stroke={item.color || 'var(--chart-orange)'} strokeWidth="1.6" points={line} opacity={item.opacity ?? 1} />}
                 {coords.map((spot) => (
-                  <circle key={spot.point.id} data-kind={item.kind || 'history'} cx={spot.x} cy={spot.y} r="2.4" fill={item.color || 'currentColor'} opacity={item.kind === 'forecast' ? 0.7 : 1} />
+                  <circle key={spot.point.id} data-kind={item.kind || 'history'} cx={spot.x} cy={spot.y} r="2.4" fill={item.color || 'var(--chart-orange)'} />
                 ))}
               </g>
             );
@@ -216,7 +216,7 @@ export function CompactColumns({ name, points, series, selectedId, onSelect, for
                 const barW = Math.min(8, Math.max(3, (slot - 8) / visible.length));
                 const h = value.value === 0 ? 2 : Math.max(2, (Math.abs(value.value) / max) * (innerH - 2));
                 const bx = x + (slot - visible.length * barW) / 2 + seriesIndex * barW;
-                return <rect key={item.id} data-bar={item.id} data-state={value.value === 0 ? 'zero' : 'value'} x={bx} y={top + innerH - h} width={barW - 1} height={h} rx="2" fill={selected && item.id === 'plan' ? 'var(--orange)' : item.color} opacity={selected || item.id !== 'plan' ? 0.95 : 0.45} />;
+                return <rect key={item.id} data-bar={item.id} data-state={value.value === 0 ? 'zero' : 'value'} x={bx} y={top + innerH - h} width={barW - 1} height={h} rx="2" fill={item.color || 'var(--chart-orange)'} opacity={selected || item.id !== 'plan' ? 1 : 0.45} />;
               })}
               <text x={x + slot / 2} y={height - 4} textAnchor="middle">{point.label}</text>
               <rect
@@ -295,10 +295,29 @@ function linePhrase(line, format) {
   return `${kind} · ${line.name} · ${moneyText(line.minor, format)}`;
 }
 
+function yearTip(month, format, average) {
+  const retainer = month.segments?.find((item) => item.id === 'retainer');
+  const project = month.segments?.find((item) => item.id === 'project');
+  const lines = (month.lines || []).map((line) => {
+    const type = line.type === 'retainer' ? 'Retainer' : line.type === 'project' ? 'Project' : 'Type not stored';
+    return `${line.name} · ${moneyText(line.minor, format)} · ${type}`;
+  });
+  return [
+    month.label,
+    `Retainer (forecast) ${moneyText(retainer?.value, format)}`,
+    `Project (forecast) ${moneyText(project?.value, format)}`,
+    `Actual received ${moneyText(month.actual, format)}`,
+    `Average ${average == null ? '—' : moneyText(average, format)}`,
+    ...lines,
+  ].join('\n');
+}
+
 export function YearColumns({ name, months, selectedId, onOpen, format, tabs = null, subtitle = '' }) {
   const [hidden, setHidden] = useState({});
   const [showAverage, setShowAverage] = useState(true);
   const [focusId, setFocusId] = useState('');
+  const [tip, setTip] = useState(null);
+  const tipId = useId();
   const legend = [
     { id: 'retainer', label: 'Retainer (forecast)', swatch: 'retainer' },
     { id: 'project', label: 'Project (forecast)', swatch: 'project' },
@@ -338,15 +357,7 @@ export function YearColumns({ name, months, selectedId, onOpen, format, tabs = n
             Average
           </button>
         </span>
-        {focusId && active ? (
-          <div className="col-tip" role="tooltip">
-            <b>{active.label}</b>
-            <span>Retainer (forecast) {moneyText(active.segments?.find((item) => item.id === 'retainer')?.value, format)}</span>
-            <span>Project (forecast) {moneyText(active.segments?.find((item) => item.id === 'project')?.value, format)}</span>
-            <span>Actual received {moneyText(active.actual, format)}</span>
-            <span>Average {average == null ? '—' : moneyText(average, format)}</span>
-          </div>
-        ) : null}
+        {tip ? <CursorTooltip id={tipId} text={tip.text} cursor={tip} className="chart-tip" /> : null}
       <div className="col-chart">
         <div className="col-axis" aria-hidden="true">
           <span>{axisText(max)}</span>
@@ -368,10 +379,11 @@ export function YearColumns({ name, months, selectedId, onOpen, format, tabs = n
               title=""
               onClick={() => onOpen?.(month.id)}
               onFocus={() => setFocusId(month.id)}
-              onBlur={() => setFocusId('')}
-              onMouseEnter={() => setFocusId(month.id)}
-              onMouseLeave={(event) => { if (event.currentTarget !== document.activeElement) setFocusId(''); }}
-              onPointerDown={() => setFocusId(month.id)}
+              onBlur={() => { setFocusId(''); setTip(null); }}
+              onMouseEnter={(event) => { setFocusId(month.id); setTip({ id: month.id, ...cursorPoint(event), text: yearTip(month, format, average) }); }}
+              onMouseMove={(event) => setTip({ id: month.id, ...cursorPoint(event), text: yearTip(month, format, average) })}
+              onMouseLeave={(event) => { if (event.currentTarget !== document.activeElement) { setFocusId(''); setTip(null); } }}
+              onPointerDown={(event) => { setFocusId(month.id); setTip({ id: month.id, ...cursorPoint(event), text: yearTip(month, format, average) }); }}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();

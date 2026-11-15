@@ -1,5 +1,5 @@
 import { canAccess, readSession } from '../../../../lib/auth.js';
-import { readPipelinePlan, writePipelineCell } from '../../../../lib/forecast/pipelineRead.js';
+import { readPipelinePlan, writePipelineCell, savePipelineDeal } from '../../../../lib/forecast/pipelineRead.js';
 import { openAppStore } from '../../../../lib/store/index.js';
 
 export const runtime = 'nodejs';
@@ -36,6 +36,16 @@ export async function POST(req) {
   const read = await readPipelinePlan();
   if (!read.ok) return Response.json({ ok: false, error: read.reason || 'sheet_unreadable' }, { status: read.configured ? 502 : 503 });
   const opened = openAppStore();
+  if (body.action === 'save-deal') {
+    const store = opened.ok ? opened.store : null;
+    const saved = await savePipelineDeal({
+      plan: read.plan,
+      input: body,
+      log: store && typeof store.appendSheetLog === 'function' ? (row) => store.appendSheetLog(row) : null,
+    });
+    const status = saved.status === 'written' ? 200 : saved.status === 'skip' ? 400 : saved.status === 'not_configured' ? 503 : 502;
+    return Response.json({ ok: saved.status === 'written', ...saved, tab: read.plan.tab }, { status });
+  }
   const store = opened.ok ? opened.store : null;
   const result = await writePipelineCell({
     plan: read.plan,

@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { parsePipelinePlan, pipelineView, preparePipelineWrite, pipelineInputEdit } = require('../lib/forecast/pipelinePlan');
+const { parsePipelinePlan, pipelineView, pipelineStack, pipelineChart, focusPlan, standingDelta, dealSheetWrites, preparePipelineWrite, pipelineInputEdit } = require('../lib/forecast/pipelinePlan');
 
 const values = [
   [],
@@ -26,7 +26,8 @@ const formulas = [
 test('the pipeline plan keeps the Sheet labels and leaves formulas read-only', () => {
   const plan = parsePipelinePlan(values, formulas);
   assert.equal(plan.tab, 'Pipeline Forecast V2');
-  assert.deepEqual(plan.months, ['Aug-26', 'Sep-26']);
+  assert.deepEqual(plan.months, ['Aug 2026', 'Sep 2026']);
+  assert.deepEqual(plan.monthKeys, ['2026-08', '2026-09']);
   assert.deepEqual(plan.rows.map((row) => row.label), ['Target', 'Active', '75% High Side - Waiting for approval', 'TOTAL', 'Like Zero']);
   const target = plan.rows[0].cells[0];
   assert.equal(target.input, true);
@@ -66,6 +67,129 @@ test('the pipeline plan keeps the Sheet labels and leaves formulas read-only', (
   assert.equal(total.cells[1].input, false);
   assert.equal(view.series[1].values[1].value, 4000);
   assert.equal(view.series[1].values[0].value, 0);
+});
+
+test('the forecast stack uses section headers for actual and potential', () => {
+  const values = [
+    [],
+    ['', 'Source', 'What We Are Doing', 'TOTAL', 'Dec-26', 'Jan 26'],
+    ['Retainers', '', '', '', '', ''],
+    ['Acme', 'Acme', 'Support', 1000, 600, 400],
+    ['Projects', '', '', '', '', ''],
+    ['Harbour', 'Harbour', 'Film', 500, 500, ''],
+    ['75% High Side - Waiting for approval', '', '', 2000, '', ''],
+    ['Like Zero', 'ClickUp', 'Build', 2000, 2000, ''],
+    ['10% Low Side - Enquiry', '', '', 100, '', ''],
+    ['Enquiry Co', '', '', 100, '', 100],
+  ];
+  const plan = parsePipelinePlan(values, values.map(() => []));
+  const stack = pipelineStack(plan);
+  assert.match(stack.tierField, /section header/);
+  assert.deepEqual(stack.months.map((month) => month.label), ['Dec 2026', 'Jan 2026']);
+  const december = stack.months[0];
+  assert.deepEqual(december.segments.map((segment) => segment.id), [
+    'actual-retainer', 'actual-project', 'potential-75', 'potential-50', 'potential-25', 'potential-10',
+  ]);
+  assert.equal(december.segments[0].clients[0].name, 'Acme');
+  assert.equal(december.segments[0].clients[0].type, 'Retainer');
+  assert.equal(december.segments[1].clients[0].type, 'Project');
+  assert.equal(december.segments[2].clients[0].name, 'Like Zero');
+  assert.equal(december.segments[2].clients[0].type, null);
+  assert.equal(december.segments[2].minor, 200000);
+  assert.equal(december.actual, 110000);
+  assert.equal(december.potential, 200000);
+  const january = stack.months[1];
+  assert.equal(january.segments.find((segment) => segment.id === 'potential-10').clients[0].name, 'Enquiry Co');
+  assert.equal(january.segments.find((segment) => segment.id === 'potential-75').minor, 0);
+  assert.equal(stack.segments.find((segment) => segment.id === 'potential-75').legend, 'Potential 75%');
+  assert.equal(stack.segments.find((segment) => segment.id === 'potential-75').legend.includes('Potential · 75% ·'), false);
+  const screen = fs.readFileSync(path.join(__dirname, '../app/cockpit/ui/ForecastScreen.js'), 'utf8');
+  assert.match(screen, /pipelineChart/);
+  assert.match(screen, /fs-seg/);
+  assert.match(screen, /fs-target/);
+  assert.match(screen, /forecast-readout/);
+  assert.match(screen, /aria-pressed=\{pipelineOn\}/);
+  assert.match(screen, /save-deal/);
+  const chart = pipelineChart(plan);
+  assert.equal(chart.months[0].retainers, 60000);
+  assert.equal(chart.months[0].projects, 50000);
+  assert.equal(chart.months[0].pipeline, 200000);
+  assert.equal(chart.months[0].stages.find((stage) => stage.id === 'potential-75').count, 1);
+  assert.equal(chart.tiles.find((tile) => tile.label === 'Actual').minor, 150000);
+});
+
+test('a deal moves to an empty line in the next stage and clears the old line', () => {
+  const values = [
+    [],
+    ['', 'Source', 'Work', 'TOTAL', 'Dec-26'],
+    ['75% High Side', '', '', '', ''],
+    ['Like Zero', 'ClickUp', 'Build', 2000, 2000],
+    ['', '', '', '', ''],
+    ['50% Low Side', '', '', '', ''],
+    ['', '', '', '', ''],
+  ];
+  const plan = parsePipelinePlan(values, values.map(() => []));
+  assert.equal(plan.stages['75'].deals[0].name, 'Like Zero');
+  assert.equal(plan.stages['50'].slots.length, 1);
+  const moved = dealSheetWrites(plan, { row: plan.stages['75'].deals[0].row, name: 'Like Zero', source: 'ClickUp', work: 'Build', stage: '50' });
+  assert.equal(moved.ok, true);
+  assert.equal(moved.writes.find((item) => item.range.endsWith('A7')).value, 'Like Zero');
+  assert.equal(moved.writes.find((item) => item.range.endsWith('A4')).value, '');
+  assert.equal(moved.writes.find((item) => item.range.endsWith('E7')).value, '2000');
+  const full = dealSheetWrites(plan, { row: plan.stages['75'].deals[0].row, name: 'Like Zero', stage: '25' });
+  assert.equal(full.ok, false);
+  assert.equal(full.error, 'stage_full');
+  const added = dealSheetWrites(plan, { name: 'Inbox Club', source: 'Nath', work: 'Proposal', stage: '50' });
+  assert.equal(added.ok, true);
+  assert.equal(added.writes[0].value, 'Inbox Club');
+  assert.equal(standingDelta({ actual: 100, pipeline: 40, target: 120 }), -20);
+});
+
+test('December on Pipeline Forecast V2 is the retainer and project lines, and the filters keep the current month', () => {
+  const beforeDec = ['', '', '', ''];
+  const values = [
+    [],
+    ['', 'Source', 'What We Are Doing', 'TOTAL', 46260, 46291, 46321, 46352, 46382, 46413, 46444],
+    ['Target', '', '', 87000, 6000, 6000, 7000, 7000, 7000, 7000, 7000],
+    ['Projects', '', '', 'TOTAL'],
+    ['Joe AA Surveys', 'Networking', 'Project', 3000, ...beforeDec, 3000],
+    ['Retainers', '', '', 'TOTAL'],
+    ['Louise', '', '', 18000, 2000, 2000, 2000, 2000, 2000, 2000],
+    ['Eki', '', '', 6488, 811, 811, 811, 811, 811, 811],
+    ['Accountability', '', '', 3512, 439, 439, 439, 439, 439, 439],
+    ['Cally', '', '', 2250, 250, 250, 250, 250, 250, 250],
+    ['Oscar', '', '', 4210, 842, 842, 842, 842, 842, 842],
+    ['Dan Ellis', '', '', 2072, 259, 259, 259, 259, 259, 259],
+    ['Quickfire', '', '', 4500, '', '', 500, 500, 500, 500],
+    ['Marcus', '', '', 6300, '', '', 700, 700, 700, 700],
+    ['Serene', '', '', 400, '', 200, 200, 200, 200, 200],
+    ['Kev Wiles', '', '', 5500, '', '', 1100, 1100, 1100, 1100],
+    ['Freedom Yoga', '', '', 8850, '', '', '', 1850, 1400, 1400],
+    ['Temple Brown', '', '', 1450, '', '', 362.5, 362.5, 362.5, 362.5],
+    ['Like Zero', '', '', 16400, '', '', '', 4000, 2000, 2000],
+    ['Hosting', '', '', ''],
+    ['Joe hosting', '', '', 600, '', '', 60, 60, 60, 60],
+    ['50% Low Side - Ran Through Proposal with client', '', '', 3600],
+    ['Inbox Club', 'Nath & Martin', 3600, 3600, ...beforeDec, 3600],
+    ['10% Low Side - Enquiry', '', '', 2500],
+    ['Oscar Bedford', 'Networking', 'ClickUp Build', 2500, ...beforeDec, 1250, 1250],
+  ];
+  const plan = parsePipelinePlan(values, values.map(() => []));
+  const asText = parsePipelinePlan([[], ['', '', '', '', '46260', '46382']], [[], []]);
+  assert.deepEqual(asText.months, ['Aug 2026', 'Dec 2026']);
+  assert.deepEqual(asText.monthKeys, ['2026-08', '2026-12']);
+  const december = pipelineChart(plan).months.find((month) => month.id === 'Dec 2026');
+  assert.equal(december.projects, 300000);
+  assert.equal(december.retainers, 1086350);
+  assert.equal(december.actual, 1386350);
+  assert.equal(december.pipeline, 485000);
+  assert.equal(december.target, 700000);
+  const aroundNow = focusPlan(plan, { past: '3', future: '3', now: '2026-11' });
+  assert.deepEqual(aroundNow.monthKeys, ['2026-08', '2026-09', '2026-10', '2026-11', '2026-12', '2027-01', '2027-02']);
+  assert.deepEqual(focusPlan(plan, { past: 'none', future: '3', now: '2026-11' }).monthKeys, ['2026-11', '2026-12', '2027-01', '2027-02']);
+  assert.deepEqual(focusPlan(plan, { past: '3', future: 'none', now: '2026-11' }).monthKeys, ['2026-08', '2026-09', '2026-10', '2026-11']);
+  assert.deepEqual(focusPlan(plan, { past: 'year', future: 'none', now: '2026-11' }).monthKeys, []);
+  assert.deepEqual(focusPlan(plan, { past: 'none', future: 'none', now: '2026-11' }).monthKeys, ['2026-11']);
 });
 
 test('the overview drops the duplicate Toki tiles and the nav says Revenue Split', () => {

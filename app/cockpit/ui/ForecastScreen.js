@@ -1,98 +1,185 @@
 'use client';
 
-import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
-import { CursorTooltip, cursorPoint } from './CursorTooltip';
-import { svgAxisFont } from '../../../lib/cockpit/placeTooltip';
+import { useEffect, useId, useState } from 'react';
+import { cursorPoint } from './CursorTooltip';
 import { formatPounds } from '../../../lib/money';
-import { pipelineInputEdit, pipelineView } from '../../../lib/forecast/pipelinePlan';
+import { pipelineInputEdit, pipelineChart, focusPlan, standingDelta, currentMonthKey, PIPELINE_STAGES } from '../../../lib/forecast/pipelinePlan';
+
+function axisText(label) {
+  const named = String(label).match(/^([A-Za-z]{3}) (\d{4})$/);
+  if (!named) return { full: label, short: label };
+  return { full: `${named[1]} ${named[2].slice(2)}`, short: named[1] };
+}
 
 function money(minor) {
   if (minor == null || !Number.isFinite(Number(minor))) return '—';
   return formatPounds(Math.round(Number(minor)));
 }
 
-function PlanChart({ points, series }) {
-  const [hidden, setHidden] = useState({});
-  const [tip, setTip] = useState(null);
-  const tipId = useId();
-  const svgRef = useRef(null);
-  const width = 720;
-  const height = 200;
-  const [axisFont, setAxisFont] = useState(12);
-  useLayoutEffect(() => {
-    const svg = svgRef.current;
-    if (!svg) return undefined;
-    const fit = () => {
-      const box = svg.getBoundingClientRect();
-      setAxisFont(svgAxisFont(12, width, box.width));
-    };
-    fit();
-    const observer = new ResizeObserver(fit);
-    observer.observe(svg);
-    return () => observer.disconnect();
-  }, [width]);
-  const visible = series.filter((item) => !hidden[item.id]);
-  const values = visible.flatMap((item) => item.values.map((point) => point.value)).filter((value) => value != null && Number.isFinite(value));
-  const max = Math.max(1, ...values.map((value) => Math.abs(value)));
-  const padL = 72;
-  const padR = 36;
-  const padT = 16;
-  const padB = 36;
+function chartTop(minor) {
+  const pounds = Math.max(0, Number(minor) || 0) / 100;
+  if (pounds <= 0) return 100;
+  const padded = pounds * 1.25;
+  const step = padded >= 20000 ? 5000 : padded >= 5000 ? 1000 : padded >= 1000 ? 250 : 50;
+  return Math.ceil(padded / step) * step * 100;
+}
 
-  function show(point, event) {
-    const lines = visible.map((item) => {
-      const value = item.values.find((entry) => entry.id === point.id);
-      return `${item.label}: ${value?.value == null ? '—' : formatPounds(Math.round(value.value * 100))}`;
-    });
-    setTip({ id: point.id, ...cursorPoint(event), text: `${point.label}\n${lines.join('\n')}` });
+function compactPounds(minor) {
+  const pounds = Math.abs(minor) / 100;
+  const compact = pounds >= 1000 ? `${Math.round((pounds / 1000) * 10) / 10}k` : String(Math.round(pounds));
+  return `${minor < 0 ? '-' : ''}£${compact}`;
+}
+
+function worthCount(minor, count) {
+  return `${money(minor)} (${count})`;
+}
+
+function standingText(month) {
+  const delta = standingDelta(month);
+  if (delta == null) return 'No target this month';
+  if (delta > 0) return `Over target by ${money(delta)}`;
+  if (delta < 0) return `Under target by ${money(-delta)}`;
+  return 'On target';
+}
+
+function shownMonth(months, keys, hover) {
+  if (hover?.monthId && months.some((month) => month.id === hover.monthId)) {
+    return months.find((month) => month.id === hover.monthId) || null;
   }
+  const index = (keys || []).indexOf(currentMonthKey());
+  return months[index] || months[months.length - 1] || null;
+}
+
+function PlanChart({ chart, pipelineOn, onToggle, hover, onHover, monthKeys }) {
+  const tipId = useId();
+  const months = chart?.months || [];
+  const visibleSegments = (column) => column.segments.filter((segment) => segment.minor > 0 && (pipelineOn || segment.family === 'actual'));
+  const peak = Math.max(1, ...months.map((column) => {
+    const stacked = visibleSegments(column).reduce((sum, segment) => sum + segment.minor, 0);
+    return Math.max(stacked, column.target || 0);
+  }));
+  const max = chartTop(peak);
+  const month = shownMonth(months, monthKeys, hover);
+  const points = months.map((column, index) => {
+    const y = column.target == null ? null : 100 - (column.target / max) * 100;
+    return y == null ? null : `${index + 0.5},${y}`;
+  }).filter(Boolean).join(' ');
 
   return (
-    <figure className="chart-card" data-chart="forecast-plan">
-      <div className="cl" role="group" aria-label="Forecast series">
-        {series.map((item) => (
-          <button key={item.id} type="button" className="chart-key" aria-pressed={!hidden[item.id]} onClick={() => setHidden((current) => ({ ...current, [item.id]: !current[item.id] }))}>
-            <i style={{ background: item.kind === 'forecast' ? 'var(--orange)' : '#171717', opacity: item.kind === 'forecast' ? 0.6 : 1 }} />
-            {item.label}
-          </button>
-        ))}
-      </div>
-      <div className="chart-plot" onMouseLeave={() => setTip(null)}>
-        <svg ref={svgRef} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Active against scenario lines">
-          <text x="4" y="12" className="chart-axis" style={{ fontSize: axisFont }} fontSize={axisFont}>£</text>
-          {[0, 0.5, 1].map((step) => {
-            const y = padT + (1 - step) * (height - padT - padB);
-            const pounds = max * step;
-            const abs = Math.abs(pounds);
-            const compact = abs >= 1000 ? `${Math.round((abs / 1000) * 10) / 10}k` : String(Math.round(abs));
-            return <g key={step}><line className="chart-grid" x1={padL} x2={width - padR} y1={y} y2={y} /><text className="chart-axis" style={{ fontSize: axisFont }} fontSize={axisFont} x={padL - 8} y={y + 4} textAnchor="end">{`${pounds < 0 ? '-' : ''}£${compact}`}</text></g>;
-          })}
-          {visible.map((item) => {
-            const coords = points.map((point, index) => {
-              const value = item.values.find((entry) => entry.id === point.id);
-              if (value?.value == null || !Number.isFinite(value.value)) return null;
-              const x = padL + (index * (width - padL - padR)) / Math.max(points.length - 1, 1);
-              const y = padT + (1 - Math.abs(value.value) / max) * (height - padT - padB);
-              return `${x},${y}`;
-            }).filter(Boolean);
-            if (coords.length < 2) return null;
-            return <polyline key={item.id} data-kind={item.kind || 'history'} fill="none" stroke={item.kind === 'forecast' ? 'var(--orange)' : '#171717'} strokeWidth="1.6" opacity={item.kind === 'forecast' ? 0.55 : 1} points={coords.join(' ')} />;
-          })}
-          {points.map((point, index) => {
-            const x = padL + (index * (width - padL - padR)) / Math.max(points.length - 1, 1);
-            const slot = (width - padL - padR) / Math.max(points.length, 1);
-            return (
-              <g key={point.id}>
-                <text className="chart-axis" style={{ fontSize: axisFont }} fontSize={axisFont} x={x} y={height - 14} textAnchor="middle">{point.label}</text>
-                <rect className="chart-hit" x={x - slot / 2} y={padT} width={slot} height={height - padT - padB} fill="transparent" onMouseEnter={(event) => show(point, event)} onMouseMove={(event) => show(point, event)} />
-              </g>
-            );
-          })}
-        </svg>
-        {tip ? <CursorTooltip id={tipId} text={tip.text} cursor={tip} className="chart-tip" /> : null}
-      </div>
-      <p className="caveat">Pounds by month. Active is the booked row. Orange lines are the Sheet’s percentage rows.</p>
-    </figure>
+    <div className="forecast-board">
+      <figure className="chart-card forecast-stack" data-chart="forecast-plan">
+        <div className="fs-plot">
+          <div className="fs-y" aria-hidden="true">
+            <span>{compactPounds(max)}</span>
+            <span>{compactPounds(max / 2)}</span>
+            <span>£0</span>
+          </div>
+          <div className="fs-scroll">
+          <div className="fs-cols" style={{ '--fs-months': months.length }} role="img" aria-label="Retainers and projects, with the target as a dashed line">
+            {months.map((column) => (
+              <div key={column.id} className={column.id === month?.id ? 'fs-col on' : 'fs-col'} onMouseEnter={() => onHover({ monthId: column.id, stageId: hover?.monthId === column.id ? hover.stageId : '' })} onClick={() => onHover({ monthId: column.id, stageId: '' })}>
+                <div className="fs-track">
+                  {visibleSegments(column).map((segment, index) => {
+                    const height = (segment.minor / max) * 100;
+                    const stage = column.stages.find((item) => item.id === segment.id);
+                    const detail = segment.family === 'potential' && stage ? worthCount(stage.minor, stage.count) : money(segment.minor);
+                    return (
+                      <button
+                        key={segment.id}
+                        type="button"
+                        className={index === 0 ? 'fs-seg fs-base' : 'fs-seg'}
+                        data-seg={segment.id}
+                        aria-label={`${column.label}. ${segment.legend || segment.label}. ${detail}`}
+                        style={{ height: `${height}%` }}
+                        onClick={() => onHover({ monthId: column.id, stageId: segment.family === 'potential' ? segment.id : '' })}
+                        onMouseEnter={(event) => {
+                          onHover({ monthId: column.id, stageId: segment.family === 'potential' ? segment.id : '', cursor: cursorPoint(event) });
+                        }}
+                        onMouseMove={(event) => onHover((current) => ({ ...current, monthId: column.id, cursor: cursorPoint(event) }))}
+                      />
+                    );
+                  })}
+                </div>
+                <span className="fs-x"><span className="fs-x-full">{axisText(column.label).full}</span><span className="fs-x-short">{axisText(column.label).short}</span></span>
+              </div>
+            ))}
+            <svg className="fs-target" viewBox={`0 0 ${Math.max(months.length, 1)} 100`} preserveAspectRatio="none" aria-hidden="true">
+              <polyline points={points} fill="none" stroke="#fff" strokeDasharray="8 5" strokeWidth="7" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+              <polyline points={points} fill="none" stroke="#1A1A1A" strokeDasharray="8 5" strokeWidth="3" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+            </svg>
+          </div>
+          </div>
+        </div>
+      </figure>
+      <aside className="forecast-readout panel glass" aria-live="polite">
+        {month ? (
+          <>
+            <h3>{month.label}</h3>
+            <p><i className="swatch" data-seg="actual-project" aria-hidden="true" /><span>Projects</span><b>{money(month.projects)}</b></p>
+            <p><i className="swatch" data-seg="actual-retainer" aria-hidden="true" /><span>Retainers</span><b>{money(month.retainers)}</b></p>
+            <p><i className="swatch swatch-dash" aria-hidden="true" /><span>Target</span><b>{money(month.target)}</b></p>
+            <button type="button" className="readout-line" aria-pressed={pipelineOn} onClick={onToggle}><i className="swatch" data-seg="potential-75" aria-hidden="true" /><span>Pipeline</span><b>{worthCount(month.pipeline, month.pipelineCount)}</b></button>
+            {month.stages.map((stage) => (
+              <p key={stage.id} className={hover?.stageId === stage.id ? 'on' : undefined}><i className="swatch" data-seg={stage.id} aria-hidden="true" /><span>{stage.label}</span><b>{worthCount(stage.minor, stage.count)}</b></p>
+            ))}
+            <p className="forecast-standing"><b>{standingText(month)}</b></p>
+          </>
+        ) : <p className="sub">Tap a month.</p>}
+        <span id={tipId} className="sr">{month ? standingText(month) : ''}</span>
+      </aside>
+    </div>
+  );
+}
+
+function DealEditor({ plan, onSave, note }) {
+  const [draft, setDraft] = useState({ name: '', source: '', work: '', stage: '75' });
+  const stages = plan?.stages || {};
+  return (
+    <div className="panel glass pipeline-editor">
+      <h3>Pipeline</h3>
+      <p className="sub">Add a deal or move one up a stage. The sheet keeps the monthly amounts. A stage with no empty line cannot take another deal.</p>
+      <form className="pipeline-add" onSubmit={(event) => { event.preventDefault(); onSave(draft); setDraft({ name: '', source: '', work: '', stage: draft.stage }); }}>
+        <label>Name<input aria-label="New deal name" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label>
+        <label>Source<input aria-label="New deal source" value={draft.source} onChange={(event) => setDraft({ ...draft, source: event.target.value })} /></label>
+        <label>What we are doing<input aria-label="New deal work" value={draft.work} onChange={(event) => setDraft({ ...draft, work: event.target.value })} /></label>
+        <label>Stage
+          <select aria-label="New deal stage" value={draft.stage} onChange={(event) => setDraft({ ...draft, stage: event.target.value })}>
+            {PIPELINE_STAGES.map((stage) => <option key={stage.id} value={stage.id}>{stage.id}%</option>)}
+          </select>
+        </label>
+        <button type="submit" className="btn">Add deal</button>
+      </form>
+      {PIPELINE_STAGES.map((stage) => (
+        <div key={stage.id}>
+          <h4>{stage.id}%</h4>
+          {(stages[stage.id]?.deals || []).map((deal) => (
+            <DealRow key={deal.row} deal={deal} onSave={onSave} />
+          ))}
+          {!(stages[stage.id]?.deals || []).length ? <p className="sub">No deals in this stage.</p> : null}
+        </div>
+      ))}
+      {note ? <p className="caveat">{note}</p> : null}
+    </div>
+  );
+}
+
+function DealRow({ deal, onSave }) {
+  const [name, setName] = useState(deal.name);
+  const [source, setSource] = useState(deal.source);
+  const [work, setWork] = useState(deal.work);
+  const [stage, setStage] = useState(deal.stage);
+  return (
+    <form className="pipeline-deal" onSubmit={(event) => { event.preventDefault(); onSave({ row: deal.row, name, source, work, stage }); }}>
+      <label>Name<input aria-label={`${deal.name} name`} value={name} onChange={(event) => setName(event.target.value)} /></label>
+      <label>Source<input aria-label={`${deal.name} source`} value={source} onChange={(event) => setSource(event.target.value)} /></label>
+      <label>What we are doing<input aria-label={`${deal.name} work`} value={work} onChange={(event) => setWork(event.target.value)} /></label>
+      <label>Stage
+        <select aria-label={`${deal.name} stage`} value={stage} onChange={(event) => setStage(event.target.value)}>
+          {PIPELINE_STAGES.map((item) => <option key={item.id} value={item.id}>{item.id}%</option>)}
+        </select>
+      </label>
+      <button type="submit" className="btn">Save</button>
+    </form>
   );
 }
 
@@ -107,6 +194,10 @@ export function ForecastScreen() {
   const [error, setError] = useState('');
   const [note, setNote] = useState('');
   const [drafts, setDrafts] = useState({});
+  const [pipelineOn, setPipelineOn] = useState(true);
+  const [hover, setHover] = useState(null);
+  const [past, setPast] = useState('12');
+  const [future, setFuture] = useState('12');
 
   useEffect(() => {
     let cancel = false;
@@ -142,22 +233,57 @@ export function ForecastScreen() {
     }
   }
 
+  async function saveDeal(input) {
+    const res = await fetch('/api/cockpit/forecast-plan', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'save-deal', ...input }),
+    });
+    const body = await res.json().catch(() => ({}));
+    setNote(body.ok ? 'Deal saved.' : body.reason === 'stage_full' ? 'That stage has no empty line on the sheet.' : body.reason === 'name' ? 'A name is required.' : 'The deal was not saved.');
+    if (body.ok) {
+      const next = await fetch('/api/cockpit/forecast-plan').then((item) => item.json()).catch(() => null);
+      if (next?.plan) setPlan(next.plan);
+    }
+  }
+
   if (error) return <section className="panel glass"><h2>Forecast</h2><p className="sub">{error}</p></section>;
   if (!plan) return <section className="panel glass"><h2>Forecast</h2><p className="sub">Reading the private planning tab.</p></section>;
-  const view = pipelineView(plan);
+  const focused = focusPlan(plan, { past, future });
+  const chart = pipelineChart(focused);
   return (
     <section className="forecast-plan" aria-label="Forecast">
       <header className="toki-section-head">
         <h2>Forecast</h2>
-        <p>{plan.tab}. Range {plan.range}. Actuals are the Active row. Scenarios use the Sheet’s own percentage labels.</p>
+        <p>{plan.tab}. Retainers and projects are the lines in those sections. Hosting is not in the stack. The dashed line is that month’s target.</p>
       </header>
+      <div className="forecast-filters">
+        <label>Past
+          <select aria-label="Past" value={past} onChange={(event) => setPast(event.target.value)}>
+            <option value="none">None</option>
+            <option value="3">Last 3 months</option>
+            <option value="6">Last 6 months</option>
+            <option value="12">Last 12 months</option>
+            <option value="year">Last year</option>
+          </select>
+        </label>
+        <label>Future
+          <select aria-label="Future" value={future} onChange={(event) => setFuture(event.target.value)}>
+            <option value="none">None</option>
+            <option value="3">Next 3 months</option>
+            <option value="6">Next 6 months</option>
+            <option value="12">Next 12 months</option>
+          </select>
+        </label>
+      </div>
+      <p className="sub">Totals for the months on the chart.</p>
       <div className="ov-tiles forecast-tiles">
-        {view.tiles.map((tile) => <div key={tile.label} className="ov-tile" role="group"><span>{tile.label}</span><b className="num">{money(tile.minor)}</b></div>)}
+        {chart.tiles.map((tile) => <div key={tile.label} className="ov-tile" role="group"><span>{tile.label}</span><b className="num">{money(tile.minor)}</b></div>)}
       </div>
-      <div className="panel glass">
-        <PlanChart points={view.points} series={view.series} />
+      <div className="panel glass forecast-chart-card">
+        {chart.months.length ? <PlanChart chart={chart} monthKeys={focused.monthKeys} pipelineOn={pipelineOn} onToggle={() => setPipelineOn((on) => !on)} hover={hover} onHover={setHover} /> : <p className="sub">None of the months fall in this range.</p>}
       </div>
-      {note ? <p className="caveat">{note}</p> : null}
+      <DealEditor plan={plan} onSave={saveDeal} note={note} />
       <div className="ledger glass ledger-scroll">
         <table className="forecast-table">
           <caption className="sub">{plan.tab}</caption>
