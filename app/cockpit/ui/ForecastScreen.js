@@ -72,39 +72,37 @@ function PlanChart({ chart, pipelineOn, onToggle, hover, onHover, monthKeys }) {
           </div>
           <div className="fs-scroll">
           <div className="fs-cols" style={{ '--fs-months': months.length }} role="img" aria-label="Retainers and projects, with the target as a dashed line">
-            <svg className="fs-target" viewBox={`0 0 ${Math.max(months.length, 1)} 100`} preserveAspectRatio="none" aria-hidden="true">
-              <polyline points={points} fill="none" stroke="currentColor" strokeDasharray="4 3" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-            </svg>
             {months.map((column) => (
               <div key={column.id} className={column.id === month?.id ? 'fs-col on' : 'fs-col'} onMouseEnter={() => onHover({ monthId: column.id, stageId: hover?.monthId === column.id ? hover.stageId : '' })} onClick={() => onHover({ monthId: column.id, stageId: '' })}>
                 <div className="fs-track">
-                  {visibleSegments(column).reduce((state, segment) => {
+                  {visibleSegments(column).map((segment, index) => {
                     const height = (segment.minor / max) * 100;
                     const stage = column.stages.find((item) => item.id === segment.id);
                     const detail = segment.family === 'potential' && stage ? worthCount(stage.minor, stage.count) : money(segment.minor);
-                    const base = state.nodes.length === 0;
-                    state.nodes.push(
+                    return (
                       <button
                         key={segment.id}
                         type="button"
-                        className={base ? 'fs-seg fs-base' : 'fs-seg'}
+                        className={index === 0 ? 'fs-seg fs-base' : 'fs-seg'}
                         data-seg={segment.id}
                         aria-label={`${column.label}. ${segment.legend || segment.label}. ${detail}`}
-                        style={{ bottom: `${state.bottom}%`, height: `${height}%` }}
+                        style={{ height: `${height}%` }}
                         onClick={() => onHover({ monthId: column.id, stageId: segment.family === 'potential' ? segment.id : '' })}
                         onMouseEnter={(event) => {
                           onHover({ monthId: column.id, stageId: segment.family === 'potential' ? segment.id : '', cursor: cursorPoint(event) });
                         }}
                         onMouseMove={(event) => onHover((current) => ({ ...current, monthId: column.id, cursor: cursorPoint(event) }))}
-                      />,
+                      />
                     );
-                    state.bottom += height;
-                    return state;
-                  }, { nodes: [], bottom: 0 }).nodes}
+                  })}
                 </div>
                 <span className="fs-x"><span className="fs-x-full">{axisText(column.label).full}</span><span className="fs-x-short">{axisText(column.label).short}</span></span>
               </div>
             ))}
+            <svg className="fs-target" viewBox={`0 0 ${Math.max(months.length, 1)} 100`} preserveAspectRatio="none" aria-hidden="true">
+              <polyline points={points} fill="none" stroke="#fff" strokeDasharray="8 5" strokeWidth="7" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+              <polyline points={points} fill="none" stroke="#1A1A1A" strokeDasharray="8 5" strokeWidth="3" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+            </svg>
           </div>
           </div>
         </div>

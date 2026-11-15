@@ -951,7 +951,7 @@ button.quick-card { padding: 18px 18px 16px; }
 .fs-cols { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; align-items: end; width: max(100%, calc(var(--fs-months, 1) * 46px)); }
 .fs-x-short { display: none; }
 .fs-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; height: 100%; }
-.fs-track { position: relative; height: 180px; display: flex; flex-direction: column-reverse; align-items: center; gap: 3px; }
+.fs-track { position: relative; height: 180px; display: flex; flex-direction: column-reverse; align-items: center; gap: 1px; }
 .fs-seg { position: relative; left: auto; right: auto; width: 92%; min-height: 2px; border: 0; padding: 0; border-radius: 10px; cursor: pointer; flex: none; }
 .fs-seg.fs-base { border-radius: 10px 10px 0 0; }
 .fs-x { height: 16px; font-size: 12px; line-height: 16px; text-align: center; color: var(--chart-label, var(--ink)); white-space: nowrap; }
@@ -967,11 +967,13 @@ button.quick-card { padding: 18px 18px 16px; }
 .forecast-board { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 16px; align-items: start; }
 .forecast-readout { display: flex; flex-direction: column; gap: 8px; padding: 16px; }
 .forecast-readout h3 { margin: 0; }
-.forecast-readout p { display: flex; justify-content: space-between; gap: 12px; margin: 0; }
+.forecast-readout p { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 0; white-space: nowrap; }
+.forecast-readout p span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.forecast-readout p b { flex: none; }
 .forecast-readout p.on b { color: var(--orange); }
 .forecast-standing { display: block !important; margin-top: 8px !important; }
 .fs-cols { position: relative; }
-.fs-target { position: absolute; left: 0; right: 0; top: 0; height: 180px; width: 100%; pointer-events: none; color: var(--ink); overflow: hidden; }
+.fs-target { position: absolute; left: 0; right: 0; top: 0; z-index: 3; height: 180px; width: 100%; pointer-events: none; overflow: visible; }
 .forecast-chart-card { min-width: 0; max-width: 100%; overflow: hidden; }
 .pipeline-editor { display: flex; flex-direction: column; gap: 12px; }
 .pipeline-add, .pipeline-deal { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto; gap: 8px; align-items: end; }
